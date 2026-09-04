@@ -412,6 +412,38 @@ jobs:
           jq --arg v "$NEW_TAG" '.["3rdparty"].candidate = $v | .["3rdparty"].release = $v' \
             versions.json > versions.json.tmp
           mv versions.json.tmp versions.json
+      # Release BEFORE commit, deliberately -- and this order matters more than
+      # it looks. Until 2026-09-05 this was reversed: the version-bump commit
+      # landed on `development` first, and the GitHub Release was created
+      # after. That leaves a real window, between those two steps, where a
+      # concurrently-triggered downstream workflow (3rdparty/pyindi-client
+      # reading core's just-committed `versions.json`) could see a release
+      # referenced that does not exist yet and 404 trying to download it --
+      # loud, not silent, and self-healing the next run, but avoidable
+      # entirely by not publishing the pointer before the thing it points to
+      # exists. No workflow here uses a `concurrency:` guard, so this
+      # ordering is what actually closes the gap, not a lock.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          mkdir -p release-assets
+          cp artifacts/*/*.rpm artifacts/*/*.deb release-assets/
+          # Release 1 keeps the plain name so existing tags stay valid; a
+          # repackage gets an explicit -N suffix, without which gh release
+          # create fails on the already-existing tag.
+          REL_TAG="indi-stable-3rdparty-${NEW_TAG}"
+          REL_TITLE="indi-stable-3rdparty ${NEW_TAG}"
+          if [ "${RELEASE}" != "1" ]; then
+            REL_TAG="${REL_TAG}-${RELEASE}"
+            REL_TITLE="${REL_TITLE} (release ${RELEASE})"
+          fi
+          echo "creating release: ${REL_TAG}"
+          gh release create "${REL_TAG}" release-assets/* \
+            --title "${REL_TITLE}" \
+            --notes "Automated release. Built from upstream indilib/indi-3rdparty ${NEW_TAG} against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on both Fedora and Debian/Ubuntu (build, clean runtime install, every shipped driver resolves its libraries, one driver from each of the nine vendors executes). Unofficial third-party build -- see README.md."
       - name: Commit to development
         env:
           NEW_TAG: ${{ needs.check.outputs.new_tag }}
@@ -447,24 +479,3 @@ jobs:
             -m "${SUBJ}" \
             -m "Automated. Gate passed on both distros: build, clean runtime install, every shipped driver resolves its libraries, one driver per vendor executes. See .github/workflows/3rdparty-release.yml."
           git push origin development
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NEW_TAG: ${{ needs.check.outputs.new_tag }}
-          RELEASE: ${{ needs.check.outputs.release }}
-        run: |
-          mkdir -p release-assets
-          cp artifacts/*/*.rpm artifacts/*/*.deb release-assets/
-          # Release 1 keeps the plain name so existing tags stay valid; a
-          # repackage gets an explicit -N suffix, without which gh release
-          # create fails on the already-existing tag.
-          REL_TAG="indi-stable-3rdparty-${NEW_TAG}"
-          REL_TITLE="indi-stable-3rdparty ${NEW_TAG}"
-          if [ "${RELEASE}" != "1" ]; then
-            REL_TAG="${REL_TAG}-${RELEASE}"
-            REL_TITLE="${REL_TITLE} (release ${RELEASE})"
-          fi
-          echo "creating release: ${REL_TAG}"
-          gh release create "${REL_TAG}" release-assets/* \
-            --title "${REL_TITLE}" \
-            --notes "Automated release. Built from upstream indilib/indi-3rdparty ${NEW_TAG} against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on both Fedora and Debian/Ubuntu (build, clean runtime install, every shipped driver resolves its libraries, one driver from each of the nine vendors executes). Unofficial third-party build -- see README.md."
