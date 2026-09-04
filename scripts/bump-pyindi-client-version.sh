@@ -93,7 +93,18 @@ OLD_VERSION=$(sed -n 's/^Version:[[:space:]]*\(.*\)$/\1/p' "$SPEC" | head -1)
 esc() { printf '%s' "$1" | sed 's/[.[\*^$/&]/\\&/g'; }
 
 echo "############ bumping indi-stable-pyindi-client: $OLD_VERSION -> $NEW_VERSION (deb revision $DEB_REV) ############"
-[ "$OLD_VERSION" = "$NEW_VERSION" ] && say "NOTE: already at $NEW_VERSION -- fields rewritten to the same value, no changelog entry. Not an error."
+if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
+  say "NOTE: already at $NEW_VERSION -- fields rewritten to the same value, no changelog entry. Not an error."
+
+  # Same-version rebuild: Release must not move BACKWARD -- same gap and same
+  # fix as bump-core-version.sh/bump-3rdparty-version.sh, all three sharing
+  # this shape. No constraint when the upstream VERSION itself changed.
+  OLD_RELEASE=$(sed -n 's/^Release:[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$SPEC" | head -1)
+  [ -n "$OLD_RELEASE" ] || die "could not read a numeric Release: from $SPEC"
+  if [ "$REV" -lt "$OLD_RELEASE" ] 2>/dev/null; then
+    die "refusing to move Release: backward for the SAME version $NEW_VERSION: $SPEC is already at ${NEW_VERSION}-${OLD_RELEASE}, and this run would rewrite it to ${NEW_VERSION}-${REV} -- an older release number describing content that has not changed upstream. If this repo's own release history genuinely never reached ${OLD_RELEASE}, fix the spec/changelog by hand first rather than silently overwriting them here."
+  fi
+fi
 
 # ------------------------------------------------------------------ spec ----
 sed -i "s/^Version:\([[:space:]]*\).*$/Version:\1${NEW_VERSION}/" "$SPEC"

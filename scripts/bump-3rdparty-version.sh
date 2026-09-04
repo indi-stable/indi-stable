@@ -108,6 +108,22 @@ echo "############ bumping indi-stable-3rdparty: $OLD_VERSION -> $NEW_VERSION (d
 if [ "$OLD_VERSION" = "$NEW_VERSION" ]; then
   say "NOTE: already at $NEW_VERSION -- version fields will be rewritten to the"
   say "      same value and no changelog entry added. Not an error."
+
+  # Same-version rebuild: Release must not move BACKWARD. dch enforces this
+  # for the Debian changelog natively and refuses outright ("New version
+  # specified is less than the current version number"); nothing protected
+  # the RPM side the same way, and it silently regressed Release: 2 -> 1
+  # here for real, 2026-09-04, when a seed carried a higher Release than the
+  # target repo's own release history justified. No constraint when the
+  # upstream VERSION itself changed -- starting a new version fresh at
+  # Release 1 (or whatever REV is given) is normal and correct regardless of
+  # what the old spec's Release was; this guard only fires when rebuilding
+  # the identical version at a lower release than what is already committed.
+  OLD_RELEASE=$(sed -n 's/^Release:[[:space:]]*\([0-9][0-9]*\).*$/\1/p' "$LIBS_SPEC" | head -1)
+  [ -n "$OLD_RELEASE" ] || die "could not read a numeric Release: from $LIBS_SPEC"
+  if [ "$REV" -lt "$OLD_RELEASE" ] 2>/dev/null; then
+    die "refusing to move Release: backward for the SAME version $NEW_VERSION: $LIBS_SPEC is already at ${NEW_VERSION}-${OLD_RELEASE}, and this run would rewrite it to ${NEW_VERSION}-${REV} -- an older release number describing content that has not changed upstream. If this repo's own release history genuinely never reached ${OLD_RELEASE} (e.g. a value carried in from a different repo's seed), fix the spec/changelogs by hand first rather than silently overwriting them here."
+  fi
 fi
 
 # ---------------------------------------------------------------- specs ----
