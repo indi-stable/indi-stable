@@ -275,6 +275,41 @@ jobs:
           jq --arg v "$NEW_TAG" '.core.candidate = $v | .core.release = $v' \
             versions.json > versions.json.tmp
           mv versions.json.tmp versions.json
+      # Release BEFORE commit, deliberately -- and this order matters more than
+      # it looks. Until 2026-09-05 this was reversed: the version-bump commit
+      # landed on `development` first, and the GitHub Release was created
+      # after. That leaves a real window, between those two steps, where a
+      # concurrently-triggered downstream workflow (3rdparty/pyindi-client
+      # reading core's just-committed `versions.json`) could see a release
+      # referenced that does not exist yet and 404 trying to download it --
+      # loud, not silent, and self-healing the next run, but avoidable
+      # entirely by not publishing the pointer before the thing it points to
+      # exists. No workflow here uses a `concurrency:` guard, so this
+      # ordering is what actually closes the gap, not a lock.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          mkdir -p release-assets
+          cp artifacts/rpm/*.rpm artifacts/deb/*.deb release-assets/
+          # Release 1 keeps the plain name, so existing tags and any link to
+          # them stay valid. A repackage gets an explicit -N suffix -- without
+          # it `gh release create` fails outright, because the tag for this
+          # upstream version already exists. That is not a hypothetical: it is
+          # exactly why core's own pipeline cannot be re-run against an
+          # already-released tag (STATUS.md).
+          REL_TAG="indi-stable-core-${NEW_TAG}"
+          REL_TITLE="indi-stable-core ${NEW_TAG}"
+          if [ "${RELEASE}" != "1" ]; then
+            REL_TAG="${REL_TAG}-${RELEASE}"
+            REL_TITLE="${REL_TITLE} (release ${RELEASE})"
+          fi
+          echo "creating release: ${REL_TAG}"
+          gh release create "${REL_TAG}" release-assets/* \
+            --title "${REL_TITLE}" \
+            --notes "Automated release. Built from upstream indilib/indi ${NEW_TAG}, gated on both Fedora and Debian/Ubuntu (build, clean install, indiserver starts, a representative driver loads). Unofficial third-party build -- see README.md."
       - name: Commit to development
         env:
           NEW_TAG: ${{ needs.check.outputs.new_tag }}
@@ -305,27 +340,3 @@ jobs:
             -m "${SUBJ}" \
             -m "Automated. Gate passed on both distros: build, clean install, indiserver starts, a representative driver loads. See .github/workflows/core-release.yml."
           git push origin development
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NEW_TAG: ${{ needs.check.outputs.new_tag }}
-          RELEASE: ${{ needs.check.outputs.release }}
-        run: |
-          mkdir -p release-assets
-          cp artifacts/rpm/*.rpm artifacts/deb/*.deb release-assets/
-          # Release 1 keeps the plain name, so existing tags and any link to
-          # them stay valid. A repackage gets an explicit -N suffix -- without
-          # it `gh release create` fails outright, because the tag for this
-          # upstream version already exists. That is not a hypothetical: it is
-          # exactly why core's own pipeline cannot be re-run against an
-          # already-released tag (STATUS.md).
-          REL_TAG="indi-stable-core-${NEW_TAG}"
-          REL_TITLE="indi-stable-core ${NEW_TAG}"
-          if [ "${RELEASE}" != "1" ]; then
-            REL_TAG="${REL_TAG}-${RELEASE}"
-            REL_TITLE="${REL_TITLE} (release ${RELEASE})"
-          fi
-          echo "creating release: ${REL_TAG}"
-          gh release create "${REL_TAG}" release-assets/* \
-            --title "${REL_TITLE}" \
-            --notes "Automated release. Built from upstream indilib/indi ${NEW_TAG}, gated on both Fedora and Debian/Ubuntu (build, clean install, indiserver starts, a representative driver loads). Unofficial third-party build -- see README.md."
