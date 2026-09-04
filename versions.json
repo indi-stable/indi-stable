@@ -5,7 +5,7 @@
   },
   "3rdparty": {
     "release": "v2.2.4.1",
-    "candidate": "v2.2.4"
+    "candidate": "v2.2.4.1"
   },
   "pyindi-client": {
     "release": "2.2.0",
