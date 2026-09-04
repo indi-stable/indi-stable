@@ -57,7 +57,7 @@
 
 Name:           indi-stable-3rdparty-drivers
 Version:        2.2.4.1
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        INDI drivers for 9 vendor camera/focuser SDKs (stable upstream release, private prefix)
 
 # Aggregate across 9 driver source trees, confirmed by reading actual SOURCE
@@ -583,9 +583,6 @@ done
 %{indi_datadir}/indi_svbonycam.xml
 
 %changelog
-* Fri Sep 04 2026 Will Snyder <william@williamlsnyder.org> - 2.2.4.1-2
-- New upstream release v2.2.4.1, built and gated by 3rdparty-release.yml.
-
 * Wed Aug 26 2026 Will Snyder <william@williamlsnyder.org> - 2.2.4.1-1
 - Initial package. Builds indi-3rdparty tag v2.2.4.1's drivers for the same
   9 vendors indi-stable-3rdparty-libs bundles, with -DBUILD_LIBS=OFF against
