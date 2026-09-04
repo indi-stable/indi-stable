@@ -27,6 +27,21 @@ Two rules keep it living rather than growing:
 
 Work happens on `development`. Will merges to `main` himself.
 
+**This is now the primary repo, as of 2026-09-04.** It began as a
+fresh-history import of `indi-stable/packaging`'s `main` at `c22b7db` (see
+this repo's own first commit, "Initial public import," for the full
+reasoning and exact content differences from that repo). `indi-stable/packaging`
+is retired to historical-reference-only — check there, not here, for "why"
+questions about anything predating this repo's first commit; its commit
+messages and `LESSONS_LEARNED.md` carry evidence this repo's shorter
+history does not.
+
+`main` is protected by real GitHub branch protection, not convention
+alone: a pull request is required to merge, `enforce_admins` is on, and
+force-pushes/deletion are disabled. Confirmed by testing, not just reading
+the settings back — a direct push to `main` was rejected with GitHub's own
+`GH006` error before this was trusted.
+
 **Switching machines?** The clone on the box you are moving *to* will be behind
 — `git pull` on `development` first. Both clones were in sync at the end of
 2026-08-26. Two per-clone git settings, both already applied on both clones —
