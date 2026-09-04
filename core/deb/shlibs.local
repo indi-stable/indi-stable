@@ -1,0 +1,33 @@
+# Package-local dependency information for the private libraries.
+#
+# Why this file has to exist at all: debian/rules skips dh_makeshlibs
+# entirely, deliberately -- a shipped shlibs file would advertise this package
+# as a system-wide provider of libindiclient.so.2 and friends, which is
+# precisely the shadowing this project exists to prevent. But dpkg-shlibdeps
+# still refuses to finish while any linked library has no dependency
+# information, and every driver in indi-stable-core links libindidriver.so.2.
+# Those two requirements collide, and this file is what resolves them.
+#
+# debian/shlibs.local is the right instrument because it is consulted FIRST,
+# ahead of every other source (dpkg-shlibdeps(1), "Shlibs files"), and is
+# never installed into any binary package -- it exists only for the duration
+# of the build. Nothing outside this source tree can ever resolve a
+# dependency through it.
+#
+# The alternative, --ignore-missing-info, was rejected: it suppresses the
+# error for ALL libraries, including system ones, turning a build failure
+# into a silently under-specified dependency. Naming our four libraries
+# explicitly keeps that failure mode intact for anything else.
+#
+# The bare package name, with no version relation, is deliberate. The strict
+# indi-stable-core-libs (= ${binary:Version}) lives in debian/control where a
+# substvar can actually be expanded; shlibs entries take literal text only,
+# so a version here would have to be hand-edited every release and would go
+# stale silently.
+#
+# SONAME versions below were read from the built artifacts with readelf -d,
+# not inferred from the filenames.
+libindidriver 2 indi-stable-core-libs
+libindiclient 2 indi-stable-core-libs
+libindiAlignmentDriver 2 indi-stable-core-libs
+libindilx200 2 indi-stable-core-libs

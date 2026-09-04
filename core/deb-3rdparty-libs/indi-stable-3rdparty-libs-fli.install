@@ -1,0 +1,5 @@
+# libfli.so.* only -- flipro/flialgo are deleted from the staged tree in
+# debian/rules (override_dh_auto_install) before dh_install ever runs, so
+# there is nothing here to exclude explicitly.
+opt/indi-stable/lib/libfli.so.*
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*fli*.rules

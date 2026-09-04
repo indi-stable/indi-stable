@@ -1,0 +1,6 @@
+indi-stable-3rdparty-libs-sbig-dev: dir-or-file-in-opt
+
+# sbigudrv.h is SBIG's own vendor header, shipped unmodified; a stray
+# non-UTF-8 byte in its own comments is upstream's to fix, not this
+# packaging's. Found on the first real `dpkg-buildpackage`, 2026-08-26.
+indi-stable-3rdparty-libs-sbig-dev: national-encoding

@@ -1,0 +1,120 @@
+#!/usr/bin/make -f
+#
+# Debian build for indi-stable-pyindi-client. Builds indilib/pyindi-client's
+# 2.2.0 release (PyPI sdist -- see DESIGN.md, "pyindi-client -- packaging
+# decisions" for why this is the untagged commit PyPI already shipped, not
+# the last real git tag) linked against THIS project's indi-stable-core
+# rather than any system libindi -- DESIGN.md's "SWIG bindings will not
+# compile against mismatched headers" is why this component is in scope at
+# all.
+#
+# Upstream's own setup.py/setup.cfg default to /usr/include(/libindi),
+# /usr/local/include/libindi and /usr/lib(64)/lib(64) -- exactly the
+# shadowing this project exists to prevent, and a REAL one on this box:
+# configuration B has libindi-dev installed, whose own unversioned
+# libindiclient.so sits in the ordinary system libdir at the SAME SONAME as
+# ours (verified 2026-08-26, DESIGN.md). override_dh_auto_configure below
+# replaces every private-prefix path with this project's own private prefix
+# directly, matching every other rules file here (core/deb/rules hardcodes
+# INDI_PREFIX the same way) rather than adding pkg-config as a moving part
+# for no benefit over a value already fixed project-wide.
+#
+# Everything below is overridden by hand rather than left to pybuild's own
+# buildsystem auto-detection: upstream's setup.py is not a plain setuptools
+# project (it runs SWIG itself via a custom Command, and hardcodes
+# library_dirs/extra_link_args as Extension() literals setup.cfg cannot
+# reach), and this project's own established style elsewhere is explicit
+# commands over implicit magic (see e.g. core/deb/rules's own CMake
+# invocations). Single Python interpreter only (whatever `python3` resolves
+# to at build time) -- multi-version support is out of scope for v1, the
+# same kind of deliberate narrowing core/deb-3rdparty-drivers/rules already
+# applies to driver count.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+INDI_PREFIX := /opt/indi-stable
+INDI_LIBDIR := $(INDI_PREFIX)/lib
+INDI_INCDIR := $(INDI_PREFIX)/include/libindi
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_auto_configure:
+	test -d $(INDI_INCDIR) || { echo "ERROR: $(INDI_INCDIR) missing -- is indi-stable-core-dev a Build-Depends?"; exit 1; }
+	# Replace, not append -- upstream's own defaults name distro paths this
+	# project must never resolve against (see header comment above).
+	sed -i \
+	  -e "s|^include_dirs = .*|include_dirs = $(INDI_PREFIX)/include:$(INDI_INCDIR)|" \
+	  -e "s|^swig_opts = .*|swig_opts = -v -Wall -c++ -threads -I$(INDI_PREFIX)/include -I$(INDI_INCDIR)|" \
+	  setup.cfg
+	grep -qF -- "$(INDI_INCDIR)" setup.cfg \
+	  || { echo "ERROR: setup.cfg did not gain the private include path; upstream changed the file"; exit 1; }
+	# setup.cfg has no key for library_dirs/extra_link_args -- both are
+	# literals in setup.py's own Extension() call. Dropping /usr/lib(64)
+	# entirely from library_dirs is deliberate: those are the compiler's
+	# default search path anyway for z/cfitsio/nova, and INCLUDING them would
+	# let -lindiclient resolve libindi-dev's own unversioned symlink instead
+	# of ours if it ever sorted first -- don't trust order, remove the
+	# ambiguity (LESSONS_LEARNED.md #11).
+	sed -i \
+	  -e 's|library_dirs=\["/usr/lib", "/usr/lib64", "/lib", "/lib64"\]|library_dirs=["$(INDI_LIBDIR)"]|' \
+	  -e 's|extra_link_args=\["-shared"\]|extra_link_args=["-shared", "-Wl,-rpath,$(INDI_LIBDIR)"]|' \
+	  setup.py
+	grep -qF -- 'library_dirs=["$(INDI_LIBDIR)"]' setup.py \
+	  || { echo "ERROR: setup.py's Extension() did not gain the private library_dirs; upstream changed the file"; exit 1; }
+	grep -qF -- '-Wl,-rpath,$(INDI_LIBDIR)' setup.py \
+	  || { echo "ERROR: setup.py's Extension() did not gain the RPATH; upstream changed the file"; exit 1; }
+	echo "setup.cfg: $$(grep '^include_dirs' setup.cfg)"
+	echo "setup.cfg: $$(grep '^swig_opts' setup.cfg)"
+	echo "setup.py:  $$(grep 'library_dirs=\[' setup.py)"
+	echo "setup.py:  $$(grep 'extra_link_args=\[' setup.py)"
+
+# `setup.py build` (not `build_ext` alone) -- build_ext only compiles the
+# extension; build_py, which copies PyIndi.py/__init__.py into the build
+# tree, is a SEPARATE step plain `build_ext` skips. Confirmed by hand
+# 2026-08-26: build_ext alone produces a directory with no __init__.py,
+# which Python then treats as an implicit PEP 420 namespace package with no
+# BaseClient attribute at all -- a working-looking import that silently
+# resolves nothing (LESSONS_LEARNED.md #1's own shape, found before this
+# even reached a `dpkg-buildpackage`).
+override_dh_auto_build:
+	python3 setup.py build
+
+# --install-layout=deb puts the module under the ordinary
+# /usr/lib/python3/dist-packages/PyIndi/ -- see DESIGN.md, "pyindi-client --
+# packaging decisions" for why that is the right place, not
+# /opt/indi-stable. --no-compile skips baking .pyc files in at install time;
+# dh_python3 (via --with python3 above) handles byte-compilation and
+# ${python3:Depends} generation afterward, the standard division of labour.
+override_dh_auto_install:
+	python3 setup.py install --root=$(CURDIR)/debian/indi-stable-pyindi-client --install-layout=deb --no-compile
+	# pyproject.toml's [project] dependencies (requests, bottle, dbus-python)
+	# are for upstream's examples/ scripts, which this package does not ship
+	# at all -- confirmed by reading them, none of PyIndi.py/_PyIndi*.so
+	# imports any of the three. Left in place, the installed .egg-info's
+	# requires.txt makes dh_python3 add all three as hard Depends anyway
+	# (confirmed: the first build of this package did exactly that). Removing
+	# the egg-info -- which nothing in this package needs at runtime, it is
+	# purely setuptools' own installed-package registration metadata --
+	# is what stops that.
+	rm -rf $(CURDIR)/debian/indi-stable-pyindi-client/usr/lib/python3/dist-packages/pyindi_client-*.egg-info
+
+# _PyIndi*.so is a dlopen()'d Python extension module, not a library any
+# other package links against -- same "do not advertise a private library
+# system-wide" reasoning as every other component here. dh_makeshlibs would
+# otherwise still try to process it, since it is .so-shaped.
+override_dh_makeshlibs:
+
+# THIS package needs debian/shlibs.local, the same reason
+# indi-stable-3rdparty-drivers does (DESIGN.md, "The Debian half of the
+# metadata layer"): _PyIndi*.so links libindiclient.so.2 via RPATH, that
+# library ships no shlibs file of its own (core/deb/rules deliberately skips
+# dh_makeshlibs), and indi-stable-core-libs is already installed on the
+# build host as a Build-Depends -- so dpkg-shlibdeps finds the real file
+# through RPATH but has no dependency information for it without
+# shlibs.local. No -l override needed: unlike core/deb/rules (which points
+# dh_shlibdeps at its OWN just-built, not-yet-installed libraries in
+# debian/tmp), indi-stable-core-libs here is already really installed on the
+# build host by the time this package builds, so RPATH resolution finds the
+# real file directly -- same reasoning as
+# core/deb-3rdparty-drivers/rules's own shlibs.local note.

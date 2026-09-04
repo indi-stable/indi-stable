@@ -1,0 +1,16 @@
+# See core/deb/indi-stable-core.lintian-overrides for the fuller reasoning;
+# same mechanism, applied to the compiled Python extension this package
+# ships instead of a server/driver binary.
+#
+# No dir-or-file-in-opt override needed here, unlike every other component in
+# this project: this package deliberately installs to the ordinary system
+# Python location, not /opt/indi-stable -- see DESIGN.md, "pyindi-client --
+# packaging decisions" for why that is not an exception to the coexistence
+# rule. If that tag ever appears for this package, something has changed and
+# it should be investigated, not blanket-overridden.
+
+# RPATH into the private libdir is the mechanism that stops _PyIndi*.so
+# resolving against -- or being resolved against -- a distribution
+# libindiclient.so carrying the same SONAME. Removing it breaks the
+# coexistence guarantee.
+indi-stable-pyindi-client: custom-library-search-path

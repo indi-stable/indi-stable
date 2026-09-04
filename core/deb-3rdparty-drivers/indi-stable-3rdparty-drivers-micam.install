@@ -1,0 +1,11 @@
+# indi_mi_ccd_usb/_eth and indi_mi_sfw_usb/_eth are symlinks to the two real
+# binaries below, created at install time via install(CODE ...) rather than
+# add_executable() (indi-mi/CMakeLists.txt ~40-64) -- same finding
+# core/rpm's own %files micam comment records.
+opt/indi-stable/bin/indi_mi_ccd
+opt/indi-stable/bin/indi_mi_ccd_usb
+opt/indi-stable/bin/indi_mi_ccd_eth
+opt/indi-stable/bin/indi_mi_sfw
+opt/indi-stable/bin/indi_mi_sfw_usb
+opt/indi-stable/bin/indi_mi_sfw_eth
+opt/indi-stable/share/indi/indi_miccd.xml

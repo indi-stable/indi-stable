@@ -1,0 +1,15 @@
+# The add_library() target in libsbig/CMakeLists.txt is named "sbig", not
+# "sbigudrv" -- confirmed by reading it (core/rpm's own %files sbig comment
+# has the detail). libsbigudrv.so does not exist.
+opt/indi-stable/lib/libsbig.so.*
+# Named explicitly, not the whole firmware/ directory: fishcamp (added
+# 2026-08-27) installs into the SAME directory, and a bare directory glob
+# here would ship its files in THIS package too -- two binary packages
+# claiming the same path, which dpkg refuses to install together. See
+# indi-stable-3rdparty-libs-fishcamp.install's own comment.
+opt/indi-stable/share/indi/firmware/sbigucam.hex
+opt/indi-stable/share/indi/firmware/sbiglcam.hex
+opt/indi-stable/share/indi/firmware/sbigfcam.hex
+opt/indi-stable/share/indi/firmware/sbigpcam.hex
+opt/indi-stable/share/indi/firmware/stfga.bin
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*sbig*.rules

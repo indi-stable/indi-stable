@@ -1,0 +1,4 @@
+opt/indi-stable/bin/indi_fli_focus
+opt/indi-stable/bin/indi_fli_wheel
+opt/indi-stable/bin/indi_fli_ccd
+opt/indi-stable/share/indi/indi_fli.xml

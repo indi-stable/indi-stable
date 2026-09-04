@@ -1,0 +1,3 @@
+opt/indi-stable/bin/
+opt/indi-stable/share/
+usr/lib/udev/rules.d/*-indi-stable-*.rules

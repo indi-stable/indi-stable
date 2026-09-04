@@ -1,0 +1,10 @@
+opt/indi-stable/lib/libgxccd.so.*
+# The bare .so symlinks are installed by the RUNTIME package, not -dev:
+# these vendor blobs carry an UNVERSIONED SONAME (or none at all), so each
+# driver's DT_NEEDED is the bare name and the dynamic loader needs the
+# symlink at RUN time, not merely at link time. Measured on the RPM side
+# 2026-09-04: with the symlink in -devel, 45 of 56 driver binaries failed
+# ldd on a runtime-only install. Vendors whose blobs DO carry a versioned
+# SONAME keep the ordinary layout. See LESSONS_LEARNED.md #22.
+opt/indi-stable/lib/libgxccd.so
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*miccd*.rules

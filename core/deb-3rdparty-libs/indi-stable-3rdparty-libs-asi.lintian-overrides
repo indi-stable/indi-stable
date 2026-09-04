@@ -1,0 +1,13 @@
+indi-stable-3rdparty-libs-asi: dir-or-file-in-opt
+indi-stable-3rdparty-libs-asi: custom-library-search-path
+
+# ZWO's own prebuilt libASICamera2.so/libCAARotator.so/libEAFFocuser.so
+# statically embed tinyxml and were compiled without RELRO -- properties of
+# a vendor-supplied binary blob this project redistributes unmodified
+# (indi-stable-3rdparty-libs.spec's own header comment has the licence
+# read), not of anything this packaging compiled. There is no source tree
+# to relink against a system tinyxml or rebuild with hardening flags; ZWO
+# ships only the .bin. Found on the first real `dpkg-buildpackage`,
+# 2026-08-26.
+indi-stable-3rdparty-libs-asi: embedded-library tinyxml *
+indi-stable-3rdparty-libs-asi: hardening-no-relro

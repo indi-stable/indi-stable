@@ -1,0 +1,7 @@
+indi-stable-pyindi-client (2.2.0-1) unstable; urgency=medium
+
+  * Initial package. Builds indilib/pyindi-client's 2.2.0 PyPI release (the
+    exact untagged commit PyPI published -- see DESIGN.md, "pyindi-client --
+    packaging decisions") against indi-stable-core 2.2.4.2.
+
+ -- Will Snyder <william@williamlsnyder.org>  Wed, 26 Aug 2026 21:00:00 +0000

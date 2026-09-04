@@ -1,0 +1,14 @@
+opt/indi-stable/lib/*.so.*
+
+# Alignment-subsystem math plugins. These belong in -libs rather than -dev
+# despite their unversioned .so names: they are dlopen'd MODULEs, not
+# link-time libraries. libs/alignment/MathPluginManagement.cpp opendir()s the
+# directory, readdir()s it and dlopen()s each entry at runtime, so a
+# runtime-only install without them enumerates zero math plugins and degrades
+# silently rather than failing.
+#
+# The entry is explicit because dh_install's globs are not recursive: neither
+# lib/*.so.* here nor lib/*.so in -dev matches a subdirectory, so these were
+# staged but unpackaged and dh_missing failed the build. The RPM %files
+# section hit the identical failure -- see core/rpm/indi-stable-core.spec.
+opt/indi-stable/lib/indi/MathPlugins/*.so

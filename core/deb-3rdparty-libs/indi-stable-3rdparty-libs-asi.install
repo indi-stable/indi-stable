@@ -1,0 +1,22 @@
+# Five add_library(... SHARED IMPORTED) targets in libasi/CMakeLists.txt --
+# USB2ST4Conv IS a real one (gated by HAVE_USB2ST4Conv, TRUE everywhere
+# except Apple arm64), same finding core/rpm's own %files asi comment
+# records after the RPM side first shipped only four.
+opt/indi-stable/lib/libASICamera2.so.*
+opt/indi-stable/lib/libEFWFilter.so.*
+opt/indi-stable/lib/libEAFFocuser.so.*
+opt/indi-stable/lib/libCAARotator.so.*
+opt/indi-stable/lib/libUSB2ST4Conv.so.*
+# The bare .so symlinks are installed by the RUNTIME package, not -dev:
+# these vendor blobs carry an UNVERSIONED SONAME (or none at all), so each
+# driver's DT_NEEDED is the bare name and the dynamic loader needs the
+# symlink at RUN time, not merely at link time. Measured on the RPM side
+# 2026-09-04: with the symlink in -devel, 45 of 56 driver binaries failed
+# ldd on a runtime-only install. Vendors whose blobs DO carry a versioned
+# SONAME keep the ordinary layout. See LESSONS_LEARNED.md #22.
+opt/indi-stable/lib/libASICamera2.so
+opt/indi-stable/lib/libEFWFilter.so
+opt/indi-stable/lib/libEAFFocuser.so
+opt/indi-stable/lib/libCAARotator.so
+opt/indi-stable/lib/libUSB2ST4Conv.so
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*asi*.rules

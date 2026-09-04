@@ -1,0 +1,4 @@
+# See core/deb/indi-stable-core.lintian-overrides for the full reasoning,
+# including why each binary package needs its own file.
+indi-stable-3rdparty-drivers-apogee: dir-or-file-in-opt
+indi-stable-3rdparty-drivers-apogee: custom-library-search-path

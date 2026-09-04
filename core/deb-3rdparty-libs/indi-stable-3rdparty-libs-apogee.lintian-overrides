@@ -1,0 +1,7 @@
+# See core/deb/indi-stable-core.lintian-overrides for the full reasoning,
+# including why each binary package needs its own file rather than one
+# shared one (dh_lintian installs a given file only into the package it is
+# named for; lintian rejects a line naming any other package as an
+# "alien-tag").
+indi-stable-3rdparty-libs-apogee: dir-or-file-in-opt
+indi-stable-3rdparty-libs-apogee: custom-library-search-path

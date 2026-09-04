@@ -1,0 +1,169 @@
+#!/usr/bin/make -f
+#
+# Debian build for indi-stable-3rdparty-drivers. Mirrors
+# core/rpm/indi-stable-3rdparty-drivers.spec -- same private prefix, same 9
+# vendor drivers, same 46-entry WITH_<X>=OFF scope list, same CFLAGS fix and
+# toupcam_test/omegonprocam_test patch. Read that spec's header and %%build
+# comments for the full rationale; this file carries only the Debian-
+# specific mechanics. core/deb-3rdparty-libs/rules is the sibling this
+# package Build-Depends and Depends on.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+INDI_PREFIX := /opt/indi-stable
+INDI_LIBDIR := $(INDI_PREFIX)/lib
+INDI_INCLUDEDIR := $(INDI_PREFIX)/include
+INDI_BINDIR := $(INDI_PREFIX)/bin
+INDI_DATADIR := $(INDI_PREFIX)/share/indi
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	# toupcam_test and omegonprocam_test are vendor SDK diagnostic tools, not
+	# INDI drivers -- neither has an install() rule in
+	# indi-toupbase/CMakeLists.txt, so they were never going to be packaged
+	# regardless. ninja builds cmake's default "all" target though, and
+	# omegonprocam_test.cpp fails to compile outright (an upstream
+	# include-path bug this project has no need to chase down, since the
+	# file was never wanted) -- see core/rpm's own %%prep comment for the
+	# full finding. EXCLUDE_FROM_ALL keeps both out of the default build
+	# without touching the add_executable()/target_link_libraries() blocks
+	# themselves. Both add_executable() lines are indented (inside their
+	# WITH_<BRAND>CAM if() blocks), so the sed match must not anchor to
+	# column 1.
+	sed -i '/add_executable(toupcam_test /a set_target_properties(toupcam_test PROPERTIES EXCLUDE_FROM_ALL TRUE)' indi-toupbase/CMakeLists.txt
+	sed -i '/add_executable(omegonprocam_test /a set_target_properties(omegonprocam_test PROPERTIES EXCLUDE_FROM_ALL TRUE)' indi-toupbase/CMakeLists.txt
+	# Extra -I$(INDI_INCLUDEDIR): indi-apogee/apogee_ccd.cpp mixes
+	# `#include "Alta.h"` (unqualified, resolved fine by the vendor
+	# find_package()'s own include dir) and `#include <libapogee/Alta.h>`
+	# (qualified, needs the PARENT directory on the search path instead)
+	# for the SAME header -- see core/rpm's own %%build comment for the full
+	# finding. Exported globally rather than patching the one file, since
+	# the same upstream inconsistency is plausible elsewhere.
+	CFLAGS="$$CFLAGS -I$(INDI_INCLUDEDIR)" CXXFLAGS="$$CXXFLAGS -I$(INDI_INCLUDEDIR)" \
+	dh_auto_configure -- \
+		-DCMAKE_INSTALL_PREFIX=$(INDI_PREFIX) \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_INSTALL_RPATH=$(INDI_LIBDIR) \
+		-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
+		-DINDI_ROOT=$(INDI_PREFIX) \
+		-DCMAKE_PREFIX_PATH=$(INDI_PREFIX) \
+		-DBUILD_LIBS=OFF \
+		-DWITH_ASTROASIS=OFF \
+		-DWITH_ATIK=OFF \
+		-DWITH_ATIK_EFW=OFF \
+		-DWITH_QHY=OFF \
+		-DWITH_SVBONY=OFF \
+		-DWITH_PENTAX=OFF \
+		-DWITH_QSI=OFF \
+		-DWITH_ARMADILLO=OFF \
+		-DWITH_ASTARBOX=OFF \
+		-DWITH_ASTROLINK4=OFF \
+		-DWITH_ASTROMECHFOC=OFF \
+		-DWITH_AVALON=OFF \
+		-DWITH_AVALONUD=OFF \
+		-DWITH_BEEFOCUS=OFF \
+		-DWITH_BRESSEREXOS2=OFF \
+		-DWITH_CAUX=OFF \
+		-DWITH_CLOUDWATCHER=OFF \
+		-DWITH_DREAMFOCUSER=OFF \
+		-DWITH_DSI=OFF \
+		-DWITH_DUINO=OFF \
+		-DWITH_EQMOD=OFF \
+		-DWITH_FFMV=OFF \
+		-DWITH_GPHOTO=OFF \
+		-DWITH_GPIO=OFF \
+		-DWITH_GPSD=OFF \
+		-DWITH_GPSNMEA=OFF \
+		-DWITH_LIMESDR=OFF \
+		-DWITH_MAXDOME=OFF \
+		-DWITH_MGEN=OFF \
+		-DWITH_NEXDOME=OFF \
+		-DWITH_NIGHTSCAPE=OFF \
+		-DWITH_OCS=OFF \
+		-DWITH_OPENOGMA=OFF \
+		-DWITH_ORION_SSG3=OFF \
+		-DWITH_RADIOSIM=OFF \
+		-DWITH_ROLLOFFINO=OFF \
+		-DWITH_RTKLIB=OFF \
+		-DWITH_SHELYAK=OFF \
+		-DWITH_SKYWALKER=OFF \
+		-DWITH_SPECTRACYBER=OFF \
+		-DWITH_STARBOOK=OFF \
+		-DWITH_STARBOOK_TEN=OFF \
+		-DWITH_SX=OFF \
+		-DWITH_TALON6=OFF \
+		"-DWITH_TICFOCUSER-NG=OFF" \
+		-DWITH_WEEWX_JSON=OFF
+
+override_dh_auto_install:
+	dh_auto_install
+	# --- vendor SDK test/bench utilities: not INDI drivers, not packaged ---
+	rm -f debian/tmp$(INDI_BINDIR)/asi_camera_test
+	rm -f debian/tmp$(INDI_BINDIR)/asi_multi_camera_test
+	rm -f debian/tmp$(INDI_BINDIR)/asi_camera_bench
+	rm -f debian/tmp$(INDI_BINDIR)/asi_wheel_test
+	rm -f debian/tmp$(INDI_BINDIR)/playerone_camera_test
+	rm -f debian/tmp$(INDI_BINDIR)/playerone_camera_bench
+	# --- driver catalogue: absolute paths, not bare names -------------------
+	# Same defect, same fix, same verification method as core/deb/rules --
+	# see that file's comment for the full reasoning (DESIGN.md,
+	# "Driver-manifest discoverability"). indi-3rdparty does not emit ONE
+	# drivers.xml the way core does, it emits one indi_<vendor>.xml PER
+	# vendor (11 separate indi_<brand>.xml files for touptek alone), so this
+	# loops over every catalogue file this package installs.
+	set -e; \
+	sedf=$$(mktemp); \
+	for b in debian/tmp$(INDI_BINDIR)/*; do \
+		[ -f "$$b" ] && [ -x "$$b" ] || continue; \
+		n=$$(basename "$$b"); \
+		echo "s|>$$n</driver>|>$(INDI_BINDIR)/$$n</driver>|g" >> "$$sedf"; \
+	done; \
+	n_done=0; \
+	for cat in debian/tmp$(INDI_DATADIR)/indi_*.xml; do \
+		[ -e "$$cat" ] || continue; \
+		sed -i -f "$$sedf" "$$cat"; \
+		n=$$(grep -c ">$(INDI_BINDIR)/" "$$cat") || n=0; \
+		n_done=$$(( n_done + n )); \
+	done; \
+	rm -f "$$sedf"; \
+	test "$$n_done" -gt 0 || { echo "ERROR: rewrote 0 catalogue entries across every indi_*.xml; the <driver> form changed upstream"; exit 1; }; \
+	echo "driver catalogues: rewrote $$n_done entries to $(INDI_BINDIR)"
+	# Assert every vendor this package means to ship actually landed, rather
+	# than trusting a clean cmake build exit (LESSONS_LEARNED.md #1 and #5).
+	set -e; for bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
+	                   indi_inovaplx_ccd indi_mi_ccd indi_sbig_ccd indi_toupcam_ccd \
+	                   indi_fishcamp_ccd; do \
+		test -x debian/tmp$(INDI_BINDIR)/$$bin \
+			|| { echo "ERROR: $$bin did not install -- an upstream WITH_* default or driver name changed"; exit 1; }; \
+	done
+
+# Skipped entirely, same "do not advertise a private library system-wide"
+# reason as core/deb/rules and core/deb-3rdparty-libs/rules -- these
+# binaries do not themselves ship libraries, but dh_makeshlibs would still
+# try to process anything .so-shaped it finds and there is nothing here that
+# should ever get a shlibs/symbols file.
+override_dh_makeshlibs:
+
+# UNLIKE core/deb-3rdparty-libs/rules, this package genuinely needs
+# debian/shlibs.local: every driver binary links against BOTH core's
+# libindi* (from indi-stable-core-libs) AND a vendor library (from
+# indi-stable-3rdparty-libs-<vendor>) -- both installed on the build host
+# via Build-Depends, both real files findable through RPATH, and NEITHER
+# ships a shlibs file of its own (both upstream packages skip
+# dh_makeshlibs, same reasoning as this one). dpkg-shlibdeps finds the
+# files but has no dependency information for either without
+# shlibs.local -- DESIGN.md's "The Debian half of the metadata layer"
+# predicted exactly this package would need it, where
+# indi-stable-3rdparty-libs itself did not (checked directly: none of its
+# own libraries link against anything private).
+#
+# No override_dh_shlibdeps -l needed here, unlike core/deb/rules: core's -l
+# points dh_shlibdeps at core's OWN just-built, not-yet-installed libraries
+# staged in debian/tmp. Here, both dependency sources (core-libs and every
+# -libs vendor package) are ALREADY REALLY INSTALLED on the build host by
+# the time this package builds (they are Build-Depends, not siblings built
+# in the same tree), so RPATH resolution finds the real files directly;
+# debian/shlibs.local supplies the missing dependency information dpkg-
+# shlibdeps consults automatically, with no extra flag required.

@@ -1,0 +1,16 @@
+# See core/deb/shlibs.local for the general mechanism this project already
+# established for core, and core/deb-3rdparty-drivers/shlibs.local for the
+# fuller writeup of the same finding applied to a consumer of a private
+# library it does not itself ship. Same reasoning here: the compiled
+# _PyIndi*.so extension links libindiclient.so.2 via RPATH
+# (pyindi-client/deb/rules), indi-stable-core-libs ships no shlibs file of
+# its own (dh_makeshlibs deliberately skipped, "do not advertise a private
+# library system-wide"), and indi-stable-core-libs is already installed on
+# the build host as a Build-Depends -- so dpkg-shlibdeps finds the real file
+# through RPATH but has no dependency information for it without this file.
+#
+# Bare package name, no version relation -- shlibs entries take literal text
+# only, so a version here would go stale silently on every release (same
+# reasoning as core/deb/shlibs.local and
+# core/deb-3rdparty-drivers/shlibs.local).
+libindiclient 2 indi-stable-core-libs

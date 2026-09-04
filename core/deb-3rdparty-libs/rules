@@ -1,0 +1,113 @@
+#!/usr/bin/make -f
+#
+# Debian build for indi-stable-3rdparty-libs. Mirrors
+# core/rpm/indi-stable-3rdparty-libs.spec -- same private prefix, same 9
+# bundled vendors, same licence-tier exclusions, same coexistence guarantees.
+# Read that spec's header comment for the full rationale; the reasoning is
+# not duplicated here, only the Debian-specific mechanics. core/deb/rules
+# (indi-stable-core) is the other half of the pattern this file follows.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+INDI_PREFIX := /opt/indi-stable
+INDI_LIBDIR := $(INDI_PREFIX)/lib
+INDI_INCLUDEDIR := $(INDI_PREFIX)/include
+
+%:
+	dh $@ --buildsystem=cmake
+
+# -DINDI_ROOT: FindINDI.cmake's own documented way to point find_package(INDI)
+# at a non-standard install -- needed even though nothing here links against
+# libindi, because find_package(INDI REQUIRED) inside libapogee's and
+# libfli's own CMakeLists.txt fails the WHOLE configure step if unmet (one
+# cmake invocation configures every lib*/ subdirectory together).
+#
+# BUILD_LIBS=ON is the whole point of this package -- see the spec header.
+#
+# Three absolute paths redirected into the private prefix, found by reading
+# every bundled lib's CMakeLists.txt (core/rpm's own spec comment has the
+# per-vendor detail): UDEVRULES_INSTALL_DIR (shared by every vendor lib,
+# same re-homing step as core), FIRMWARE_INSTALL_DIR (libsbig only, upstream
+# default /usr/lib/firmware is a real conflict risk), CONF_DIR (libapogee
+# only, upstream default is bare /etc).
+#
+# Six WITH_<X>=OFF overrides, the licence-tier exclusions (DESIGN.md) --
+# identical set to the RPM spec. QSI's own libqsi/COPYING explicitly forbids
+# redistribution without written permission (confirmed 2026-08-27); Fishcamp
+# resolved the other way the same day (libfishcamp/COPYING.LIB is genuine
+# BSD-2-Clause despite the LGPL-suggesting filename) and moved out of this
+# list -- see DESIGN.md, "QSI and Fishcamp resolved".
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_INSTALL_PREFIX=$(INDI_PREFIX) \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_INSTALL_RPATH=$(INDI_LIBDIR) \
+		-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
+		-DINDI_ROOT=$(INDI_PREFIX) \
+		-DBUILD_LIBS=ON \
+		-DINDI_INSTALL_UDEV_RULES=ON \
+		-DUDEVRULES_INSTALL_DIR=$(INDI_PREFIX)/udev-rules \
+		-DINDI_INSTALL_FIRMWARE=ON \
+		-DFIRMWARE_INSTALL_DIR=$(INDI_PREFIX)/share/indi/firmware \
+		-DCONF_DIR=$(INDI_PREFIX)/etc \
+		-DWITH_ASTROASIS=OFF \
+		-DWITH_ATIK=OFF \
+		-DWITH_QHY=OFF \
+		-DWITH_SVBONY=OFF \
+		-DWITH_PENTAX=OFF \
+		-DWITH_QSI=OFF
+
+override_dh_auto_install:
+	dh_auto_install
+	# --- flipro/flialgo: built unconditionally alongside libfli, not
+	# packaged -- same finding and same fix as core/rpm's %install (see that
+	# spec's comment for the full reasoning). Their licence coverage is
+	# still genuinely open (STATUS.md), so they must not ship; deleting them
+	# here is what makes "not packaged" true in the staged tree, not merely
+	# an omission from the .install files below.
+	rm -f debian/tmp$(INDI_LIBDIR)/libflipro.so*
+	rm -f debian/tmp$(INDI_LIBDIR)/libflialgo.so*
+	rm -f debian/tmp$(INDI_INCLUDEDIR)/libflipro.h
+	# --- udev rules: re-home exactly as core/deb does ----------------------
+	# Every vendor lib bundled here installs its own 99-<vendor>.rules into
+	# the SAME UDEVRULES_INSTALL_DIR variable, redirected above into the
+	# private prefix's scratch tree. Re-home under namespaced filenames so
+	# they take effect without colliding with any distribution package that
+	# might one day ship a udev rule for the same hardware. /usr/lib, not
+	# /lib, for the same merged-/usr reason as core/deb/rules.
+	mkdir -p debian/tmp/usr/lib/udev/rules.d
+	set -e; for rule in debian/tmp$(INDI_PREFIX)/udev-rules/*.rules; do \
+		[ -e "$$rule" ] || continue; \
+		base=$$(basename "$$rule"); \
+		mv "$$rule" "debian/tmp/usr/lib/udev/rules.d/$${base%%-*}-indi-stable-3rdparty-$${base#*-}"; \
+	done
+	rm -rf debian/tmp$(INDI_PREFIX)/udev-rules
+	# Assert every vendor this package means to ship actually landed, rather
+	# than trusting a clean cmake build exit -- an upstream option rename
+	# would leave a WITH_<X>=OFF-shaped silence indistinguishable from a
+	# real build across every one of the vendors this package exists to
+	# bundle (LESSONS_LEARNED.md #1 and #5).
+	set -e; for lib in libapogee libASICamera2 libfli libPlayerOneCamera \
+	                   libinovasdk libgxccd libsbig libtoupcam libfishcamp; do \
+		ls debian/tmp$(INDI_LIBDIR)/$$lib.so* >/dev/null 2>&1 \
+			|| { echo "ERROR: $$lib did not install -- an upstream WITH_* default or library name changed"; exit 1; }; \
+	done
+
+# Skipped entirely (empty override), same reason as core/deb/rules: these
+# libraries are private to indi-stable and resolved through RPATH rather
+# than the system linker path. A shlibs file would advertise this package as
+# a system-wide provider of e.g. libapogee.so.3 -- precisely the shadowing
+# this project exists to prevent -- and the ldconfig trigger dh_makeshlibs
+# installs is pointless for a directory deliberately not on the linker path.
+override_dh_makeshlibs:
+
+# No override_dh_shlibdeps here, unlike core/deb/rules -- checked directly
+# against every bundled vendor's CMakeLists.txt (core/rpm's own spec
+# comment has the per-vendor detail): none of these libraries link against
+# libindi or against each other, only against ordinary system libraries
+# (libc, libusb-1.0, libcurl) that already publish their own shlibs. There
+# is nothing here for dpkg-shlibdeps to fail to resolve, so the shlibs.local
+# DESIGN.md predicts this project's later Debian work will need
+# ("The Debian half of the metadata layer") is indi-stable-3rdparty-drivers's
+# problem, not this package's -- drivers link against BOTH core's libindi*
+# and these vendor libraries, neither of which ships a shlibs file.

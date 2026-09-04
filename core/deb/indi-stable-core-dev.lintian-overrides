@@ -1,0 +1,8 @@
+# See indi-stable-core.lintian-overrides for the full reasoning, including why
+# each binary package needs its own file rather than one shared one.
+#
+# No custom-library-search-path entry here: -dev ships only headers, the
+# unversioned .so symlinks, static libraries and pkgconfig data, none of which
+# carry a RUNPATH of their own. If that tag ever appears for this package,
+# something has changed and it should be investigated, not blanket-overridden.
+indi-stable-core-dev: dir-or-file-in-opt

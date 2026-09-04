@@ -1,0 +1,4 @@
+opt/indi-stable/include/
+opt/indi-stable/lib/*.so
+opt/indi-stable/lib/*.a
+opt/indi-stable/lib/pkgconfig/

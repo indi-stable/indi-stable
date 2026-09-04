@@ -1,0 +1,40 @@
+opt/indi-stable/lib/libtoupcam.so.*
+opt/indi-stable/lib/libaltaircam.so.*
+opt/indi-stable/lib/libbressercam.so.*
+opt/indi-stable/lib/libmallincam.so.*
+opt/indi-stable/lib/libmeadecam.so.*
+opt/indi-stable/lib/libnncam.so.*
+opt/indi-stable/lib/libogmacam.so.*
+opt/indi-stable/lib/libomegonprocam.so.*
+opt/indi-stable/lib/libstarshootg.so.*
+opt/indi-stable/lib/libtscam.so.*
+opt/indi-stable/lib/libsvbonycam.so.*
+# The bare .so symlinks are installed by the RUNTIME package, not -dev:
+# these vendor blobs carry an UNVERSIONED SONAME (or none at all), so each
+# driver's DT_NEEDED is the bare name and the dynamic loader needs the
+# symlink at RUN time, not merely at link time. Measured on the RPM side
+# 2026-09-04: with the symlink in -devel, 45 of 56 driver binaries failed
+# ldd on a runtime-only install. Vendors whose blobs DO carry a versioned
+# SONAME keep the ordinary layout. See LESSONS_LEARNED.md #22.
+opt/indi-stable/lib/libtoupcam.so
+opt/indi-stable/lib/libaltaircam.so
+opt/indi-stable/lib/libbressercam.so
+opt/indi-stable/lib/libmallincam.so
+opt/indi-stable/lib/libmeadecam.so
+opt/indi-stable/lib/libnncam.so
+opt/indi-stable/lib/libogmacam.so
+opt/indi-stable/lib/libomegonprocam.so
+opt/indi-stable/lib/libstarshootg.so
+opt/indi-stable/lib/libtscam.so
+opt/indi-stable/lib/libsvbonycam.so
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*toupcam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*altaircam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*bressercam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*mallincam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*meadecam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*nncam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*ogmacam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*omegonprocam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*starshootg*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*tscam*.rules
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*svbonycam*.rules

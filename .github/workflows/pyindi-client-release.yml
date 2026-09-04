@@ -1,0 +1,331 @@
+name: indi-stable-pyindi-client release
+
+# The third and last component to get the gate core-release.yml established.
+# Structurally the SIMPLEST of the three -- one binary package per distro, no
+# subpackages, no inter-package version pins -- but the one whose upstream
+# differs most:
+#
+# 1. It releases on PyPI, not as a git tag, so the check is
+#    scripts/check-upstream-pypi.sh rather than check-upstream-tag.sh. That
+#    script also guards two failure modes a git tag cannot have: a release
+#    yanked in place, and a release published as wheels only (this packaging
+#    builds from the sdist).
+# 2. The version carries no leading "v" -- 2.2.0, not v2.2.0 -- so nothing
+#    here strips one. The bump script rejects a leading v outright.
+# 3. Source0 must be rewritten to a URL that cannot be derived from the
+#    version, because PyPI sdist URLs contain a content-addressed path
+#    segment. check-upstream-pypi.sh emits the URL and sha256 as job outputs
+#    and they are threaded through to the build and promote jobs, so every
+#    consumer uses one API answer rather than re-resolving.
+#
+# Core is downloaded from its own gated GitHub Release rather than rebuilt,
+# same as 3rdparty-release.yml and for the same reasons -- see that file.
+# Runner pinning and the chained-jobs shape are as in core-release.yml.
+
+on:
+  schedule:
+    # Offset from core (09:17) and 3rdparty (10:43).
+    - cron: '11 11 * * *'
+  workflow_dispatch:
+    inputs:
+      repackage:
+        description: >-
+          Rebuild the CURRENT upstream version at the next Release number,
+          instead of polling for a new one. For when the packaging changed
+          and upstream did not.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  DEBFULLNAME: Will Snyder
+  DEBEMAIL: william@williamlsnyder.org
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      # In repackage mode new_version carries the CURRENT version, so every
+      # downstream `if:` and build job below stays exactly as it is.
+      new_version: ${{ steps.resolve.outputs.new_version }}
+      release: ${{ steps.resolve.outputs.release }}
+      sdist_url: ${{ steps.resolve.outputs.sdist_url }}
+      sdist_sha256: ${{ steps.resolve.outputs.sdist_sha256 }}
+      core_tag: ${{ steps.core.outputs.core_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check PyPI for a newer pyindi-client release
+        id: check
+        if: inputs.repackage != true
+        run: bash scripts/check-upstream-pypi.sh pyindi-client pyindi-client
+      - name: Compute the next release (repackage only)
+        id: next
+        if: inputs.repackage == true
+        run: bash scripts/next-release.sh pyindi-client/rpm/indi-stable-pyindi-client.spec
+      # A repackage builds the SAME sdist, so its URL and hash come from the
+      # spec that is already pinned to them rather than from PyPI again --
+      # re-resolving could pick up a different artifact and silently change
+      # what a "rebuild" rebuilds.
+      - name: Resolve what this run builds
+        id: resolve
+        run: |
+          if [ "${{ inputs.repackage }}" = "true" ]; then
+            SPEC=pyindi-client/rpm/indi-stable-pyindi-client.spec
+            URL=$(sed -n 's|^Source0:[[:space:]]*\(.*\)$|\1|p' "$SPEC" | head -1)
+            SHA=$(grep -oE '^echo "[0-9a-f]{64}' "$SPEC" | head -1 | sed 's/^echo "//')
+            [ -n "$URL" ] && [ -n "$SHA" ] || { echo "could not read Source0/sha256 from $SPEC" >&2; exit 1; }
+            {
+              echo "new_version=${{ steps.next.outputs.version }}"
+              echo "release=${{ steps.next.outputs.release }}"
+              echo "sdist_url=$URL"
+              echo "sdist_sha256=$SHA"
+            } >> "$GITHUB_OUTPUT"
+            echo "repackage: ${{ steps.next.outputs.version }} release ${{ steps.next.outputs.release }}"
+          else
+            {
+              echo "new_version=${{ steps.check.outputs.new_version }}"
+              echo "release=1"
+              echo "sdist_url=${{ steps.check.outputs.sdist_url }}"
+              echo "sdist_sha256=${{ steps.check.outputs.sdist_sha256 }}"
+            } >> "$GITHUB_OUTPUT"
+            echo "poll: '${{ steps.check.outputs.new_version }}' release 1"
+          fi
+      - name: Resolve the core release to build against
+        id: core
+        run: |
+          CORE_TAG=$(jq -r '.core.release' versions.json)
+          [ -n "$CORE_TAG" ] && [ "$CORE_TAG" != "null" ] \
+            || { echo "could not read .core.release from versions.json" >&2; exit 1; }
+          echo "core_tag=${CORE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "building against core ${CORE_TAG}"
+
+  build-fedora:
+    needs: check
+    if: needs.check.outputs.new_version != ''
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      # gcc-c++ comes from the spec's own BuildRequires via dnf builddep, not
+      # from this list -- it was missing once already (STATUS.md: python3-devel
+      # pulls gcc but not gcc-c++, and this package compiles a SWIG .cxx).
+      - name: Install RPM build tools
+        run: dnf install -y rpm-build rpmdevtools dnf-plugins-core gh jq
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-rpms
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.rpm' --dir core-rpms
+          dnf install -y ./core-rpms/indi-stable-core-*.rpm
+      # Transient: rewrites Version:, Source0: and the %prep sha256 in this
+      # checkout only. The real committed bump happens once in promote, and
+      # only if both gates pass.
+      - name: Point the spec at the new release (this checkout only)
+        run: |
+          bash scripts/bump-pyindi-client-version.sh --spec-only \
+            "${{ needs.check.outputs.new_version }}" \
+            "${{ needs.check.outputs.sdist_url }}" \
+            "${{ needs.check.outputs.sdist_sha256 }}" "${{ needs.check.outputs.release }}"
+      - name: Resolve BuildRequires from the spec
+        run: dnf builddep -y pyindi-client/rpm/indi-stable-pyindi-client.spec
+      - name: Fetch upstream sdist and build
+        run: |
+          rpmdev-setuptree
+          spectool -g -R pyindi-client/rpm/indi-stable-pyindi-client.spec
+          rpmbuild -bb pyindi-client/rpm/indi-stable-pyindi-client.spec
+      - name: Collect built RPMs
+        run: |
+          mkdir -p out
+          find "$HOME/rpmbuild/RPMS" -name '*.rpm' \
+            ! -name '*debuginfo*' ! -name '*debugsource*' -exec cp {} out/ \;
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pyindi-client-rpm
+          path: out/
+          if-no-files-found: error
+
+  build-debian:
+    needs: check
+    if: needs.check.outputs.new_version != ''
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install devscripts and equivs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts equivs
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-debs
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
+          sudo apt-get install -y ./core-debs/*.deb
+      # The sdist comes from the URL the check job resolved, and its hash is
+      # verified HERE rather than trusted -- the RPM side gets this free from
+      # the spec's own %prep check, and the Debian side would otherwise build
+      # whatever it downloaded.
+      - name: Fetch and verify the upstream sdist
+        env:
+          NEW_VERSION: ${{ needs.check.outputs.new_version }}
+          SDIST_URL: ${{ needs.check.outputs.sdist_url }}
+          SDIST_SHA: ${{ needs.check.outputs.sdist_sha256 }}
+        run: |
+          echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_ENV"
+          echo "SRCDIR=/tmp/pyindi-client-${NEW_VERSION}" >> "$GITHUB_ENV"
+          curl -fsSL -o /tmp/pyindi.tar.gz "$SDIST_URL"
+          echo "${SDIST_SHA}  /tmp/pyindi.tar.gz" | sha256sum -c - \
+            || { echo "sdist sha256 mismatch -- PyPI served something other than what the check job resolved"; exit 1; }
+          mkdir -p "/tmp/pyindi-client-${NEW_VERSION}"
+          tar xzf /tmp/pyindi.tar.gz -C "/tmp/pyindi-client-${NEW_VERSION}" --strip-components=1
+      - name: Populate debian/ and bump changelog (this checkout only)
+        run: |
+          rm -rf "$SRCDIR/debian"
+          cp -r pyindi-client/deb "$SRCDIR/debian"
+          cd "$SRCDIR"
+          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}" \
+            --distribution unstable \
+            "Rebuild of ${NEW_VERSION} at release ${{ needs.check.outputs.release }}, built by pyindi-client-release.yml"
+      - name: Resolve Build-Depends from debian/control
+        run: sudo mk-build-deps -i -t 'apt-get -y' "$SRCDIR/debian/control"
+      - name: Build
+        run: cd "$SRCDIR" && dpkg-buildpackage -us -uc -b
+      - name: Collect built DEBs
+        run: |
+          mkdir -p out
+          find /tmp -maxdepth 1 -name '*.deb' ! -name '*-dbgsym*' -exec cp {} out/ \;
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pyindi-client-deb
+          path: out/
+          if-no-files-found: error
+
+  smoke-test-fedora:
+    needs: [check, build-fedora]
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gh
+        run: dnf install -y gh
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-rpms
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.rpm' --dir core-rpms
+      - uses: actions/download-artifact@v4
+        with:
+          name: pyindi-client-rpm
+          path: py-rpms
+      - run: bash scripts/smoke-test-pyindi-client.sh py-rpms core-rpms
+
+  smoke-test-debian:
+    needs: [check, build-debian]
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-debs
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
+      - uses: actions/download-artifact@v4
+        with:
+          name: pyindi-client-deb
+          path: py-debs
+      - run: sudo bash scripts/smoke-test-pyindi-client-deb.sh py-debs core-debs
+
+  promote:
+    needs: [check, smoke-test-fedora, smoke-test-debian]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+      - uses: actions/download-artifact@v4
+        with:
+          name: pyindi-client-rpm
+          path: artifacts/rpm
+      - uses: actions/download-artifact@v4
+        with:
+          name: pyindi-client-deb
+          path: artifacts/deb
+      - name: Install devscripts
+        run: sudo apt-get update && sudo apt-get install -y devscripts
+      - name: Bump every version-carrying field for real
+        run: |
+          bash scripts/bump-pyindi-client-version.sh \
+            "${{ needs.check.outputs.new_version }}" \
+            "${{ needs.check.outputs.sdist_url }}" \
+            "${{ needs.check.outputs.sdist_sha256 }}" "${{ needs.check.outputs.release }}"
+      - name: Update versions.json
+        env:
+          NEW_VERSION: ${{ needs.check.outputs.new_version }}
+        run: |
+          jq --arg v "$NEW_VERSION" '.["pyindi-client"].candidate = $v | .["pyindi-client"].release = $v' \
+            versions.json > versions.json.tmp
+          mv versions.json.tmp versions.json
+      - name: Commit to development
+        env:
+          NEW_VERSION: ${{ needs.check.outputs.new_version }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyindi-client/rpm/indi-stable-pyindi-client.spec \
+                  pyindi-client/deb/changelog \
+                  versions.json
+          # The release number belongs in the subject whenever it is not 1.
+          # Without it a repackage commit is byte-identical to the original
+          # promotion's subject -- confirmed 2026-09-04, when the first real
+          # repackage produced a second "promote ... v2.2.4.1" line
+          # indistinguishable from the first in git log.
+          #
+          # An `if` rather than `[ ... ] && SUBJ=...` deliberately. These steps
+          # run under bash -e, where the `&&` form is safe ONLY because more
+          # commands follow it: POSIX exempts the non-final command of an
+          # AND-list from set -e, so a false test there is ignored, but the
+          # SAME line as the last line of a step exits 1 and fails the job.
+          # Measured both ways, 2026-09-04, after an earlier version of this
+          # comment claimed the `&&` form was already broken here and testing
+          # showed it was not. The `if` removes the dependence on position.
+          SUBJ="pyindi-client-release: promote indi-stable-pyindi-client ${NEW_VERSION}"
+          if [ "${RELEASE}" != "1" ]; then
+            SUBJ="${SUBJ} (release ${RELEASE})"
+          fi
+          git commit \
+            -m "${SUBJ}" \
+            -m "Automated. Gate passed on both distros: build, clean install, the module imports as a real module, BaseClient constructs, every symbol the SWIG wrapper references is exported by the compiled extension, and libindiclient resolves into the private prefix. See .github/workflows/pyindi-client-release.yml."
+          git push origin development
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_VERSION: ${{ needs.check.outputs.new_version }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          mkdir -p release-assets
+          cp artifacts/rpm/*.rpm artifacts/deb/*.deb release-assets/
+          # Release 1 keeps the plain name so existing tags stay valid; a
+          # repackage gets an explicit -N suffix, without which gh release
+          # create fails on the already-existing tag.
+          REL_TAG="indi-stable-pyindi-client-${NEW_VERSION}"
+          REL_TITLE="indi-stable-pyindi-client ${NEW_VERSION}"
+          if [ "${RELEASE}" != "1" ]; then
+            REL_TAG="${REL_TAG}-${RELEASE}"
+            REL_TITLE="${REL_TITLE} (release ${RELEASE})"
+          fi
+          echo "creating release: ${REL_TAG}"
+          gh release create "${REL_TAG}" release-assets/* \
+            --title "${REL_TITLE}" \
+            --notes "Automated release. Built from the PyPI pyindi-client ${NEW_VERSION} sdist against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on both Fedora and Debian/Ubuntu. Linked against this project's own libindiclient rather than any system libindi. Unofficial third-party build -- see README.md."

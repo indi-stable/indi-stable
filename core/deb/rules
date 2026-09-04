@@ -1,0 +1,182 @@
+#!/usr/bin/make -f
+#
+# Debian build for indi-stable-core. Mirrors core/rpm/indi-stable-core.spec --
+# same private prefix, same coexistence guarantees, same three binary
+# packages. Read that spec's header comment for the full rationale; the
+# reasoning is not duplicated here, only the Debian-specific mechanics.
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+INDI_PREFIX := /opt/indi-stable
+INDI_LIBDIR := $(INDI_PREFIX)/lib
+INDI_BINDIR := $(INDI_PREFIX)/bin
+INDI_DATADIR := $(INDI_PREFIX)/share/indi
+
+%:
+	dh $@ --buildsystem=cmake
+
+# CMAKE_INSTALL_LIBDIR is passed relative ("lib") for the same two reasons
+# the spec documents: INDI derives PKGCONFIG_INSTALL_PREFIX straight from it
+# (CMakeLists.txt:83), so an absolute value escapes the private prefix; and
+# a self-contained /opt tree has no multiarch split to honour. Passing the
+# Debian multiarch triplet here would put libindi.pc outside the prefix AND
+# make the tree diverge from the RPM's for no benefit.
+#
+# UDEVRULES_INSTALL_DIR is redirected into the build tree and the rules are
+# renamed in override_dh_auto_install below -- it is the single INDI install
+# path not derived from CMAKE_INSTALL_PREFIX, and left alone it collides
+# outright with files libindi-data already owns.
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_INSTALL_PREFIX=$(INDI_PREFIX) \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_INSTALL_RPATH=$(INDI_LIBDIR) \
+		-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
+		-DFIX_WARNINGS=OFF \
+		-DINDI_BUILD_SERVER=ON \
+		-DINDI_BUILD_CLIENT=ON \
+		-DINDI_BUILD_DRIVERS=ON \
+		-DINDI_BUILD_QT_CLIENT=OFF \
+		-DINDI_INSTALL_UDEV_RULES=ON \
+		-DUDEVRULES_INSTALL_DIR=$(INDI_PREFIX)/udev-rules
+
+override_dh_auto_install:
+	dh_auto_install
+	# Re-home the udev rules under namespaced filenames so they take effect
+	# without colliding with the distribution's copies. The numeric prefix is
+	# preserved because udev applies rules in lexical order.
+	# /usr/lib, not /lib: Debian 12+ and Ubuntu 22.04+ are merged-usr, where
+	# /lib is an alias symlink and shipping files through it is an error.
+	# This also matches Fedora's %{_udevrulesdir} exactly, so both packagings
+	# put the rules in the same place. Note INDI's own default for
+	# UDEVRULES_INSTALL_DIR is the older /lib/udev/rules.d -- one more reason
+	# it is overridden rather than accepted.
+	mkdir -p debian/tmp/usr/lib/udev/rules.d
+	set -e; for rule in debian/tmp$(INDI_PREFIX)/udev-rules/*.rules; do \
+		[ -e "$$rule" ] || continue; \
+		base=$$(basename "$$rule"); \
+		mv "$$rule" "debian/tmp/usr/lib/udev/rules.d/$${base%%-*}-indi-stable-$${base#*-}"; \
+	done
+	rm -rf debian/tmp$(INDI_PREFIX)/udev-rules
+	# --- driver catalogue: absolute paths, not bare names -----------------
+	# Upstream generates drivers.xml naming each binary by BARE NAME, e.g.
+	#   <driver name="CCD Simulator">indi_simulator_ccd</driver>
+	# A bare name is resolved by execvp through PATH, and the private bindir
+	# is deliberately not on PATH, so /usr/bin wins and a picker aimed at our
+	# catalogue still launches the DISTRIBUTION's drivers. Our file and the
+	# distribution's are otherwise byte-identical, so shipping it under a
+	# private prefix buys nothing on its own.
+	#
+	# Rewriting the entries to absolute paths is what makes the private
+	# prefix reachable: someone points KStars/Ekos (indiDriversDir) or INDI
+	# Web Manager (--xmldir) at $(INDI_DATADIR) and gets OUR drivers,
+	# explicitly and reversibly, with no PATH change and nothing shadowed.
+	# The decision, and the live-Ekos verification behind it, are in
+	# DESIGN.md "Resolution -- absolute paths in our drivers.xml". This is
+	# the Debian half of what the RPM does in %install.
+	#
+	# Only entries whose binary this package actually ships are rewritten.
+	# The catalogue also lists drivers built by other packages, and two that
+	# exist in no build at all; inventing paths for those would turn a driver
+	# that is merely absent into one that fails with a wrong path.
+	set -e; \
+	cat=debian/tmp$(INDI_DATADIR)/drivers.xml; \
+	test -f "$$cat" || { echo "ERROR: $$cat is missing; upstream layout changed"; exit 1; }; \
+	sedf=$$(mktemp); \
+	for b in debian/tmp$(INDI_BINDIR)/*; do \
+		[ -f "$$b" ] && [ -x "$$b" ] || continue; \
+		n=$$(basename "$$b"); \
+		echo "s|>$$n</driver>|>$(INDI_BINDIR)/$$n</driver>|g" >> "$$sedf"; \
+	done; \
+	sed -i -f "$$sedf" "$$cat"; \
+	rm -f "$$sedf"; \
+	n_done=$$(grep -c ">$(INDI_BINDIR)/" "$$cat") || n_done=0; \
+	test "$$n_done" -gt 0 || { echo "ERROR: rewrote 0 catalogue entries; the <driver> form changed upstream"; exit 1; }; \
+	n_left=0; \
+	for n in $$(grep -oE '<driver[^>]*>[^<>/][^<>]*</driver>' "$$cat" \
+	            | sed -e 's|</driver>$$||' -e 's|^.*>||' | sort -u); do \
+		if [ -x "debian/tmp$(INDI_BINDIR)/$$n" ]; then \
+			echo "ERROR: $$n is shipped by this package but is still a bare name"; \
+			n_left=$$(( n_left + 1 )); \
+		fi; \
+	done; \
+	test "$$n_left" -eq 0 || { echo "ERROR: $$n_left shipped driver(s) left unrewritten"; exit 1; }; \
+	echo "drivers.xml: rewrote $$n_done entries to $(INDI_BINDIR)"
+	# --- pkg-config: two fixes to the generated libindi.pc ---------------
+	# Both exist for the same underlying reason: upstream's template is
+	# written for an install at prefix=/usr, where the compiler and the
+	# dynamic linker already search the right directories by default. In a
+	# private prefix neither does, and each omission fails SILENTLY.
+	#
+	# (1) Libs: -- the RPATH.
+	# Upstream's libindi.pc.cmake hardcodes
+	#     Libs: -L${libdir} -lindiclient
+	# and -L is a LINK-time search path only. Our own binaries do not care,
+	# because CMake bakes CMAKE_INSTALL_RPATH into each of them at build
+	# time -- but nothing does that for a third-party consumer, and
+	# $(INDI_LIBDIR) is deliberately absent from ld.so.conf and ldconfig.
+	# So a program built against indi-stable-core-dev linked fine and then
+	# died at startup with "libindiclient.so.2: cannot open shared object
+	# file" -- using the exact command the -dev package description
+	# documents. See DESIGN.md, "Consumers of the private prefix need the
+	# RPATH too".
+	#
+	# Appending -Wl,-rpath gives consumers the same mechanism our binaries
+	# already rely on: per-consumer, opt-in, and no global state touched.
+	# The tempting alternative -- an /etc/ld.so.conf.d entry -- is exactly
+	# the shadowing this project exists to prevent and must never be added.
+	#
+	# grep -F, not plain grep: the pattern is a literal string containing a
+	# '$' that is not an anchor. POSIX says '$' is literal mid-BRE, but
+	# implementations disagree -- ugrep treats it as an anchor and never
+	# matches. -F sidesteps the question entirely.
+	#
+	# (2) Cflags: -- the parent include directory.
+	# Upstream DROPPED -I${includedir} between 1.9.9 and 2.2.4, keeping only
+	# -I${includedir}/libindi. At prefix=/usr that loses nothing, because
+	# /usr/include is searched implicitly and both spellings land in the
+	# same tree. Under our prefix only the second-level directory is on the
+	# path, so:
+	#     #include <indiversion.h>         -> ours
+	#     #include <libindi/indiversion.h> -> /usr/include/libindi, the
+	#                                         DISTRIBUTION's 1.9.9 headers,
+	#                                         against our 2.2.4 library
+	# Measured with g++ -E -H, both spellings. That mismatch is silent, and
+	# it is the exact failure the private include path exists to prevent --
+	# headers are not SONAME-versioned and /usr/include wins the search
+	# order. Restoring -I${includedir} puts both spellings back on our tree.
+	# Safe because our includedir holds nothing but the libindi/
+	# subdirectory, so it exposes no header that could shadow a system one.
+	#
+	# ${libdir} and ${includedir} stay LITERAL in the output: they are
+	# pkg-config's own variable syntax, expanded by pkg-config at query
+	# time, not by CMake, make or the shell. Hence the single quotes around
+	# each sed script and the $$.
+	set -e; \
+	pc=debian/tmp$(INDI_LIBDIR)/pkgconfig/libindi.pc; \
+	test -f "$$pc" || { echo "ERROR: $$pc is missing; upstream layout changed"; exit 1; }; \
+	sed -i 's|^Libs: -L$${libdir} -lindiclient|Libs: -L$${libdir} -Wl,-rpath,$${libdir} -lindiclient|' "$$pc"; \
+	grep -qF -- '-Wl,-rpath,$${libdir}' "$$pc" \
+		|| { echo "ERROR: libindi.pc Libs: line did not gain the RPATH; upstream changed the template"; exit 1; }; \
+	sed -i 's|^Cflags: -I$${includedir}/libindi|Cflags: -I$${includedir} -I$${includedir}/libindi|' "$$pc"; \
+	grep -qF -- 'Cflags: -I$${includedir} -I$${includedir}/libindi' "$$pc" \
+		|| { echo "ERROR: libindi.pc Cflags: line did not gain -I\$${includedir}; upstream changed the template"; exit 1; }; \
+	echo "libindi.pc: $$(grep '^Libs:' "$$pc")"; \
+	echo "libindi.pc: $$(grep '^Cflags:' "$$pc")"
+
+# Skipped entirely (empty override), not merely quietened. These libraries are
+# private to indi-stable and resolved through RPATH rather than the system
+# linker path, so:
+#   * a shlibs/symbols file would advertise this package as a system-wide
+#     provider of libindiclient.so.2 -- precisely the shadowing this project
+#     exists to prevent, and it would make other packages' dependencies
+#     resolve against a library they cannot actually find; and
+#   * the ldconfig trigger dh_makeshlibs installs is pointless for a
+#     directory that is deliberately not on the linker path.
+override_dh_makeshlibs:
+
+# dpkg-shlibdeps cannot resolve the drivers' and indiserver's dependencies on
+# the private libraries unless told where they are, and fails the build if it
+# cannot. -l adds the staged private libdir to its search path.
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(CURDIR)/debian/tmp$(INDI_LIBDIR)

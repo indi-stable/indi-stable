@@ -1,0 +1,83 @@
+# Package-local dependency information for the private libraries this
+# package's drivers link against -- BOTH core's libindi* (from
+# indi-stable-core-libs) and every vendor library (from
+# indi-stable-3rdparty-libs-<vendor>). Neither ships a shlibs file of its
+# own (both skip dh_makeshlibs, same "do not advertise a private library
+# system-wide" reason indi-stable-3rdparty-drivers's own rules documents),
+# so dpkg-shlibdeps finds the files through RPATH but has no dependency
+# information for either without this file. See core/deb/shlibs.local for
+# the full mechanism this project already established for core; this is
+# the case DESIGN.md's "The Debian half of the metadata layer" predicted
+# indi-stable-3rdparty-drivers specifically would need it, unlike
+# indi-stable-3rdparty-libs itself (STATUS.md).
+#
+# The bare package name, with no version relation, is deliberate -- same
+# reasoning as core/deb/shlibs.local: shlibs entries take literal text
+# only, so a version here would go stale silently on every release.
+#
+# SONAME versions below were read directly from the built
+# indi-stable-3rdparty-libs artifacts with readelf -d, not inferred from
+# filenames.
+#
+# CONFIRMED 2026-08-26 against a real dpkg-buildpackage, and the result is
+# more nuanced than "it works": the entries below with a real numbered
+# SONAME (core's four, plus apogee/fli/playerone/inovasdk/sbig, and
+# fishcamp added 2026-08-27) are what actually engage -- no shlibs-related
+# warnings for any of them, and
+# dpkg-deb -f on the built packages confirms ${shlibs:Depends} contributed
+# correctly. The asi/micam/touptek entries further down do NOT engage at
+# all: dpkg-shlibdeps warns "cannot extract name and version from library
+# name '<name>.so'" for every one of those 17 libraries and skips them
+# BEFORE it would ever consult this file -- an unversioned or absent SONAME
+# fails to parse at all, which is a different code path from "parsed fine,
+# no shlibs entry found" (the case this file exists to solve, and the one
+# core/deb/shlibs.local's own header describes). No build failure resulted
+# only because indi-stable-3rdparty-drivers/control's own Depends: lines
+# name indi-stable-core-libs and indi-stable-3rdparty-libs-<vendor>
+# LITERALLY, not through ${shlibs:Depends} -- if that explicit pinning were
+# ever removed in favour of relying on shlibs alone, these 17 libraries'
+# dependencies would silently go unspecified. The entries below are kept
+# (harmless, and correct if a future indi-3rdparty release ever gives these
+# libraries a real SONAME) but are not load-bearing today -- the control
+# file's own literal Depends: lines are what actually protects this
+# package. See DEBIAN.md for the full finding.
+libindidriver 2 indi-stable-core-libs
+libindiclient 2 indi-stable-core-libs
+libindiAlignmentDriver 2 indi-stable-core-libs
+libindilx200 2 indi-stable-core-libs
+
+libapogee 3 indi-stable-3rdparty-libs-apogee
+libfli 2 indi-stable-3rdparty-libs-fli
+libPlayerOneCamera 3 indi-stable-3rdparty-libs-playerone
+libPlayerOnePW 1 indi-stable-3rdparty-libs-playerone
+libinovasdk 1 indi-stable-3rdparty-libs-inovasdk
+libsbig 4 indi-stable-3rdparty-libs-sbig
+libfishcamp 1 indi-stable-3rdparty-libs-fishcamp
+
+# No DT_SONAME at all on any of these five (ZWO's own prebuilt .bin blobs) --
+# confirmed with readelf -d, empty SONAME field. dpkg-shlibdeps records a
+# consumer's NEEDED entry from the library's OWN (missing) SONAME, which
+# means the linker fell back to the literal filename used at link time.
+libASICamera2 1 indi-stable-3rdparty-libs-asi
+libEFWFilter 1 indi-stable-3rdparty-libs-asi
+libEAFFocuser 1 indi-stable-3rdparty-libs-asi
+libCAARotator 1 indi-stable-3rdparty-libs-asi
+libUSB2ST4Conv 1 indi-stable-3rdparty-libs-asi
+
+# Unversioned SONAME (bare "libgxccd.so", no trailing digits) -- confirmed
+# with readelf -d.
+libgxccd 0 indi-stable-3rdparty-libs-micam
+
+# Unversioned SONAMEs (bare "lib<brand>.so", no trailing digits) for all
+# eleven Touptek-family brands -- confirmed with readelf -d.
+libtoupcam 60 indi-stable-3rdparty-libs-touptek
+libaltaircam 60 indi-stable-3rdparty-libs-touptek
+libbressercam 60 indi-stable-3rdparty-libs-touptek
+libmallincam 60 indi-stable-3rdparty-libs-touptek
+libmeadecam 60 indi-stable-3rdparty-libs-touptek
+libnncam 60 indi-stable-3rdparty-libs-touptek
+libogmacam 60 indi-stable-3rdparty-libs-touptek
+libomegonprocam 60 indi-stable-3rdparty-libs-touptek
+libstarshootg 60 indi-stable-3rdparty-libs-touptek
+libtscam 60 indi-stable-3rdparty-libs-touptek
+libsvbonycam 57 indi-stable-3rdparty-libs-touptek

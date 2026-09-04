@@ -1,0 +1,9 @@
+opt/indi-stable/lib/libapogee.so.*
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*apogee*.rules
+
+# Per-camera-model config data (CONF_DIR/Apogee/camera/*.txt), read at
+# runtime by the apogee library itself -- ships in the runtime package, not
+# -dev. Same file libapogee/CMakeLists.txt installs that core/rpm's own
+# %files apogee had to add after rpmbuild's "installed but unpackaged"
+# check caught it missing (STATUS.md).
+opt/indi-stable/etc/Apogee/

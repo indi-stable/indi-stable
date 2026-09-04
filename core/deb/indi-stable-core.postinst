@@ -1,0 +1,32 @@
+#!/bin/sh
+# Register indiserver-stable with update-alternatives -- NOT indiserver.
+#
+# This package deliberately ships NO file at /usr/bin/indiserver -- that path
+# is owned by indi-bin, which kstars depends on, so shipping it would make
+# installing indi-stable-core uninstall Ekos. update-alternatives points at
+# the real binary in the private prefix instead; the target need not live in
+# a bin directory on the default PATH.
+#
+# The link name is namespaced (indiserver-stable), not the plain indiserver
+# name, even though Debian's indi-bin has not been confirmed to own
+# /usr/bin/indiserver as a non-symlink the way Fedora's libindi does. See
+# DESIGN.md "Resolution -- namespaced link, not /usr/bin/indiserver": the
+# Fedora finding must not be assumed to transfer, but the namespaced name
+# costs nothing and is guaranteed to register cleanly either way, so there is
+# no reason to gamble on the plain name working here.
+#
+# Priority 20 is above a typical distribution default. `update-alternatives
+# --config indiserver-stable` lets the user choose, and --remove on purge
+# restores whatever was there before.
+set -e
+
+case "$1" in
+    configure)
+        update-alternatives --install \
+            /usr/bin/indiserver-stable indiserver-stable \
+            /opt/indi-stable/bin/indiserver 20
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

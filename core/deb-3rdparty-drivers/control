@@ -1,0 +1,153 @@
+Source: indi-stable-3rdparty-drivers
+Section: science
+Priority: optional
+Maintainer: Will Snyder <william@williamlsnyder.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               g++,
+               indi-stable-core-dev,
+               libcfitsio-dev,
+               zlib1g-dev,
+               libusb-1.0-0-dev,
+               indi-stable-3rdparty-libs-apogee-dev (= 2.2.4.1-2),
+               indi-stable-3rdparty-libs-asi-dev (= 2.2.4.1-2),
+               indi-stable-3rdparty-libs-fli-dev (= 2.2.4.1-2),
+               indi-stable-3rdparty-libs-playerone-dev (= 2.2.4.1-2),
+               indi-stable-3rdparty-libs-inovasdk-dev (= 2.2.4.1-2),
+               indi-stable-3rdparty-libs-micam-dev (= 2.2.4.1-2),
+               indi-stable-3rdparty-libs-sbig-dev (= 2.2.4.1-2),
+               indi-stable-3rdparty-libs-touptek-dev (= 2.2.4.1-2),
+               indi-stable-3rdparty-libs-fishcamp-dev (= 2.2.4.1-2)
+Standards-Version: 4.6.2
+Homepage: https://github.com/indilib/indi-3rdparty
+Rules-Requires-Root: no
+
+# Mirrors core/rpm/indi-stable-3rdparty-drivers.spec -- same private prefix,
+# same 9 vendor drivers, same scope decision (the ~50 other indi-3rdparty
+# drivers that need no vendor blob are deliberately out of scope, STATUS.md).
+# Read that spec's header comment for the full rationale; core/deb-
+# 3rdparty-drivers/rules carries only the Debian-specific mechanics.
+#
+# Every Depends: on indi-stable-3rdparty-libs-<vendor> below is pinned to a
+# LITERAL version (= X.Y.Z-1), not a substvar -- there is no dpkg
+# mechanism for one source package's control file to reference another
+# source package's version automatically the way ${binary:Version} does
+# within a single source package. This is the Debian expression of the SAME
+# hand-synchronized pinning core/rpm/indi-stable-3rdparty-drivers.spec's own
+# `= %%{version}-%%{release}` BuildRequires uses (both specs' Version: fields
+# are kept in step by the packager, not enforced by the build system) --
+# update every line below by hand whenever -libs's own version changes.
+#
+# indi-stable-core-libs is NOT version-pinned, unlike the -libs Depends
+# above -- core and indi-3rdparty are independent version axes (DESIGN.md),
+# where -libs and -drivers share one axis and one tag.
+
+Package: indi-stable-3rdparty-drivers-apogee
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-apogee (= 2.2.4.1-2)
+Description: Apogee CCD/filter-wheel INDI drivers
+ indi_apogee_ccd and indi_apogee_wheel, linked against the bundled Apogee
+ SDK (indi-stable-3rdparty-libs-apogee).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-asi
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-asi (= 2.2.4.1-2)
+Description: ZWO Optics ASI camera/filter-wheel/focuser/rotator INDI drivers
+ indi_asi_ccd, indi_asi_single_ccd, indi_asi_wheel, indi_asi_st4,
+ indi_asi_focuser and indi_asi_rotator, linked against the bundled ZWO ASI
+ SDK (indi-stable-3rdparty-libs-asi).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-fli
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-fli (= 2.2.4.1-2)
+Description: Finger Lakes Instrumentation INDI drivers
+ indi_fli_ccd, indi_fli_focus and indi_fli_wheel, linked against the bundled
+ FLI SDK (indi-stable-3rdparty-libs-fli). Does NOT include the Kepler
+ camera driver (indi_kepler_ccd) or its indi_flipro.xml -- both are gated
+ by find_package(FLIPRO), which self-excludes here because
+ indi-stable-3rdparty-libs deliberately does not package flipro/flialgo
+ (still-undecided licence coverage, see STATUS.md).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-playerone
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-playerone (= 2.2.4.1-2)
+Description: Player One Astronomy camera/filter-wheel INDI drivers
+ indi_playerone_ccd, indi_playerone_single_ccd and indi_playerone_wheel,
+ linked against the bundled Player One SDK
+ (indi-stable-3rdparty-libs-playerone).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-inovasdk
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-inovasdk (= 2.2.4.1-2)
+Description: i.Nova Technologies focuser INDI driver
+ indi_inovaplx_ccd, linked against the bundled i.Nova SDK
+ (indi-stable-3rdparty-libs-inovasdk).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-micam
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-micam (= 2.2.4.1-2)
+Description: Moravian Instruments camera/filter-wheel INDI drivers
+ indi_mi_ccd and indi_mi_sfw (plus their _usb/_eth symlinks), linked
+ against the bundled Moravian SDK (indi-stable-3rdparty-libs-micam).
+ Upstream's own driver source directory is named indi-mi; this package is
+ named micam to match the sibling -libs package it Depends on.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-sbig
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-sbig (= 2.2.4.1-2)
+Description: Santa Barbara Instrument Group camera INDI driver
+ indi_sbig_ccd, linked against the bundled SBIG SDK
+ (indi-stable-3rdparty-libs-sbig).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-fishcamp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-fishcamp (= 2.2.4.1-2)
+Description: Fishcamp Engineering CCD camera INDI driver
+ indi_fishcamp_ccd, linked against the bundled Fishcamp library
+ (indi-stable-3rdparty-libs-fishcamp). Added 2026-08-27 once Fishcamp's
+ licence was confirmed clear (DESIGN.md).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-touptek
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
+         indi-stable-3rdparty-libs-touptek (= 2.2.4.1-2)
+Description: Touptek and rebranded-Touptek camera INDI drivers (11 brands)
+ indi_<brand>_ccd, indi_<brand>_wheel and indi_<brand>_focuser for all
+ eleven Touptek-family brands (Toupcam, Altair, Bresser, Mallincam, Meade,
+ Nncam, Ogmacam, Omegon, StarShootG, TSCam, SVBONYCAM), linked against the
+ bundled SDKs (indi-stable-3rdparty-libs-touptek).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.

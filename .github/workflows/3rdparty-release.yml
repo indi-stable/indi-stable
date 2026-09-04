@@ -1,0 +1,470 @@
+name: indi-stable-3rdparty release
+
+# The same gate core-release.yml runs, applied to indi-stable-3rdparty-libs
+# and -drivers: poll indilib/indi-3rdparty for a newer stable tag, build both
+# source packages on both distros, smoke-test, and promote only what passes.
+#
+# Three things differ from core's workflow, all forced by the shape of this
+# component rather than chosen:
+#
+# 1. TWO source packages, built in sequence. -drivers BuildRequires/Depends
+#    on -libs at an exact version-release, so -libs must be built first and
+#    its -devel packages installed before -drivers can configure at all.
+#    That is why there are four build jobs here and two in core's.
+#
+# 2. Core is DOWNLOADED, not rebuilt. Both packages need
+#    indi-stable-core-devel/-dev at build time. Rebuilding core here would
+#    duplicate core-release.yml's ~20-minute build and, worse, could build
+#    3rdparty against a core that was never released. Downloading the
+#    current core GitHub Release encodes the right semantics: 3rdparty is
+#    built against a core that actually passed its own gate.
+#
+# 3. The promote step calls scripts/bump-3rdparty-version.sh rather than
+#    inline sed. core/deb-3rdparty-drivers/control carries eighteen literal
+#    version pins on -libs with no substvar able to express them, so the
+#    rewrite is assertion-checked in a script that can be tested by hand.
+#
+# Runner pinning, the rm -rf debian trap, and the GITHUB_TOKEN-cannot-
+# retrigger-a-workflow reason for one file with chained jobs are all the
+# same as core-release.yml -- see that file's comments.
+
+on:
+  schedule:
+    # Daily, offset from core's 09:17 so the two do not contend for runners
+    # or race on a development push if upstream ever tags both at once.
+    - cron: '43 10 * * *'
+  workflow_dispatch:
+    inputs:
+      repackage:
+        description: >-
+          Rebuild the CURRENT upstream version at the next Release number,
+          instead of polling for a new one. For when the packaging changed
+          and upstream did not.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  DEBFULLNAME: Will Snyder
+  DEBEMAIL: william@williamlsnyder.org
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      # In repackage mode new_tag carries the CURRENT version, so every
+      # downstream `if:` and build job below stays exactly as it is.
+      new_tag: ${{ steps.resolve.outputs.new_tag }}
+      release: ${{ steps.resolve.outputs.release }}
+      core_tag: ${{ steps.core.outputs.core_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check indilib/indi-3rdparty for a newer stable tag
+        id: check
+        if: inputs.repackage != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/check-upstream-tag.sh indilib/indi-3rdparty 3rdparty
+      # -libs is the source of truth for both specs' Version/Release -- they
+      # are kept in step deliberately, because -drivers pins -libs by
+      # %{version}-%{release}.
+      - name: Compute the next release (repackage only)
+        id: next
+        if: inputs.repackage == true
+        run: bash scripts/next-release.sh core/rpm/indi-stable-3rdparty-libs.spec
+      - name: Resolve what this run builds
+        id: resolve
+        run: |
+          if [ "${{ inputs.repackage }}" = "true" ]; then
+            echo "new_tag=v${{ steps.next.outputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "release=${{ steps.next.outputs.release }}"  >> "$GITHUB_OUTPUT"
+            echo "repackage: v${{ steps.next.outputs.version }} release ${{ steps.next.outputs.release }}"
+          else
+            echo "new_tag=${{ steps.check.outputs.new_tag }}" >> "$GITHUB_OUTPUT"
+            echo "release=1" >> "$GITHUB_OUTPUT"
+            echo "poll: '${{ steps.check.outputs.new_tag }}' release 1"
+          fi
+      # Which core release to build against. Read from versions.json rather
+      # than "whatever is newest", so a core promotion landing mid-run cannot
+      # change what this build links against halfway through.
+      - name: Resolve the core release to build against
+        id: core
+        run: |
+          CORE_TAG=$(jq -r '.core.release' versions.json)
+          [ -n "$CORE_TAG" ] && [ "$CORE_TAG" != "null" ] \
+            || { echo "could not read .core.release from versions.json" >&2; exit 1; }
+          echo "core_tag=${CORE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "building against core ${CORE_TAG}"
+
+  build-libs-fedora:
+    needs: check
+    if: needs.check.outputs.new_tag != ''
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install RPM build tools
+        run: dnf install -y rpm-build rpmdevtools dnf-plugins-core gh jq
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-rpms
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.rpm' --dir core-rpms
+          ls -la core-rpms/
+      - name: Install core and core-devel into the build container
+        run: dnf install -y ./core-rpms/indi-stable-core-*.rpm
+      - name: Bump spec Version to the new tag (this checkout only)
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          sed -i "s/^Version:\([[:space:]]*\).*$/Version:\1${NEW_TAG#v}/" core/rpm/indi-stable-3rdparty-libs.spec
+          sed -i "s/^Release:\([[:space:]]*\)[0-9][0-9]*/Release:\1${RELEASE}/" core/rpm/indi-stable-3rdparty-libs.spec
+          grep -E '^Version:|^Release:' core/rpm/indi-stable-3rdparty-libs.spec
+      - name: Resolve BuildRequires from the spec
+        run: dnf builddep -y core/rpm/indi-stable-3rdparty-libs.spec
+      - name: Fetch upstream source and build
+        run: |
+          rpmdev-setuptree
+          spectool -g -R core/rpm/indi-stable-3rdparty-libs.spec
+          rpmbuild -bb core/rpm/indi-stable-3rdparty-libs.spec
+      - name: Collect built RPMs
+        run: |
+          mkdir -p out
+          find "$HOME/rpmbuild/RPMS" -name '*.rpm' \
+            ! -name '*debuginfo*' ! -name '*debugsource*' -exec cp {} out/ \;
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3rdparty-libs-rpm
+          path: out/
+          if-no-files-found: error
+
+  build-drivers-fedora:
+    needs: [check, build-libs-fedora]
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install RPM build tools
+        run: dnf install -y rpm-build rpmdevtools dnf-plugins-core gh jq
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-rpms
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.rpm' --dir core-rpms
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-libs-rpm
+          path: libs-rpms
+      # -drivers' BuildRequires pin -libs' exact %{version}-%{release}, so it
+      # must build against the RPMs the previous job just produced -- not any
+      # other build of the same version. This is the CI equivalent of the
+      # `mock --install` step the by-hand procedure uses (STATUS.md), and for
+      # the same reason: there is no repository to resolve them from.
+      - name: Install core and the just-built -libs into the build container
+        run: |
+          dnf install -y ./core-rpms/indi-stable-core-*.rpm
+          dnf install -y ./libs-rpms/indi-stable-3rdparty-libs-*.rpm
+      - name: Bump spec Version to the new tag (this checkout only)
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          sed -i "s/^Version:\([[:space:]]*\).*$/Version:\1${NEW_TAG#v}/" core/rpm/indi-stable-3rdparty-drivers.spec
+          sed -i "s/^Release:\([[:space:]]*\)[0-9][0-9]*/Release:\1${RELEASE}/" core/rpm/indi-stable-3rdparty-drivers.spec
+          grep -E '^Version:|^Release:' core/rpm/indi-stable-3rdparty-drivers.spec
+      - name: Resolve BuildRequires from the spec
+        run: dnf builddep -y core/rpm/indi-stable-3rdparty-drivers.spec
+      - name: Fetch upstream source and build
+        run: |
+          rpmdev-setuptree
+          spectool -g -R core/rpm/indi-stable-3rdparty-drivers.spec
+          rpmbuild -bb core/rpm/indi-stable-3rdparty-drivers.spec
+      - name: Collect built RPMs
+        run: |
+          mkdir -p out
+          find "$HOME/rpmbuild/RPMS" -name '*.rpm' \
+            ! -name '*debuginfo*' ! -name '*debugsource*' -exec cp {} out/ \;
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3rdparty-drivers-rpm
+          path: out/
+          if-no-files-found: error
+
+  build-libs-debian:
+    needs: check
+    if: needs.check.outputs.new_tag != ''
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install devscripts and equivs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts equivs
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-debs
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
+          sudo apt-get install -y ./core-debs/*.deb
+      - name: Fetch and unpack upstream source
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+        run: |
+          NEW_VERSION="${NEW_TAG#v}"
+          echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_ENV"
+          echo "SRCDIR=/tmp/indi-3rdparty-${NEW_VERSION}" >> "$GITHUB_ENV"
+          curl -fsSL -o "/tmp/3rdparty-${NEW_TAG}.tar.gz" \
+            "https://github.com/indilib/indi-3rdparty/archive/refs/tags/${NEW_TAG}.tar.gz"
+          mkdir -p "/tmp/indi-3rdparty-${NEW_VERSION}"
+          tar xzf "/tmp/3rdparty-${NEW_TAG}.tar.gz" \
+            -C "/tmp/indi-3rdparty-${NEW_VERSION}" --strip-components=1
+      # rm -rf debian FIRST: the indi-3rdparty tarball ships its OWN debian/
+      # too, same as indi's. Confirmed again by hand 2026-09-04. Without it,
+      # cp -r puts our tree INSIDE theirs as debian/deb-3rdparty-libs and the
+      # build silently produces upstream's packaging instead of ours.
+      - name: Populate debian/ and bump changelog (this checkout only)
+        run: |
+          rm -rf "$SRCDIR/debian"
+          cp -r core/deb-3rdparty-libs "$SRCDIR/debian"
+          cd "$SRCDIR"
+          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}" \
+            --distribution unstable \
+            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }}, built by 3rdparty-release.yml"
+      - name: Resolve Build-Depends from debian/control
+        run: sudo mk-build-deps -i -t 'apt-get -y' "$SRCDIR/debian/control"
+      - name: Build
+        run: cd "$SRCDIR" && dpkg-buildpackage -us -uc -b
+      - name: Collect built DEBs
+        run: |
+          mkdir -p out
+          find /tmp -maxdepth 1 -name '*.deb' ! -name '*-dbgsym*' -exec cp {} out/ \;
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3rdparty-libs-deb
+          path: out/
+          if-no-files-found: error
+
+  build-drivers-debian:
+    needs: [check, build-libs-debian]
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install devscripts and equivs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts equivs
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-debs
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
+          sudo apt-get install -y ./core-debs/*.deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-libs-deb
+          path: libs-debs
+      # Same reason as the Fedora side: -drivers' Build-Depends pin -libs at
+      # an exact version, and only the artifact the previous job produced
+      # satisfies them.
+      - name: Install the just-built -libs packages
+        run: sudo apt-get install -y ./libs-debs/*.deb
+      - name: Fetch and unpack upstream source
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+        run: |
+          NEW_VERSION="${NEW_TAG#v}"
+          echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_ENV"
+          echo "SRCDIR=/tmp/indi-3rdparty-drivers-${NEW_VERSION}" >> "$GITHUB_ENV"
+          curl -fsSL -o "/tmp/3rdparty-drv-${NEW_TAG}.tar.gz" \
+            "https://github.com/indilib/indi-3rdparty/archive/refs/tags/${NEW_TAG}.tar.gz"
+          mkdir -p "/tmp/indi-3rdparty-drivers-${NEW_VERSION}"
+          tar xzf "/tmp/3rdparty-drv-${NEW_TAG}.tar.gz" \
+            -C "/tmp/indi-3rdparty-drivers-${NEW_VERSION}" --strip-components=1
+      # The control file's eighteen -libs pins still name the OLD version at
+      # this point, and Build-Depends cannot resolve against the -libs
+      # artifact the previous job just built until they are rewritten. Run
+      # the bump in the checkout FIRST, then copy the corrected tree across.
+      # Transient -- nothing here is committed; only the promote job commits.
+      - name: Rewrite the -libs version pins (this checkout only)
+        run: bash scripts/bump-3rdparty-version.sh "${{ needs.check.outputs.new_tag }}" "${{ needs.check.outputs.release }}"
+      - name: Populate debian/ and bump changelog (this checkout only)
+        run: |
+          rm -rf "$SRCDIR/debian"
+          cp -r core/deb-3rdparty-drivers "$SRCDIR/debian"
+          cd "$SRCDIR"
+          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}" \
+            --distribution unstable \
+            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }}, built by 3rdparty-release.yml"
+      - name: Resolve Build-Depends from debian/control
+        run: sudo mk-build-deps -i -t 'apt-get -y' "$SRCDIR/debian/control"
+      - name: Build
+        run: cd "$SRCDIR" && dpkg-buildpackage -us -uc -b
+      - name: Collect built DEBs
+        run: |
+          mkdir -p out
+          find /tmp -maxdepth 1 -name '*.deb' ! -name '*-dbgsym*' -exec cp {} out/ \;
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3rdparty-drivers-deb
+          path: out/
+          if-no-files-found: error
+
+  smoke-test-fedora:
+    needs: [check, build-libs-fedora, build-drivers-fedora]
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gh
+        run: dnf install -y gh
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-rpms
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.rpm' --dir core-rpms
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-libs-rpm
+          path: libs-rpms
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-drivers-rpm
+          path: drivers-rpms
+      - run: bash scripts/smoke-test-3rdparty.sh libs-rpms drivers-rpms core-rpms
+
+  smoke-test-debian:
+    needs: [check, build-libs-debian, build-drivers-debian]
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the gated core release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p core-debs
+          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-libs-deb
+          path: libs-debs
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-drivers-deb
+          path: drivers-debs
+      - run: sudo bash scripts/smoke-test-3rdparty-deb.sh libs-debs drivers-debs core-debs
+
+  promote:
+    needs: [check, smoke-test-fedora, smoke-test-debian]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-libs-rpm
+          path: artifacts/libs-rpm
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-drivers-rpm
+          path: artifacts/drivers-rpm
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-libs-deb
+          path: artifacts/libs-deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-drivers-deb
+          path: artifacts/drivers-deb
+      - name: Install devscripts
+        run: sudo apt-get update && sudo apt-get install -y devscripts
+      # One script, not inline sed: it rewrites both specs' Version:, both
+      # deb changelogs, both RPM %changelogs, and all eighteen literal -libs
+      # pins in core/deb-3rdparty-drivers/control -- asserting that every
+      # -libs dependency ends up exactly pinned, and aborting if any does
+      # not. It is idempotent, so a re-promotion of the same tag adds no
+      # duplicate changelog entry (the bug core-release.yml produced on
+      # 2026-08-28 and had to have squashed back by hand).
+      - name: Bump every version-carrying field for real
+        run: bash scripts/bump-3rdparty-version.sh "${{ needs.check.outputs.new_tag }}" "${{ needs.check.outputs.release }}"
+      - name: Update versions.json
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+        run: |
+          jq --arg v "$NEW_TAG" '.["3rdparty"].candidate = $v | .["3rdparty"].release = $v' \
+            versions.json > versions.json.tmp
+          mv versions.json.tmp versions.json
+      - name: Commit to development
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add core/rpm/indi-stable-3rdparty-libs.spec \
+                  core/rpm/indi-stable-3rdparty-drivers.spec \
+                  core/deb-3rdparty-libs/changelog \
+                  core/deb-3rdparty-drivers/changelog \
+                  core/deb-3rdparty-drivers/control \
+                  versions.json
+          # The release number belongs in the subject whenever it is not 1.
+          # Without it a repackage commit is byte-identical to the original
+          # promotion's subject -- confirmed 2026-09-04, when the first real
+          # repackage produced a second "promote ... v2.2.4.1" line
+          # indistinguishable from the first in git log.
+          #
+          # An `if` rather than `[ ... ] && SUBJ=...` deliberately. These steps
+          # run under bash -e, where the `&&` form is safe ONLY because more
+          # commands follow it: POSIX exempts the non-final command of an
+          # AND-list from set -e, so a false test there is ignored, but the
+          # SAME line as the last line of a step exits 1 and fails the job.
+          # Measured both ways, 2026-09-04, after an earlier version of this
+          # comment claimed the `&&` form was already broken here and testing
+          # showed it was not. The `if` removes the dependence on position.
+          SUBJ="3rdparty-release: promote indi-stable-3rdparty ${NEW_TAG}"
+          if [ "${RELEASE}" != "1" ]; then
+            SUBJ="${SUBJ} (release ${RELEASE})"
+          fi
+          git commit \
+            -m "${SUBJ}" \
+            -m "Automated. Gate passed on both distros: build, clean runtime install, every shipped driver resolves its libraries, one driver per vendor executes. See .github/workflows/3rdparty-release.yml."
+          git push origin development
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          mkdir -p release-assets
+          cp artifacts/*/*.rpm artifacts/*/*.deb release-assets/
+          # Release 1 keeps the plain name so existing tags stay valid; a
+          # repackage gets an explicit -N suffix, without which gh release
+          # create fails on the already-existing tag.
+          REL_TAG="indi-stable-3rdparty-${NEW_TAG}"
+          REL_TITLE="indi-stable-3rdparty ${NEW_TAG}"
+          if [ "${RELEASE}" != "1" ]; then
+            REL_TAG="${REL_TAG}-${RELEASE}"
+            REL_TITLE="${REL_TITLE} (release ${RELEASE})"
+          fi
+          echo "creating release: ${REL_TAG}"
+          gh release create "${REL_TAG}" release-assets/* \
+            --title "${REL_TITLE}" \
+            --notes "Automated release. Built from upstream indilib/indi-3rdparty ${NEW_TAG} against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on both Fedora and Debian/Ubuntu (build, clean runtime install, every shipped driver resolves its libraries, one driver from each of the nine vendors executes). Unofficial third-party build -- see README.md."

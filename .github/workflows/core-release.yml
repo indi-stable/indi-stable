@@ -1,0 +1,331 @@
+name: indi-stable-core release
+
+# The gate DESIGN.md's "Versioning policy" describes for indi-stable-core:
+# poll indilib/indi for a newer stable tag, build it on both distros, run
+# the smoke test (clean install, indiserver starts, a representative
+# driver loads), and promote only what passes -- no manual click-to-build
+# in the normal path, a human is involved only when the gate fails.
+#
+# Scope: indi-stable-core only. 3rdparty has its own equivalent workflow
+# (.github/workflows/3rdparty-release.yml), which BUILDS AGAINST the release
+# this one produces -- it downloads core's -devel/-dev packages from the
+# GitHub Release rather than rebuilding them, so a change to what core
+# publishes here is a change to that workflow's inputs. pyindi-client is
+# still manual; it releases on PyPI rather than as a GitHub tag and needs a
+# different upstream check. See STATUS.md.
+# GitHub-hosted runners throughout, not fedoraastro/ubuntuastro (those
+# VMs cannot stay up permanently to serve a scheduled poll, and the build
+# steps below don't need anything specific to them -- `mock` exists to
+# protect a persistent host's state, which is moot inside an
+# already-disposable CI container). No COPR/OBS publish yet -- a gated
+# build becomes a GitHub Release instead; see DESIGN.md's own "Build-logic
+# portability" section for why that is a deferred addition, not a
+# redesign.
+#
+# All four jobs below are chained with `needs:`, not by one workflow
+# triggering another via a push -- the default GITHUB_TOKEN cannot
+# re-trigger a workflow from its own push, by GitHub's own design (loop
+# prevention), which is exactly the shape DESIGN.md's original four-
+# separate-.yml-files sketch would have needed.
+
+on:
+  schedule:
+    # Daily, off-peak UTC. Upstream stable tags are infrequent; polling
+    # more often buys nothing.
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+    inputs:
+      repackage:
+        description: >-
+          Rebuild the CURRENT upstream version at the next Release number,
+          instead of polling for a new one. For when the packaging changed
+          and upstream did not.
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  DEBFULLNAME: Will Snyder
+  DEBEMAIL: william@williamlsnyder.org
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      # new_tag drives every downstream `if:` unchanged. In repackage mode it
+      # carries the CURRENT version rather than a newly-found one, which is
+      # what lets the whole pipeline below stay exactly as it is -- the only
+      # things that differ are the release number and the release tag name.
+      new_tag: ${{ steps.resolve.outputs.new_tag }}
+      release: ${{ steps.resolve.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check indilib/indi for a newer stable tag
+        id: check
+        if: inputs.repackage != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/check-upstream-tag.sh indilib/indi core
+      - name: Compute the next release (repackage only)
+        id: next
+        if: inputs.repackage == true
+        run: bash scripts/next-release.sh core/rpm/indi-stable-core.spec
+      # One place decides the version and release for the whole run, so a
+      # build job and the promote job cannot arrive at different answers.
+      - name: Resolve what this run builds
+        id: resolve
+        run: |
+          if [ "${{ inputs.repackage }}" = "true" ]; then
+            echo "new_tag=v${{ steps.next.outputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "release=${{ steps.next.outputs.release }}"  >> "$GITHUB_OUTPUT"
+            echo "repackage: v${{ steps.next.outputs.version }} release ${{ steps.next.outputs.release }}"
+          else
+            echo "new_tag=${{ steps.check.outputs.new_tag }}" >> "$GITHUB_OUTPUT"
+            echo "release=1" >> "$GITHUB_OUTPUT"
+            echo "poll: '${{ steps.check.outputs.new_tag }}' release 1"
+          fi
+
+  build-fedora:
+    needs: check
+    if: needs.check.outputs.new_tag != ''
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      # Just the tools, not the spec's own BuildRequires -- those come from
+      # `dnf builddep` below, reading core.spec directly, so this list can
+      # never drift out of sync with what the spec actually declares the
+      # way a hand-typed duplicate list would.
+      - name: Install RPM build tools
+        run: dnf install -y rpm-build rpmdevtools dnf-plugins-core
+      # Transient -- this checkout is thrown away when the job ends. The
+      # real, committed bump happens once in the `promote` job, only if
+      # the gate passes on both distros.
+      - name: Bump spec Version to the new tag (this checkout only)
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          sed -i "s/^Version:\([[:space:]]*\).*$/Version:\1${NEW_TAG#v}/" core/rpm/indi-stable-core.spec
+          sed -i "s/^Release:\([[:space:]]*\)[0-9][0-9]*/Release:\1${RELEASE}/" core/rpm/indi-stable-core.spec
+          grep -E '^Version:|^Release:' core/rpm/indi-stable-core.spec
+      - name: Resolve BuildRequires from the spec
+        run: dnf builddep -y core/rpm/indi-stable-core.spec
+      - name: Fetch upstream source and build
+        run: |
+          rpmdev-setuptree
+          spectool -g -R core/rpm/indi-stable-core.spec
+          rpmbuild -bb core/rpm/indi-stable-core.spec
+      - name: Collect built RPMs
+        run: |
+          mkdir -p out
+          find "$HOME/rpmbuild/RPMS" -name '*.rpm' \
+            ! -name '*debuginfo*' ! -name '*debugsource*' \
+            -exec cp {} out/ \;
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-rpm
+          path: out/
+          if-no-files-found: error
+
+  build-debian:
+    needs: check
+    if: needs.check.outputs.new_tag != ''
+    # Pinned to the exact Ubuntu release ubuntuastro (this project's own
+    # verification VM) runs, not ubuntu-latest -- found 2026-08-27, the
+    # hard way: ubuntu-latest currently resolves to 24.04 "noble", whose
+    # archive ships libxisf-dev 0.2.8-1, missing the
+    # LibXISF::DataBlock::CompressionCodecSupported()/ZSTD API indi
+    # 2.2.4.2's own indiccd.cpp calls. 26.04 "resolute" carries
+    # libxisf-dev 0.2.13-1build1, which has it -- exactly why the same
+    # source has always built cleanly by hand and never on ubuntu-latest.
+    # ubuntu-26.04 is a GitHub-hosted label already, if still preview.
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      # devscripts (dch, mk-build-deps) and equivs (mk-build-deps' own
+      # backend) up front -- dch is needed by the very next step.
+      - name: Install devscripts and equivs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y devscripts equivs
+      - name: Fetch and unpack upstream source
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+        run: |
+          NEW_VERSION="${NEW_TAG#v}"
+          echo "NEW_VERSION=${NEW_VERSION}" >> "$GITHUB_ENV"
+          echo "SRCDIR=/tmp/indi-${NEW_VERSION}" >> "$GITHUB_ENV"
+          curl -fsSL -o "/tmp/${NEW_TAG}.tar.gz" \
+            "https://github.com/indilib/indi/archive/refs/tags/${NEW_TAG}.tar.gz"
+          tar xzf "/tmp/${NEW_TAG}.tar.gz" -C /tmp
+      # Transient, same as the Fedora job's spec bump -- this unpacked
+      # tree and its debian/ never get committed; only `promote` commits
+      # for real.
+      #
+      # rm -rf debian FIRST is load-bearing -- found the hard way running
+      # this exact job, 2026-08-27: indi's own tarball DOES ship its own
+      # debian/ (indi-bin, libindi1, libindi-data, libindi-dev, upstream's
+      # own packaging, confirmed by reading the real tarball), exactly the
+      # same trap DEBIAN.md's core/deb section already documents and this
+      # workflow's own earlier comment wrongly claimed didn't apply here.
+      # Without the rm -rf, `cp -r core/deb "$SRCDIR/debian"` copies OUR
+      # tree INSIDE theirs as debian/deb instead of replacing it, so
+      # dpkg-buildpackage silently builds upstream's own unmodified
+      # packaging -- wrong names, no private prefix, nothing this project
+      # exists to guarantee. Caught only because smoke-test-debian
+      # couldn't find an indi-stable-core*.deb afterward and failed loudly
+      # rather than promoting it.
+      - name: Populate debian/ and bump changelog (this checkout only)
+        run: |
+          rm -rf "$SRCDIR/debian"
+          cp -r core/deb "$SRCDIR/debian"
+          cd "$SRCDIR"
+          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}" \
+            --distribution unstable \
+            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }}, built by core-release.yml"
+      - name: Resolve Build-Depends from debian/control
+        run: sudo mk-build-deps -i -t 'apt-get -y' "$SRCDIR/debian/control"
+      - name: Build
+        run: |
+          cd "$SRCDIR"
+          dpkg-buildpackage -us -uc -b
+      - name: Collect built DEBs
+        run: |
+          mkdir -p out
+          find /tmp -maxdepth 1 -name '*.deb' \
+            ! -name '*-dbgsym*' \
+            -exec cp {} out/ \;
+          ls -la out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-deb
+          path: out/
+          if-no-files-found: error
+
+  smoke-test-fedora:
+    needs: build-fedora
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-rpm
+          path: rpms
+      - run: bash scripts/smoke-test-core.sh rpms
+
+  smoke-test-debian:
+    needs: build-debian
+    # Same pin as build-debian, same reason -- and doubly so here: the
+    # .deb was linked against 26.04's own libraries (and glibc/libstdc++
+    # ABI), so installing it for a runtime smoke test on a DIFFERENT
+    # Ubuntu release risks a second, different mismatch even if the build
+    # itself had used 26.04.
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-deb
+          path: debs
+      - run: sudo bash scripts/smoke-test-core-deb.sh debs
+
+  promote:
+    needs: [check, smoke-test-fedora, smoke-test-debian]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: development
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-rpm
+          path: artifacts/rpm
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-deb
+          path: artifacts/deb
+      # dch, not preinstalled on ubuntu-latest -- the same gap
+      # build-debian's own "Install devscripts and equivs" step exists to
+      # close, needed again here since this is a separate job/runner.
+      - name: Install devscripts
+        run: sudo apt-get update && sudo apt-get install -y devscripts
+      # The real, committed version bump -- only reached once both gates
+      # above have passed.
+      #
+      # One script, not inline sed, matching 3rdparty-release.yml and
+      # pyindi-client-release.yml. The inline version this replaces had two
+      # real defects: it never wrote an RPM %changelog entry at all (so a
+      # genuinely new promotion would leave the spec's changelog silently
+      # behind Debian's), and its dch call had no idempotency guard, which
+      # produced the duplicate core/deb/changelog entry the 2026-08-28 run
+      # left behind to be squashed by hand. Its sed also matched
+      # "^Version:        .*" with exactly eight literal spaces and would
+      # have silently rewritten nothing had that column ever shifted.
+      - name: Bump spec and changelog for real
+        run: bash scripts/bump-core-version.sh "${{ needs.check.outputs.new_tag }}" "${{ needs.check.outputs.release }}"
+      - name: Update versions.json
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+        run: |
+          jq --arg v "$NEW_TAG" '.core.candidate = $v | .core.release = $v' \
+            versions.json > versions.json.tmp
+          mv versions.json.tmp versions.json
+      - name: Commit to development
+        env:
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add core/rpm/indi-stable-core.spec core/deb/changelog versions.json
+          # The release number belongs in the subject whenever it is not 1.
+          # Without it a repackage commit is byte-identical to the original
+          # promotion's subject -- confirmed 2026-09-04, when the first real
+          # repackage produced a second "promote ... v2.2.4.1" line
+          # indistinguishable from the first in git log.
+          #
+          # An `if` rather than `[ ... ] && SUBJ=...` deliberately. These steps
+          # run under bash -e, where the `&&` form is safe ONLY because more
+          # commands follow it: POSIX exempts the non-final command of an
+          # AND-list from set -e, so a false test there is ignored, but the
+          # SAME line as the last line of a step exits 1 and fails the job.
+          # Measured both ways, 2026-09-04, after an earlier version of this
+          # comment claimed the `&&` form was already broken here and testing
+          # showed it was not. The `if` removes the dependence on position.
+          SUBJ="core-release: promote indi-stable-core ${NEW_TAG}"
+          if [ "${RELEASE}" != "1" ]; then
+            SUBJ="${SUBJ} (release ${RELEASE})"
+          fi
+          git commit \
+            -m "${SUBJ}" \
+            -m "Automated. Gate passed on both distros: build, clean install, indiserver starts, a representative driver loads. See .github/workflows/core-release.yml."
+          git push origin development
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
+        run: |
+          mkdir -p release-assets
+          cp artifacts/rpm/*.rpm artifacts/deb/*.deb release-assets/
+          # Release 1 keeps the plain name, so existing tags and any link to
+          # them stay valid. A repackage gets an explicit -N suffix -- without
+          # it `gh release create` fails outright, because the tag for this
+          # upstream version already exists. That is not a hypothetical: it is
+          # exactly why core's own pipeline cannot be re-run against an
+          # already-released tag (STATUS.md).
+          REL_TAG="indi-stable-core-${NEW_TAG}"
+          REL_TITLE="indi-stable-core ${NEW_TAG}"
+          if [ "${RELEASE}" != "1" ]; then
+            REL_TAG="${REL_TAG}-${RELEASE}"
+            REL_TITLE="${REL_TITLE} (release ${RELEASE})"
+          fi
+          echo "creating release: ${REL_TAG}"
+          gh release create "${REL_TAG}" release-assets/* \
+            --title "${REL_TITLE}" \
+            --notes "Automated release. Built from upstream indilib/indi ${NEW_TAG}, gated on both Fedora and Debian/Ubuntu (build, clean install, indiserver starts, a representative driver loads). Unofficial third-party build -- see README.md."

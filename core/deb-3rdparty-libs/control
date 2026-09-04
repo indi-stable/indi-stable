@@ -1,0 +1,187 @@
+Source: indi-stable-3rdparty-libs
+Section: science
+Priority: optional
+Maintainer: Will Snyder <william@williamlsnyder.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               g++,
+               indi-stable-core-dev,
+               libusb-1.0-0-dev,
+               libcurl4-gnutls-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/indilib/indi-3rdparty
+Rules-Requires-Root: no
+
+# Mirrors core/rpm/indi-stable-3rdparty-libs.spec -- same private prefix, same
+# 9 bundled vendors, same licence-tier exclusions. Read that spec's header
+# comment for the full rationale; not repeated here verbatim, only the
+# Debian-specific mechanics (see core/deb-3rdparty-libs/rules).
+#
+# Every -dev package below Depends on its runtime sibling by NAME
+# (= ${binary:Version}), not ${shlibs:Depends} -- deliberately, from the
+# start, unlike core/rpm's own -devel subpackages, which had to add this
+# after their first real `dnf install` failed with "nothing provides
+# libapogee.so.3()(64bit)" (an auto-generated Requires on the -devel
+# package's own unversioned .so symlink, unsatisfiable once
+# __provides_exclude_from stripped the matching Provides). Debian's -dev
+# convention of a hand-written package-name Depends, with no ${shlibs:Depends}
+# on the -dev package at all, sidesteps that whole bug class by construction
+# -- core/deb's own indi-stable-core-dev already does this, and it is the
+# reason that packaging never hit the RPM-side defect.
+
+Package: indi-stable-3rdparty-libs-apogee
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Apogee Instruments CCD camera SDK (GPL-2.0)
+ Apogee Instruments' CCD camera library, GPL-2.0 licensed -- source is
+ included in this package's copyright file, satisfying GPL's own
+ redistribution terms rather than merely permitting them.
+ .
+ Installs into /opt/indi-stable, the same private prefix as
+ indi-stable-core, so it never collides with any distribution-provided
+ camera SDK package.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-apogee-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-apogee (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-apogee
+ Headers for building against the bundled Apogee SDK. Install path is
+ /opt/indi-stable/include, matching indi-stable-core-dev's own headers --
+ never under /usr/include, for the same reason core's headers are not there.
+
+Package: indi-stable-3rdparty-libs-asi
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: ZWO Optics ASI camera/filter-wheel/focuser SDK (MIT)
+ ZWO's ASICamera2, EFW, ST4, EAF and CAA SDKs, bundled as prebuilt vendor
+ binaries under a verbatim MIT licence.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-asi-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-asi (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-asi
+ Headers for building against the bundled ZWO ASI SDK.
+
+Package: indi-stable-3rdparty-libs-fli
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Finger Lakes Instrumentation SDK (BSD-2-Clause)
+ FLI's camera/focuser/filter-wheel SDK, 2-clause BSD licensed, source
+ included.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-fli-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-fli (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-fli
+ Headers for building against the bundled FLI SDK.
+
+Package: indi-stable-3rdparty-libs-playerone
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Player One Astronomy camera SDK (MIT-style)
+ Player One Astronomy's camera SDK, redistributable under the terms in its
+ own licence.txt (an MIT-style permission notice).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-playerone-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-playerone (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-playerone
+ Headers for building against the bundled Player One SDK.
+
+Package: indi-stable-3rdparty-libs-inovasdk
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: i.Nova Technologies focuser SDK
+ i.Nova's focuser SDK, redistributable in binary form under its own
+ licence.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-inovasdk-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-inovasdk (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-inovasdk
+ Headers for building against the bundled i.Nova SDK.
+
+Package: indi-stable-3rdparty-libs-micam
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Moravian Instruments camera SDK
+ Moravian Instruments' gxccd camera SDK, redistributable in binary form
+ under its own licence.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-micam-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-micam (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-micam
+ Headers for building against the bundled Moravian SDK.
+
+Package: indi-stable-3rdparty-libs-sbig
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Santa Barbara Instrument Group camera SDK and firmware
+ SBIG's camera SDK and firmware images, redistributable in binary form
+ under its own licence.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-sbig-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-sbig (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-sbig
+ Headers for building against the bundled SBIG SDK.
+
+Package: indi-stable-3rdparty-libs-fishcamp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Fishcamp Engineering CCD camera library and firmware (BSD-2-Clause)
+ Fishcamp Engineering's camera library, 2-clause BSD licensed, source
+ included -- same tier as fli, resolved 2026-08-27 (DESIGN.md). Ships two
+ firmware images uploaded to the camera's own microcontroller, covered by
+ the same top-level licence as the library source.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-fishcamp-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-fishcamp (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-fishcamp
+ Headers for building against the bundled Fishcamp library.
+
+Package: indi-stable-3rdparty-libs-touptek
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Touptek and rebranded-Touptek camera SDKs (LGPL-2.1)
+ The Touptek camera SDK and its ten rebrands (Altair, Bresser, Mallincam,
+ Meade, Nncam, Ogmacam, Omegon, StarShoot, TSCam, SVBONYCAM) -- the same
+ underlying hardware sold under eleven brand names, each with its own
+ LGPL-2.1-licensed vendor SDK. Bundled together because indi-toupbase, the
+ single driver source that consumes them, builds against all eleven from
+ one CMakeLists.txt loop.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-libs-touptek-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-3rdparty-libs-touptek (= ${binary:Version})
+Description: Development files for indi-stable-3rdparty-libs-touptek
+ Headers for building against all eleven bundled Touptek-family SDKs.

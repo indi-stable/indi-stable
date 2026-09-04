@@ -1,0 +1,10 @@
+indi-stable-core (2.2.4.2-1) unstable; urgency=medium
+
+  * Initial package. Builds upstream tag v2.2.4.2 into /opt/indi-stable.
+  * Verified end-to-end by core-release.yml (build, clean install,
+    indiserver starts, indi_simulator_ccd loads) on both distros,
+    2026-08-28 -- the release-automation pipeline's first real gated run,
+    re-confirming this already-current version rather than a genuinely
+    new upstream release.
+
+ -- Will Snyder <william@williamlsnyder.org>  Sun, 23 Aug 2026 12:00:00 +0000

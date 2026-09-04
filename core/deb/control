@@ -1,0 +1,82 @@
+Source: indi-stable-core
+Section: science
+Priority: optional
+Maintainer: Will Snyder <william@williamlsnyder.org>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               g++,
+               pkg-config,
+               zlib1g-dev,
+               libcfitsio-dev,
+               libnova-dev,
+               libusb-1.0-0-dev,
+               libcurl4-gnutls-dev,
+               libgsl-dev,
+               libjpeg-dev,
+               libev-dev,
+               libgps-dev,
+               libraw-dev,
+               libftdi-dev,
+               libkrb5-dev,
+               libtiff-dev,
+               libfftw3-dev,
+               librtlsdr-dev,
+               libgphoto2-dev,
+               libdc1394-dev,
+               libboost-regex-dev,
+               libtheora-dev,
+               libxisf-dev,
+               liberfa-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/indilib/indi
+Rules-Requires-Root: no
+
+Package: indi-stable-core
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs (= ${binary:Version})
+Description: INDI core library and server (stable upstream release, private prefix)
+ INDI (Instrument-Neutral Distributed Interface) is a distributed control
+ protocol for astronomical instrumentation. This package provides indiserver
+ and the bundled device drivers, built from an upstream stable release tag.
+ .
+ It installs into a private prefix (/opt/indi-stable) and registers
+ indiserver-stable through update-alternatives, so it coexists with a
+ distribution-provided INDI rather than replacing it. Nothing this package
+ installs overwrites a file owned by another package -- notably it does not
+ conflict with indi-bin, which kstars depends on.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-core-libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Shared libraries for indi-stable-core
+ The INDI client, driver and alignment shared libraries, installed under
+ /opt/indi-stable/lib.
+ .
+ These deliberately do NOT use the standard library search path. Consumers
+ find them through RPATH instead, so they can never shadow a distribution
+ INDI: this project ships stable releases just as the distribution does, so
+ both carry libindiclient.so.2 and SONAME alone would not keep them apart.
+ .
+ The package is therefore not named liblindiclient2 or similar. Debian's
+ lib<name><soversion> convention exists for libraries in the public linker
+ path that other packages link against; these are private to indi-stable.
+
+Package: indi-stable-core-dev
+Architecture: any
+Depends: ${misc:Depends}, indi-stable-core-libs (= ${binary:Version})
+Description: Development files for indi-stable-core
+ Headers, static libraries and pkg-config metadata for building against
+ indi-stable-core.
+ .
+ Headers install to /opt/indi-stable/include, NOT /usr/include/libindi. That
+ is deliberate and load-bearing: headers are not SONAME-versioned, and
+ /usr/include precedes any private path in the default compiler search
+ order, so a distribution libindi-dev left installed would silently win and
+ the build would quietly use the wrong INDI.
+ .
+ Build against this package with:
+   PKG_CONFIG_PATH=/opt/indi-stable/lib/pkgconfig \
+     pkg-config --cflags --libs libindi

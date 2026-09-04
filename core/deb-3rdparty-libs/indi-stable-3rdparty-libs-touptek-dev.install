@@ -1,0 +1,11 @@
+opt/indi-stable/include/libtoupcam/
+opt/indi-stable/include/libaltaircam/
+opt/indi-stable/include/libbressercam/
+opt/indi-stable/include/libmallincam/
+opt/indi-stable/include/libmeadecam/
+opt/indi-stable/include/libnncam/
+opt/indi-stable/include/libogmacam/
+opt/indi-stable/include/libomegonprocam/
+opt/indi-stable/include/libstarshootg/
+opt/indi-stable/include/libtscam/
+opt/indi-stable/include/libsvbonycam/

@@ -1,0 +1,127 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: indi-3rdparty
+Upstream-Contact: https://github.com/indilib/indi-3rdparty/issues
+Source: https://github.com/indilib/indi-3rdparty
+
+Comment:
+ This package is built by indi-stable, an unofficial third-party packaging
+ project. It is not affiliated with, endorsed by, or supported by the INDI
+ project. Problems with these packages should be reported to indi-stable,
+ not to INDI upstream.
+ .
+ One tarball, several vendors, several licences -- this file is a defensible
+ aggregate, NOT a fully-verified per-file audit. See
+ core/rpm/indi-stable-3rdparty-libs.spec's own License: comment for exactly
+ which licences were read in full text versus inferred, and DESIGN.md, "The
+ licence tiers", for why astroasis/atik/qhy/svbony/pentax/qsi are NOT in
+ this package at all. Fishcamp was in that list too until 2026-08-27, when
+ its licence was confirmed clear -- see DESIGN.md, "QSI and Fishcamp
+ resolved".
+
+Files: libapogee/*
+Copyright: Apogee Instruments, Inc.
+License: GPL-2.0-only
+ This library is redistributed under the GNU General Public License version
+ 2, the FULL text of which is included below -- not a permissive grant.
+ Complete corresponding source is shipped alongside the compiled library
+ (this is the same source tree GPL requires access to), which is what GPL's
+ own terms require for lawful redistribution.
+ .
+ Whether apogee's own source files say "-only" or "-or-later" was NOT
+ checked at the per-file header level; -only is the more conservative tag
+ and is used here for that reason.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-2.
+
+Files: libasi/*
+Copyright: ZWO Company Limited (Suzhou ZWO Co., Ltd.)
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files, to deal in the
+ Software without restriction, including without limitation the rights to
+ use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, subject to the inclusion of the above copyright
+ notice in all copies. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ ANY KIND. Verbatim text confirmed by reading libasi/license.txt in full.
+
+Files: libfli/*
+Copyright: Finger Lakes Instrumentation, LLC
+License: BSD-2-Clause
+ 2-clause BSD, confirmed by reading libfli/LICENSE.BSD in full. Does NOT
+ cover flipro/flialgo (a second, different prebuilt blob in a subdirectory
+ with no licence file of its own) -- those are deliberately not shipped by
+ this package (STATUS.md, "Genuinely open").
+
+Files: libplayerone/*
+Copyright: Player One Astronomy
+License: MIT
+ An MIT-style permission notice wrapped in a company preamble -- the same
+ boilerplate as libasi's, confirmed by reading libplayerone/license.txt in
+ full.
+
+Files: libinovasdk/*
+Copyright: i.Nova Technologies
+License: BSD-2-Clause
+ A custom "redistribution in binary form permitted" notice, BSD-shaped but
+ not the literal SPDX BSD-2-Clause text -- tagged BSD-2-Clause as the
+ closest match, not a byte-for-byte one. Confirmed by reading
+ libinovasdk/LICENSE.lib in full.
+
+Files: libmicam/*
+Copyright: CCD Labs s.r.o. (Moravian Instruments)
+License: BSD-2-Clause
+ Same custom "redistribution in binary form permitted" notice as
+ libinovasdk's. Confirmed by reading libmicam/LICENSE in full.
+
+Files: libsbig/*
+Copyright: Santa Barbara Instrument Group / Diffraction Limited
+License: BSD-2-Clause
+ Same custom "redistribution in binary form permitted" notice as
+ libinovasdk's. Confirmed by reading libsbig/LICENSE.firmware in full.
+
+Files: libfishcamp/*
+Copyright: Fishcamp Engineering
+License: BSD-2-Clause
+ 2-clause BSD, confirmed by reading libfishcamp/COPYING.LIB in full,
+ 2026-08-27 -- the filename suggests LGPL, the text does not. Covers the
+ library source (fishcamp.c) and the two bundled firmware images
+ (gdr_usb.hex, Guider_mono_rev16_intel.srec), uploaded to the camera's own
+ microcontroller at runtime: same directory, same copyright header, no
+ separate or contradicting notice found for them.
+
+Files: libtoupcam/* libaltaircam/* libbressercam/* libmallincam/* libmeadecam/*
+ libnncam/* libogmacam/* libomegonprocam/* libstarshootg/* libtscam/*
+ libsvbonycam/*
+Copyright: Touptek Photonics Co., Ltd. and its eleven rebrand partners
+License: LGPL-2.1-only
+ The same underlying hardware sold under eleven brand names, each with its
+ own SDK under LGPL-2.1. Confirmed byte-identical (502 lines) across all
+ eleven directories' COPYING.LGPL rather than assumed from one.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
+Files: debian/*
+Copyright: 2026 Will Snyder
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to
+ deal in the Software without restriction, including without limitation the
+ rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ sell copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ IN THE SOFTWARE.
+ .
+ This MIT license covers the packaging metadata in debian/ only. It does not
+ relicense indi-3rdparty, which remains under the terms above.

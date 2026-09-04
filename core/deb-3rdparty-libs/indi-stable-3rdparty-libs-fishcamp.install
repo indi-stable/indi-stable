@@ -1,0 +1,9 @@
+# Named explicitly, not the whole firmware/ directory: sbig also installs
+# into opt/indi-stable/share/indi/firmware/, and a bare directory glob here
+# would ship ITS files in this package too -- two binary packages claiming
+# the same path, which dpkg refuses to install together. See
+# indi-stable-3rdparty-libs-sbig.install's own comment, added the same day.
+opt/indi-stable/lib/libfishcamp.so.*
+opt/indi-stable/share/indi/firmware/gdr_usb.hex
+opt/indi-stable/share/indi/firmware/Guider_mono_rev16_intel.srec
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*fishcamp*.rules

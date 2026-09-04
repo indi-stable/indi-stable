@@ -1,0 +1,2 @@
+opt/indi-stable/lib/libinovasdk*.so.*
+usr/lib/udev/rules.d/*-indi-stable-3rdparty-*inovaplx*.rules

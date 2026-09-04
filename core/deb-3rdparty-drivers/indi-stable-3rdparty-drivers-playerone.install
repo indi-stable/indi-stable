@@ -1,0 +1,4 @@
+opt/indi-stable/bin/indi_playerone_ccd
+opt/indi-stable/bin/indi_playerone_single_ccd
+opt/indi-stable/bin/indi_playerone_wheel
+opt/indi-stable/share/indi/indi_playerone.xml

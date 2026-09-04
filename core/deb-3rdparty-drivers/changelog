@@ -1,0 +1,18 @@
+indi-stable-3rdparty-drivers (2.2.4.1-2) unstable; urgency=medium
+
+  * New upstream release v2.2.4.1, built and gated by 3rdparty-
+    release.yml
+
+ -- Will Snyder <william@williamlsnyder.org>  Fri, 04 Sep 2026 20:13:05 +0000
+
+indi-stable-3rdparty-drivers (2.2.4.1-1) unstable; urgency=medium
+
+  * Initial package. Builds indi-3rdparty tag v2.2.4.1's drivers for the
+    same 9 vendors indi-stable-3rdparty-libs bundles, with -DBUILD_LIBS=OFF
+    against that package's -dev packages. Builds, installs and removes
+    cleanly alongside indi-stable-core and indi-stable-3rdparty-libs as of
+    2026-08-26. See STATUS.md. Fishcamp added 2026-08-27 once its licence
+    was confirmed clear (DESIGN.md); not yet released, so folded into the
+    initial entry rather than given its own dated one.
+
+ -- Will Snyder <william@williamlsnyder.org>  Wed, 26 Aug 2026 20:00:00 +0000

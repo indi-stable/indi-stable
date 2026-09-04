@@ -1,0 +1,7 @@
+opt/indi-stable/bin/indi_asi_ccd
+opt/indi-stable/bin/indi_asi_single_ccd
+opt/indi-stable/bin/indi_asi_wheel
+opt/indi-stable/bin/indi_asi_st4
+opt/indi-stable/bin/indi_asi_focuser
+opt/indi-stable/bin/indi_asi_rotator
+opt/indi-stable/share/indi/indi_asi.xml

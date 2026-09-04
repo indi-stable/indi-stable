@@ -1,0 +1,13 @@
+#!/bin/sh
+# Withdraw the alternative on real removal only -- not on upgrade, where the
+# link must survive so the package stays usable across the replacement.
+set -e
+
+case "$1" in
+    remove|deconfigure)
+        update-alternatives --remove indiserver-stable /opt/indi-stable/bin/indiserver
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

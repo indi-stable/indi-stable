@@ -1,0 +1,45 @@
+Source: indi-stable-pyindi-client
+Section: python
+Priority: optional
+Maintainer: Will Snyder <william@williamlsnyder.org>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-dev,
+               python3-setuptools,
+               swig,
+               zlib1g-dev,
+               libcfitsio-dev,
+               libnova-dev,
+               indi-stable-core-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/indilib/pyindi-client
+Rules-Requires-Root: no
+
+# Builds indilib/pyindi-client's 2.2.0 PyPI release, linked against
+# indi-stable-core rather than any system libindi -- DESIGN.md's "SWIG
+# bindings will not compile against mismatched headers" is why this
+# component is in scope at all. See DESIGN.md, "pyindi-client -- packaging
+# decisions", 2026-08-26, for why 2.2.0 (an untagged commit on upstream's
+# master) is built instead of the last real git tag, v2.1.2 -- that tag
+# needs a static libindiclient.a this project's core/ does not build.
+#
+# The private RPATH baked into the compiled extension at link time
+# (pyindi-client/deb/rules) is what keeps this coexisting the same way
+# every other component does. The built module itself installs to the
+# ordinary system Python location, not /opt/indi-stable -- deliberately, not
+# an oversight; see DESIGN.md's same section for why that is not an
+# exception to the coexistence rule.
+
+Package: indi-stable-pyindi-client
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, indi-stable-core-libs
+Description: Python bindings for the INDI client library (indi-stable build)
+ SWIG-generated Python bindings for INDI's C++ client API
+ (INDI::BaseClient et al.), built and version-matched against this
+ project's own indi-stable-core rather than any system libindi.
+ .
+ This is indilib/pyindi-client's own upstream binding, rebuilt against
+ this project's private INDI prefix; it is not a fork.
+ .
+ Unofficial third-party build; not affiliated with or endorsed by the
+ INDI project.

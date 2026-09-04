@@ -1,0 +1,21 @@
+# Everything below is a deliberate consequence of this package's coexistence
+# design, not an oversight. See core/rpm/indi-stable-core.spec's header and
+# DESIGN.md for the reasoning.
+#
+# There is one override file PER BINARY PACKAGE, and that is required rather
+# than stylistic: dh_lintian installs a given file only into the package it is
+# named for, and lintian rejects any line naming a different package as an
+# "alien-tag". A single combined file therefore leaves the other packages'
+# overrides silently INERT -- their tags stay hard errors -- which is exactly
+# what the first Debian build produced.
+
+# /opt is correct here: FHS 3.13 reserves it for add-on application software,
+# and Debian Policy's prohibition binds packages shipped by Debian, which this
+# third-party repository is not. It also keeps the install path identical
+# across Fedora/RHEL/Debian/Ubuntu, so one documented path works everywhere.
+indi-stable-core: dir-or-file-in-opt
+
+# RPATH into the private libdir is the mechanism that stops these binaries
+# resolving against -- or being resolved against -- a distribution INDI
+# carrying the same SONAME. Removing it breaks the coexistence guarantee.
+indi-stable-core: custom-library-search-path

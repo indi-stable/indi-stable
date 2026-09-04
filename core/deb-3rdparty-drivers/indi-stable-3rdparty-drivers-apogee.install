@@ -1,0 +1,3 @@
+opt/indi-stable/bin/indi_apogee_ccd
+opt/indi-stable/bin/indi_apogee_wheel
+opt/indi-stable/share/indi/indi_apogee.xml

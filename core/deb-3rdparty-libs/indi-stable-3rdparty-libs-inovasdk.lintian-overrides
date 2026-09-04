@@ -1,0 +1,2 @@
+indi-stable-3rdparty-libs-inovasdk: dir-or-file-in-opt
+indi-stable-3rdparty-libs-inovasdk: custom-library-search-path

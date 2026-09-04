@@ -1,0 +1,12 @@
+*.rpm
+*.deb
+*.tar.gz
+build/
+BUILD/
+BUILDROOT/
+RPMS/
+SRPMS/
+
+# Operational specifics (sudoers paths, SSH key names) that don't need to be
+# in git even privately -- STATUS.md points here generically instead.
+.local-notes.md

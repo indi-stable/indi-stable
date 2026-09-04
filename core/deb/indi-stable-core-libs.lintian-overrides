@@ -1,0 +1,4 @@
+# See indi-stable-core.lintian-overrides for the full reasoning, including why
+# each binary package needs its own file rather than one shared one.
+indi-stable-core-libs: dir-or-file-in-opt
+indi-stable-core-libs: custom-library-search-path
