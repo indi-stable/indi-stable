@@ -9,15 +9,15 @@ Build-Depends: debhelper-compat (= 13),
                libcfitsio-dev,
                zlib1g-dev,
                libusb-1.0-0-dev,
-               indi-stable-3rdparty-libs-apogee-dev (= 2.2.4.1-2),
-               indi-stable-3rdparty-libs-asi-dev (= 2.2.4.1-2),
-               indi-stable-3rdparty-libs-fli-dev (= 2.2.4.1-2),
-               indi-stable-3rdparty-libs-playerone-dev (= 2.2.4.1-2),
-               indi-stable-3rdparty-libs-inovasdk-dev (= 2.2.4.1-2),
-               indi-stable-3rdparty-libs-micam-dev (= 2.2.4.1-2),
-               indi-stable-3rdparty-libs-sbig-dev (= 2.2.4.1-2),
-               indi-stable-3rdparty-libs-touptek-dev (= 2.2.4.1-2),
-               indi-stable-3rdparty-libs-fishcamp-dev (= 2.2.4.1-2)
+               indi-stable-3rdparty-libs-apogee-dev (= 2.2.4.1-1),
+               indi-stable-3rdparty-libs-asi-dev (= 2.2.4.1-1),
+               indi-stable-3rdparty-libs-fli-dev (= 2.2.4.1-1),
+               indi-stable-3rdparty-libs-playerone-dev (= 2.2.4.1-1),
+               indi-stable-3rdparty-libs-inovasdk-dev (= 2.2.4.1-1),
+               indi-stable-3rdparty-libs-micam-dev (= 2.2.4.1-1),
+               indi-stable-3rdparty-libs-sbig-dev (= 2.2.4.1-1),
+               indi-stable-3rdparty-libs-touptek-dev (= 2.2.4.1-1),
+               indi-stable-3rdparty-libs-fishcamp-dev (= 2.2.4.1-1)
 Standards-Version: 4.6.2
 Homepage: https://github.com/indilib/indi-3rdparty
 Rules-Requires-Root: no
@@ -45,7 +45,7 @@ Rules-Requires-Root: no
 Package: indi-stable-3rdparty-drivers-apogee
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-apogee (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-apogee (= 2.2.4.1-1)
 Description: Apogee CCD/filter-wheel INDI drivers
  indi_apogee_ccd and indi_apogee_wheel, linked against the bundled Apogee
  SDK (indi-stable-3rdparty-libs-apogee).
@@ -56,7 +56,7 @@ Description: Apogee CCD/filter-wheel INDI drivers
 Package: indi-stable-3rdparty-drivers-asi
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-asi (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-asi (= 2.2.4.1-1)
 Description: ZWO Optics ASI camera/filter-wheel/focuser/rotator INDI drivers
  indi_asi_ccd, indi_asi_single_ccd, indi_asi_wheel, indi_asi_st4,
  indi_asi_focuser and indi_asi_rotator, linked against the bundled ZWO ASI
@@ -68,7 +68,7 @@ Description: ZWO Optics ASI camera/filter-wheel/focuser/rotator INDI drivers
 Package: indi-stable-3rdparty-drivers-fli
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-fli (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-fli (= 2.2.4.1-1)
 Description: Finger Lakes Instrumentation INDI drivers
  indi_fli_ccd, indi_fli_focus and indi_fli_wheel, linked against the bundled
  FLI SDK (indi-stable-3rdparty-libs-fli). Does NOT include the Kepler
@@ -83,7 +83,7 @@ Description: Finger Lakes Instrumentation INDI drivers
 Package: indi-stable-3rdparty-drivers-playerone
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-playerone (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-playerone (= 2.2.4.1-1)
 Description: Player One Astronomy camera/filter-wheel INDI drivers
  indi_playerone_ccd, indi_playerone_single_ccd and indi_playerone_wheel,
  linked against the bundled Player One SDK
@@ -95,7 +95,7 @@ Description: Player One Astronomy camera/filter-wheel INDI drivers
 Package: indi-stable-3rdparty-drivers-inovasdk
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-inovasdk (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-inovasdk (= 2.2.4.1-1)
 Description: i.Nova Technologies focuser INDI driver
  indi_inovaplx_ccd, linked against the bundled i.Nova SDK
  (indi-stable-3rdparty-libs-inovasdk).
@@ -106,7 +106,7 @@ Description: i.Nova Technologies focuser INDI driver
 Package: indi-stable-3rdparty-drivers-micam
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-micam (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-micam (= 2.2.4.1-1)
 Description: Moravian Instruments camera/filter-wheel INDI drivers
  indi_mi_ccd and indi_mi_sfw (plus their _usb/_eth symlinks), linked
  against the bundled Moravian SDK (indi-stable-3rdparty-libs-micam).
@@ -119,7 +119,7 @@ Description: Moravian Instruments camera/filter-wheel INDI drivers
 Package: indi-stable-3rdparty-drivers-sbig
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-sbig (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-sbig (= 2.2.4.1-1)
 Description: Santa Barbara Instrument Group camera INDI driver
  indi_sbig_ccd, linked against the bundled SBIG SDK
  (indi-stable-3rdparty-libs-sbig).
@@ -130,7 +130,7 @@ Description: Santa Barbara Instrument Group camera INDI driver
 Package: indi-stable-3rdparty-drivers-fishcamp
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-fishcamp (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-fishcamp (= 2.2.4.1-1)
 Description: Fishcamp Engineering CCD camera INDI driver
  indi_fishcamp_ccd, linked against the bundled Fishcamp library
  (indi-stable-3rdparty-libs-fishcamp). Added 2026-08-27 once Fishcamp's
@@ -142,7 +142,7 @@ Description: Fishcamp Engineering CCD camera INDI driver
 Package: indi-stable-3rdparty-drivers-touptek
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
-         indi-stable-3rdparty-libs-touptek (= 2.2.4.1-2)
+         indi-stable-3rdparty-libs-touptek (= 2.2.4.1-1)
 Description: Touptek and rebranded-Touptek camera INDI drivers (11 brands)
  indi_<brand>_ccd, indi_<brand>_wheel and indi_<brand>_focuser for all
  eleven Touptek-family brands (Toupcam, Altair, Bresser, Mallincam, Meade,
