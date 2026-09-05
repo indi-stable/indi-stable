@@ -24,7 +24,26 @@ Two rules keep it living rather than growing:
 | **CI (all three)** | **Verified end to end ON THIS REPO, 2026-09-04**, not just inherited from the seed's own history. Core, 3rdparty and pyindi-client each ran a real (not dry-run) check → build → smoke-test → promote cycle here for the first time, each publishing a real GitHub Release and pushing a real promotion commit: `indi-stable-core-v2.2.4.2` (6 assets), `indi-stable-3rdparty-v2.2.4.1` (54 assets, at a clean `Release: 1` — see below for why that needed a real fix first), `indi-stable-pyindi-client-2.2.0` (2 assets, symbol-check counts 1172/1199 confirmed substantive, not vacuous). All three promote jobs now create the GitHub Release **before** committing the version bump (`53cef94`) — closing a real, if narrow, window where a downstream workflow reading `versions.json` could see a release referenced before it existed; confirmed on this run by the release's `publishedAt` and the promote commit's own timestamp landing in the same second, not by trusting the reorder alone. |
 | **3rdparty's first real run here failed, and the cause was worth finding.** The fresh-history seed carried over the archived repo's already-bumped state (`Release: 2%{?dist}`, changelogs and all 18 control pins at `-2` — leftover from a repackage test run there). This repo's own release history starts fresh, so the first real promotion attempt collided: Debian's `dch` correctly refused to write a lower version than what its changelog already claimed, but the RPM side's plain `sed` had no equivalent check and **silently regressed `Release: 2` back down to `1`**, reporting success. Fixed in two parts, `01b52b9`: the seed's phantom `-2` content reset to a clean `-1` (nothing describing that content ever actually shipped from this repo), and all three bump scripts hardened to refuse moving RPM `Release:` backward for an unchanged upstream version, matching what `dch` already enforced on the Debian side. Re-run afterward: all 8 jobs passed. |
 
-Work happens on `development`. Will merges to `main` himself.
+Work happens on `development`. Will merges to `main` himself, via PR.
+
+**`main`, not `development`, is what every release workflow reads from and
+publishes to, as of 2026-09-05.** Before that fix, `check`/`build-*`/
+`smoke-test-*` used an unpinned `actions/checkout@v4`, which follows
+whichever ref triggered the run — the default branch (`main`) on every
+scheduled poll, but `development` on the `workflow_dispatch` runs that
+happened to produce 2026-09-04's real first promotions. That split brain
+went unnoticed until `main`'s now-stale `versions.json` candidates made
+2026-09-05's scheduled polls re-detect core and 3rdparty as "new" and
+rebuild them — failing harmlessly at `gh release create`, because those
+releases already existed. Fixed by pinning every checkout to `ref: main`,
+and by having `promote` open and self-merge a PR into `main` instead of
+pushing to `development` (a plain push there was always incidental —
+`main`'s protection blocks direct pushes outright, but never required the
+target to be `development`; `required_approving_review_count: 0` is what
+makes the bot's self-merge possible without weakening the "no direct
+pushes" guarantee). `development` remains where hand-authored packaging
+changes are made, and is fast-forwarded from `main` at the end of each
+promotion job so it never lags behind main's own bumps.
 
 **This is now the primary repo, as of 2026-09-04.** It began as a
 fresh-history import of `indi-stable/packaging`'s `main` at `c22b7db` (see
