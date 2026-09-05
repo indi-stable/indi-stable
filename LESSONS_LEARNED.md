@@ -517,3 +517,28 @@ absent, the symlink is a runtime file and belongs in the runtime package.
 And when a package spans multiple independent vendors, test one binary from
 **each** of them: a per-vendor fault is invisible to a single representative,
 however carefully that representative was chosen.
+
+## 23. A clean 3-way merge can still discard the change you meant to bring in
+
+Reconciling a stale `versions.json` on `main`, `git diff main development`
+showed exactly the 2-line change expected, and the hosting platform reported
+the pull request as clean and mergeable. Both were true, and both were the
+wrong question. `development`'s own history had forced those same two values
+down and then back up to what they started at, so relative to the
+merge-base its *net* change was empty — even though its tip differed from
+`main`'s tip. A 3-way merge diffs each side against the merge-base, not
+against each other: with `development`'s side unchanged from the base and
+`main`'s side changed (by an earlier, already-superseded commit), the merge
+kept `main`'s stale value. No conflict, no warning — it simply didn't do
+what the PR title said it would.
+
+**Rule:** a tip-to-tip diff tells you what differs between two branches, not
+what merging them will produce — that depends on the merge-base, which can
+make a branch that "looks like it has the fix" contribute nothing. After a
+merge meant to reconcile state, read the actual resulting file, not the diff
+you expected going in or the host's "mergeable: clean" status.
+
+*Evidence:* a merge into `main` reported clean left `versions.json`'s
+candidates stale anyway; caught only by reading the merged file directly
+while verifying an unrelated, later change, and fixed with a direct commit
+against `main`'s tip instead of another merge.
