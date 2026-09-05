@@ -42,6 +42,17 @@ with a direct commit against `main`'s tip; confirmed byte-identical to
 `development`'s `versions.json` and against upstream's actual latest tags
 via `scripts/check-upstream-tag.sh`.
 
+**`promote`'s new branch-create → PR → self-merge → delete-branch path is
+still unexercised.** All three `workflow_dispatch` runs on 2026-09-05 that
+confirmed the poll itself is quiet again correctly found nothing new, so
+`build`/`smoke-test`/`promote` were all skipped in every one of them — the
+YAML has been reviewed but never actually run. Deliberately not forced via
+a `repackage: true` run (would publish a real extra GitHub Release just to
+test plumbing); verify this for real on whichever component's `promote`
+job runs next for a genuine reason, and check afterward that its
+`ci/promote-<component>-...` branch was actually deleted, not just that
+the job went green.
+
 **This repo is public**, with Will as its only collaborator with write
 access (`gh api repos/:owner/:repo/collaborators`, confirmed 2026-09-05).
 Anyone can read, clone, or fork it, but pushing a branch — to `development`
