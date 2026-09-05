@@ -1496,6 +1496,57 @@ GitHub Release.
 this pipeline — see `STATUS.md`'s "Undecided" section for the sweep/scrub
 that is a prerequisite before that ever changes.
 
+## Release automation — `main`, not `development`, is the branch of record — decided 2026-09-05
+
+v1 above committed the promotion to `development` and relied on Will
+merging to `main` by hand afterward — inherited from `indi-stable/packaging`
+without being re-examined here. That split surfaced as a real failure:
+scheduled runs check out the default branch (`main`), while the
+`workflow_dispatch` runs that produced 2026-09-04's real first promotions
+targeted `development`, so `main`'s `versions.json` went stale and
+2026-09-05's scheduled polls rediscovered already-released tags as "new"
+(`STATUS.md`).
+
+Revisited with Will the same day, and the answer was structural, not a
+patch: packages built for public consumption must never be built from
+`development`, which can hold work in progress — only `main`, which only
+ever changes via a reviewed PR, should ever be the source a release is
+built from. Concretely:
+
+- Every job's `actions/checkout@v4` is pinned to `ref: main` — not left to
+  default-branch inference, and not `development`.
+- `promote` cannot push to `main` directly (branch protection forbids it),
+  so it opens a PR carrying the version-bump commit and merges it itself.
+  This is not a bypass: `main`'s protection requires a pull request, but
+  `required_approving_review_count: 0` (confirmed via `gh api
+  repos/:owner/:repo/branches/main/protection`) — nothing stops the bot's
+  own `GITHUB_TOKEN`, given `permissions: pull-requests: write`, from
+  merging its own gate-verified PR immediately. The branch requires a PR
+  wrapper around every push; it does not require a human to click approve.
+- `development` keeps its original purpose — hand-authored packaging
+  changes, merged to `main` by Will via a real reviewed PR — and is
+  fast-forwarded (`--ff-only`) from `main` at the end of each promotion so
+  it doesn't drift behind main's own bumps. `--ff-only` deliberately: if
+  `development` ever holds commits `main` doesn't (real work in progress),
+  the sync step fails loudly rather than fabricating a merge commit or
+  overwriting anything.
+
+**Who can actually push to `main` this way:** only an existing collaborator
+with write access — currently Will alone (`gh api
+repos/:owner/:repo/collaborators`, one entry, admin). The repo being public
+lets anyone read, clone, or fork it, but pushing a branch — and therefore
+opening a mergeable PR — requires write access; a fork's PR runs CI with a
+restricted, read-only token and cannot self-merge regardless of the review
+count. If a second collaborator or bot is ever added, revisit
+`required_approving_review_count` and consider a repo ruleset with a bypass
+list scoped to the release bot specifically — classic branch protection has
+no way to require review from humans while exempting one bot.
+
+See `LESSONS_LEARNED.md` #23 for a real defect the reconciliation itself
+hit: a clean-looking merge of `development` into `main` silently discarded
+the fix, because of how a 3-way merge uses the merge-base rather than the
+two tips.
+
 ## What this does NOT change on the ACS side
 
 ACS's version-detection and coexistence machinery (`indi_version.check()`,

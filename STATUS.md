@@ -27,23 +27,26 @@ Two rules keep it living rather than growing:
 Work happens on `development`. Will merges to `main` himself, via PR.
 
 **`main`, not `development`, is what every release workflow reads from and
-publishes to, as of 2026-09-05.** Before that fix, `check`/`build-*`/
-`smoke-test-*` used an unpinned `actions/checkout@v4`, which follows
-whichever ref triggered the run — the default branch (`main`) on every
-scheduled poll, but `development` on the `workflow_dispatch` runs that
-happened to produce 2026-09-04's real first promotions. That split brain
-went unnoticed until `main`'s now-stale `versions.json` candidates made
-2026-09-05's scheduled polls re-detect core and 3rdparty as "new" and
-rebuild them — failing harmlessly at `gh release create`, because those
-releases already existed. Fixed by pinning every checkout to `ref: main`,
-and by having `promote` open and self-merge a PR into `main` instead of
-pushing to `development` (a plain push there was always incidental —
-`main`'s protection blocks direct pushes outright, but never required the
-target to be `development`; `required_approving_review_count: 0` is what
-makes the bot's self-merge possible without weakening the "no direct
-pushes" guarantee). `development` remains where hand-authored packaging
-changes are made, and is fast-forwarded from `main` at the end of each
-promotion job so it never lags behind main's own bumps.
+publishes to, as of 2026-09-05** — see `DESIGN.md`, "Release automation —
+`main`, not `development`, is the branch of record" for why and how
+`promote` self-merges into a protected branch without a human click.
+`development` remains where hand-authored packaging changes are made, and
+is fast-forwarded from `main` at the end of each promotion job so it never
+lags behind main's own bumps.
+
+The reconciliation that preceded this fix (bringing `main`'s `versions.json`
+up to what had actually been promoted) needed a follow-up correction: the
+first attempt merged clean but silently kept `main`'s stale candidates
+anyway, a merge-base pitfall recorded in `LESSONS_LEARNED.md` #23. Fixed
+with a direct commit against `main`'s tip; confirmed byte-identical to
+`development`'s `versions.json` and against upstream's actual latest tags
+via `scripts/check-upstream-tag.sh`.
+
+**This repo is public**, with Will as its only collaborator with write
+access (`gh api repos/:owner/:repo/collaborators`, confirmed 2026-09-05).
+Anyone can read, clone, or fork it, but pushing a branch — to `development`
+or anywhere — requires write access nobody else has, so no outside PR can
+reach the self-merge path above.
 
 **This is now the primary repo, as of 2026-09-04.** It began as a
 fresh-history import of `indi-stable/packaging`'s `main` at `c22b7db` (see
