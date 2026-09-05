@@ -45,6 +45,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 env:
   DEBFULLNAME: Will Snyder
@@ -62,6 +63,8 @@ jobs:
       release: ${{ steps.resolve.outputs.release }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Check indilib/indi for a newer stable tag
         id: check
         if: inputs.repackage != true
@@ -94,6 +97,8 @@ jobs:
     container: fedora:44
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       # Just the tools, not the spec's own BuildRequires -- those come from
       # `dnf builddep` below, reading core.spec directly, so this list can
       # never drift out of sync with what the spec actually declares the
@@ -146,6 +151,8 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       # devscripts (dch, mk-build-deps) and equivs (mk-build-deps' own
       # backend) up front -- dch is needed by the very next step.
       - name: Install devscripts and equivs
@@ -212,6 +219,8 @@ jobs:
     container: fedora:44
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/download-artifact@v4
         with:
           name: core-rpm
@@ -228,6 +237,8 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/download-artifact@v4
         with:
           name: core-deb
@@ -240,7 +251,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: development
+          ref: main
       - uses: actions/download-artifact@v4
         with:
           name: core-rpm
@@ -310,14 +321,21 @@ jobs:
           gh release create "${REL_TAG}" release-assets/* \
             --title "${REL_TITLE}" \
             --notes "Automated release. Built from upstream indilib/indi ${NEW_TAG}, gated on both Fedora and Debian/Ubuntu (build, clean install, indiserver starts, a representative driver loads). Unofficial third-party build -- see README.md."
-      - name: Commit to development
+      # main is protected (PR required), so the bump lands via a PR the bot
+      # opens and immediately merges itself -- main's branch protection
+      # requires a pull request but zero approving reviews, so this is not a
+      # bypass, it is the one form of automation that protection already
+      # allows. main, not development, is what every workflow here reads
+      # from and publishes from (STATUS.md); development is for hand-authored
+      # packaging changes, merged to main by hand like any other PR.
+      - name: Commit the version bump on a promotion branch, and merge it into main
         env:
+          GH_TOKEN: ${{ github.token }}
           NEW_TAG: ${{ needs.check.outputs.new_tag }}
           RELEASE: ${{ needs.check.outputs.release }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add core/rpm/indi-stable-core.spec core/deb/changelog versions.json
           # The release number belongs in the subject whenever it is not 1.
           # Without it a repackage commit is byte-identical to the original
           # promotion's subject -- confirmed 2026-09-04, when the first real
@@ -336,7 +354,23 @@ jobs:
           if [ "${RELEASE}" != "1" ]; then
             SUBJ="${SUBJ} (release ${RELEASE})"
           fi
+          BRANCH="ci/promote-core-${NEW_TAG}-${RELEASE}-${{ github.run_id }}"
+          git checkout -b "$BRANCH"
+          git add core/rpm/indi-stable-core.spec core/deb/changelog versions.json
           git commit \
             -m "${SUBJ}" \
             -m "Automated. Gate passed on both distros: build, clean install, indiserver starts, a representative driver loads. See .github/workflows/core-release.yml."
+          git push origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" --title "$SUBJ" \
+            --body "Automated promotion. Gate passed on both distros before this PR was opened -- see this run's own log."
+          gh pr merge "$BRANCH" --merge --delete-branch
+      # Keeps development from drifting behind main's automated bumps between
+      # hand-authored sessions. --ff-only deliberately: if development has
+      # commits main doesn't (real work in progress), this fails loudly
+      # rather than fabricating a merge commit or overwriting anything.
+      - name: Fast-forward development from main
+        run: |
+          git fetch origin main development
+          git checkout development
+          git merge --ff-only origin/main
           git push origin development
