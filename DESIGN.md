@@ -1070,6 +1070,84 @@ under any letter directory). `fedoraastro` — this project's own Fedora test
 VM — is Fedora 44, and gets nothing from Fedora's own repos for indi-3rdparty
 at all, not merely "incomplete coverage" as `README.md` currently says.
 
+### The ~50 non-blob drivers — real dependency survey, scope still undecided — 2026-09-08
+
+Investigated because Will needs `eqmod` for his mount (`indi-stable-3rdparty-drivers.spec`'s
+own `WITH_EQMOD=OFF` currently blocks it) and asked to look into building all of them, not
+just that one. This section is the survey; the scope decision itself is still open — see
+`STATUS.md`, "3rdparty — remaining" for what happens next.
+
+**Checked directly against the real upstream tree**, not inferred: downloaded the
+`v2.2.4.1` tarball this spec already builds from and read every driver directory's own
+`CMakeLists.txt`, rather than trusting the "11 of 61" blob count above, which predates the
+QSI/Fishcamp correction (2026-08-27) and is now demonstrably short — it omits `apogee` and
+`qsi` at minimum. **Before finalizing which of "the ~50" are actually blob-free, that count
+needs redoing against the current 9-vendor scope; nothing below depends on the stale number.**
+
+**The top-level `CMakeLists.txt` declares 74 `WITH_<X>` options.** Of those:
+
+- **44 are `On` by default and currently forced `Off`** by this spec's `%build` — the
+  "out of scope, not licence" list the file header already names.
+- **7 are `Off` by default even upstream**, and this spec doesn't need to touch them at all
+  because nothing forces them on: `WITH_GIGE` (industrial machine-vision, `ARAVIS`/`GLIB2`),
+  `WITH_LIBCAMERA` (Raspberry Pi camera stack), `WITH_BNO_IMU`/`WITH_ICM_IMU` (specific IMU
+  sensor SDKs with no source in the tree, no Fedora/Debian package either), `WITH_CELESTRON_ORIGIN`
+  (pulls in `Qt5`/`Qt6`/`OpenSSL`/`TIFF` for one driver), and **`WITH_AHP_XC`/`WITH_AHP_GT`, which
+  `execute_process(COMMAND git clone ...)` a separate repo at CMake **configure** time** — a
+  real build-hygiene problem independent of scope, since a `mock`/`pbuilder` chroot has no
+  business reaching out to the network mid-build. None of these seven belong in "the ~50"
+  regardless of how the scope question below is answered.
+- **2 more (`WITH_WEBCAM`, `WITH_NUT`) are neither** — upstream's own `CMakeLists.txt` sets
+  their default by running `find_package(FFmpeg)` / `find_package(NUTClient)` **at configure
+  time on whatever machine happens to be building**, not a fixed value. Left unset, either one
+  would silently flip on or off depending on what's installed in that day's `mock`/`pbuilder`
+  chroot — exactly the nondeterminism this project's reproducibility already guards against
+  elsewhere (`check-docs.sh`, pinned `Source0` hashes). Whatever the scope decision is, both
+  need an explicit `-DWITH_WEBCAM=...`/`-DWITH_NUT=...`, never left to discovery. `WITH_WEBCAM`
+  in particular needs `ffmpeg-devel`, which is **not in base Fedora** (RPM Fusion only, a repo
+  this project has never depended on) — a real reason to pin it `Off` rather than a reason to
+  chase down.
+
+**Dependency table for the 44, `find_package()` calls read directly from each driver's own
+`CMakeLists.txt`** (INDI/CFITSIO/ZLIB/USB1/Threads omitted — core's spec already covers
+those for every driver here):
+
+| Needs only `Nova` (`libnova-devel` / `libnova-dev`) | `indi-aok`, `indi-avalon`, `indi-bresserexos2`, `indi-celestronaux` (+`GSL`), `indi-eqmod` (+`GSL`), `indi-gpsd`, `indi-gpsnmea`, `indi-nexdome`, `indi-ocs`, `indi-qhy`\*, `indi-rolloffino`, `indi-rtklib`, `indi-starbook`, `indi-starbook-ten`, `indi-talon6` |
+|---|---|
+| No extra dependency beyond INDI itself | `indi-armadillo-platypus`, `indi-astarbox`, `indi-nightscape`, `indi-openogma`, `indi-shelyak` |
+| `GTest` in `find_package()` but gated behind `INDI_BUILD_UNITTESTS`, confirmed in `indi-atik-efw` and `indi-maxdomeii`'s own `CMakeLists.txt` (`IF (INDI_BUILD_UNITTESTS) ... find_package(GTest REQUIRED)`) | `indi-atik-efw`\*, `indi-beefocus`, `indi-maxdomeii`, `indi-starbook` — **not a real `BuildRequires`**, since this project never turns `INDI_BUILD_UNITTESTS` on (same as core) |
+| One extra library, ordinary Fedora/Debian package | `indi-duino`/`indi-weewx-json` (`CURL`→`libcurl-devel`), `indi-avalonud` (`nlohmann_json`+`ZMQ`→`json-devel`+`cppzmq-devel`), `indi-sx` (`hidapi`→`hidapi-devel`), `indi-mgen` (`FTDI1`→`libftdi1-devel` — the same package `WITH_QSI` needed and didn't have on `fedoraastro`'s `mock` chroot, so confirm it resolves before counting on it), `indi-ffmv` (`DC1394`→`libdc1394-devel`, an EOL FireWire camera), `indi-limesdr` (`LIMESUITE`, may not be in either distro's base repos — unconfirmed) |
+| `find_package(GPIOD)` wrapped in its own success check, so the driver silently doesn't build if the package is absent rather than failing configure | `indi-gpio` (Raspberry Pi GPIO; `libgpiod-devel` exists on both distros if wanted) |
+| Heaviest new surface | `indi-gphoto` (`GPHOTO2`+`JPEG`+`LibRaw`→`gphoto2-devel`+`libjpeg-turbo-devel`+`libraw-devel` — DSLR control, plausibly wanted for an astrophotography audience despite the dependency count) |
+
+\* `indi-qhy` and `indi-atik-efw` are worth a second look before inclusion: `qhy` needs the
+`QHY` blob this project already excludes for licence reasons (no `COPYING` file — "bundle by
+licence tier" above), and while `indi-atik-efw`'s own `find_package()` list has no vendor
+blob, it ships alongside `indi-atik` (which does) and its exact relationship to that licence
+decision hasn't been checked.
+
+**`eqmod` specifically is clean**: `find_package(INDI REQUIRED)`, `find_package(Nova REQUIRED)`,
+`find_package(ZLIB REQUIRED)`, `find_package(GSL REQUIRED)` — nothing else, no vendor blob,
+no licence question. `libnova-devel`/`gsl-devel` (Fedora) and `libnova-dev`/`libgsl-dev`
+(Debian) are both ordinary base-repo packages on `fedoraastro`/`ubuntuastro`, unconfirmed by
+an actual `dnf`/`apt` resolve yet. It installs **four** binaries, not one —
+`indi_eqmod_telescope`, `indi_azgti_telescope`, `indi_staradventurergti_telescope`,
+`indi_staradventurer2i_telescope` — covering Skywatcher/EQMod-protocol mounts, the ZWO AM5/AZ-GTi
+family, and both Star Adventurer GTi variants, since they share `skywatcher.cpp`'s motor-control
+code. A fifth (`indi_ahpgt_telescope`) is gated behind `indi-eqmod/CMakeLists.txt`'s own
+**local** `option(WITH_AHP_GT ... OFF)` — a same-named but independent option from the
+top-level `WITH_AHP_GT` above, defaults `Off` either way, not something enabling `eqmod`
+touches.
+
+**Not yet decided: which of the 44 to actually build.** Discussed with Will 2026-09-08;
+options on the table were EQMod alone (fast, unblocks the mount today, minimal new
+`BuildRequires` surface), the full 44 minus the licence-adjacent pair noted above (matches
+upstream's own defaults, but real new dependency surface — `gphoto2-devel`, `libraw-devel`,
+`libftdi1-devel`, `libdc1394-devel`, `libgpiod-devel` — and the same build/install/
+coexistence/upgrade rigor the original 9-vendor work needed, likely with its own real defects
+per `LESSONS_LEARNED.md` #1), or a curated batch in between. Deferred, not decided either way.
+See `STATUS.md` for next steps.
+
 ### Three more absolute paths found while writing `indi-stable-3rdparty-libs.spec` — 2026-08-26
 
 Found by reading every bundled vendor's `CMakeLists.txt` for `install()`

@@ -393,14 +393,38 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   for how the other two members of this same "never actually read" group
   were settled the same day.
 - **The ~50 non-blob indi-3rdparty drivers (eqmod, gpsd, celestronaux,
-  ticfocuser-ng, ...) are entirely out of scope for `-drivers` as written.**
-  Deliberately not decided either way (confirmed with Will, 2026-08-26) — they
-  need no vendor blob and have no dependency on `-libs` at all, so bundling
-  them is a wholly separate question from everything this spec's own scope
-  answers. The 46 `-DWITH_<X>=OFF` overrides in `%build` are what currently
-  keeps them out; extending this package to cover any of them means editing
-  that list deliberately, not something a future add_subdirectory() upstream
-  adds should silently slip through.
+  ticfocuser-ng, ...) are entirely out of scope for `-drivers` as written,
+  and still are** — real work here, not yet started. Will needs `eqmod` for
+  his mount (2026-09-08); a real dependency survey against the actual
+  upstream `v2.2.4.1` tree is now in `DESIGN.md`, "The ~50 non-blob drivers —
+  real dependency survey, scope still undecided", but no spec, no build, no
+  BuildRequires added yet. **Next steps, in order:**
+  1. Decide scope with Will — EQMod alone, the full ~44 minus the two
+     licence-adjacent ones (`qhy`, `atik-efw`) `DESIGN.md` flags as needing a
+     second look, or a curated batch. Not decided as of 2026-09-08.
+  2. Whatever the scope, confirm `libnova-devel`/`gsl-devel` (Fedora) and
+     `libnova-dev`/`libgsl-dev` (Debian) actually resolve on `fedoraastro`/
+     `ubuntuastro` — assumed present as ordinary base-repo packages, not yet
+     confirmed by an actual `dnf`/`apt` resolve.
+  3. Edit `-DWITH_EQMOD=OFF` (and whichever other `-DWITH_<X>=OFF` lines the
+     scope decision covers) out of `core/rpm/indi-stable-3rdparty-drivers.spec`
+     `%build`, add `%package`/`%files eqmod` (four binaries — see `DESIGN.md`
+     for which), pin `-DWITH_WEBCAM=OFF`/`-DWITH_NUT=OFF` explicitly regardless
+     of scope (`DESIGN.md` — both are configure-time auto-detected upstream,
+     not a fixed default, so leaving them unset is nondeterministic across
+     `mock` chroots).
+  4. Same edits on the Debian side (`core/deb-3rdparty-drivers/`) — not yet
+     looked at for this.
+  5. Real `mock` build on `fedoraastro`, real `dpkg-buildpackage` on
+     `ubuntuastro` (this repo's own current session machine — confirmed
+     available 2026-09-08), then the same install/coexistence/upgrade
+     verification every other package here got. Expect real defects on the
+     first attempt — `LESSONS_LEARNED.md` #1's track record has held every
+     time so far.
+  6. `qhy` and `atik-efw` specifically need their licence relationship to the
+     existing "bundle by licence tier" decision checked before either is
+     included, not assumed clear by omission from the blob-driver list
+     (`DESIGN.md`).
 - **The License: tag's precision is a defensible aggregate, not a full
   per-file audit** — read in `indi-stable-3rdparty-libs.spec`'s own header
   comment for exactly which licences were read in full text versus inferred,
