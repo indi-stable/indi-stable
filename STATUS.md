@@ -116,7 +116,7 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `fedoraastro` | `~/mock-result-drivers-slice7` | `-drivers` `2.2.4.1-1`, **30 subpackages** — the current build |
 | `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is the current **30-package** build |
 | `ubuntuastro` | `~/build/slice7-stage/` | the runtime-only 41-deb set the slice-7 smoke test ran against, one version of each |
-| `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`, freshly rebuilt from current packaging |
+| `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`: `-libs` 18, `-drivers` **30**, the latter rebuilt at full scope 2026-09-09 (it held 10 from the eqmod slice). All 30 share one mtime, so there is no stale mix |
 
 **Disk cleanup, 2026-09-09.** `ubuntuastro` reached 99% full (643 MB free)
 during the driver widening. The cause was seven unpacked `indi-3rdparty`
@@ -266,7 +266,32 @@ empty directory, across all three source packages' worth of shared
 `%dir` declarations), only the distribution's own `99-indi_auxiliary.rules`
 left in `/usr/lib/udev/rules.d`.
 
-**Both RPM upgrade harnesses re-run green at full scope, 2026-09-09.**
+**All four upgrade harnesses re-run green at full scope, 2026-09-09** — RPM
+and Debian, `-libs` and `-drivers`. **None of the four needed changing:** all
+of them glob their inputs, and both `-drivers` harnesses loop over the
+installed package list rather than naming vendors, so all four scaled from
+8 packages to 30 on their own. That is the state the `LESSONS_LEARNED.md`
+#25 fix left them in; the coexistence harness was the one that had been
+missed, and is fixed separately.
+
+What did need rebuilding was the scratch input on both distros. Each
+`-drivers` `-2` set held 10 subpackages and dated from the eqmod slice, so
+it would have tested an upgrade between two versions of a package that no
+longer exists in that shape. Rebuilt at 30 on both: Fedora via the
+documented "bump `Release` in a scratch copy, never commit it" trick, Debian
+via `scripts/bump-3rdparty-version.sh v2.2.4.1 2` run in a **copy** of the
+repo — the working tree here was confirmed clean afterward, since that
+script rewrites changelogs and all 18 control pins in place.
+
+**All 30 driver packages were individually confirmed to resolve and run
+after the upgrade** on both distros, not one representative. Every control
+fired: the orphan check on all four (a planted stray file under
+`/opt/indi-stable` must be reported), and on the Debian pair the
+restore-by-diff control as well. Both boxes back to exact baseline,
+`fedoraastro` at 2153 with `gcc` still absent, `ubuntuastro` at 1839 diffed
+by package name.
+
+**Detail on the RPM pair, 2026-09-09.**
 `-libs` against its own `-2` scratch, and `-drivers` against a fresh `-2`
 scratch built at 30 subpackages — the previous one held 10 and dated from
 eqmod. Neither harness needed changing: both glob their inputs and the

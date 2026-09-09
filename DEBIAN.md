@@ -543,6 +543,42 @@ B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
 
+### Both upgrade harnesses re-run at full scope — 2026-09-09
+
+`scripts/test-upgrade-path-3rdparty-deb.sh` and
+`scripts/test-upgrade-path-drivers-deb.sh`, both green across all 30 driver
+packages. **Neither needed changing** — the `LESSONS_LEARNED.md` #25 fix
+already made them derive their lists, and the drivers one loops over the
+installed packages, so both scaled on their own.
+
+**The `-2` side had to be rebuilt, and that is the part worth getting
+right.** The existing `_2.2.4.1-2_` drivers set held 10 packages from the
+eqmod slice, so the harness would have "upgraded" between two versions of a
+package that no longer exists in that shape — passing while testing a third
+of the scope.
+
+Rebuild it with the bump script run in a **copy** of the repo, never in the
+working tree:
+
+```bash
+cp -r ~/src/indi-stable /tmp/repo-rel2 && cd /tmp/repo-rel2
+DEBFULLNAME="Will Snyder" DEBEMAIL=william@williamlsnyder.org \
+  bash scripts/bump-3rdparty-version.sh v2.2.4.1 2
+```
+
+It rewrites both changelogs, both specs and all 18 `-libs` control pins in
+place — `git status` in the real tree must come back empty afterward, and
+was checked. Build `-drivers` from that copy's `debian/` with the `-libs`
+**`-2`** `-dev` packages installed, not the `-1` ones, or the pinned
+`Build-Depends` resolves against the wrong headers.
+
+Every control fired on both runs: the planted stray file under
+`/opt/indi-stable` was reported by the orphan check, and the planted
+package-set difference was reported by the restore-by-diff check.
+`ubuntuastro` back to 1839 packages, diffed by name — note the harness's own
+"matches the baseline exactly (1841)" line is relative to *its* start, with
+`libftdi1-dev` installed for the build; that was purged afterward.
+
 ### `beefocus` added — verified 2026-09-09
 
 Thirty binary packages, 86 driver binaries, `lintian` **0 errors**. The last
