@@ -578,3 +578,38 @@ unhandled case can arrive silently" when upstream adds the next one.
 against the already-shipped `2.2.4.1-1` packages all 56 existing entries were
 already absolute (so the check passes for a real reason, #1), and run against
 an unstripped `indi_eqmod.xml` it fires on the AHP GT line.
+
+## 25. A hardcoded list stops testing the thing you just added, silently
+
+Running the two Debian upgrade-path harnesses against a newly-added driver
+showed they had been covering eight packages out of nine since 2026-08-27.
+Both opened with a literal `VENDORS="apogee asi fli playerone inovasdk micam
+sbig touptek"`. `fishcamp` was added to the packaging that day and to the
+smoke tests, and nothing pointed at these two, so they kept passing on the
+eight vendors they knew about and said nothing whatever about the ninth.
+
+The RPM twins of the same two tests were never affected. They enumerate by
+globbing the result directory (`ls "$1"/indi-stable-3rdparty-libs-*.rpm`), so
+a new subpackage joins the test the moment it exists.
+
+The failure is quiet in the worst way: a hardcoded list produces a **shorter
+green run**, not a red one. Nothing in the output says "I did not check
+fishcamp" — the reader sees PASS lines and stops. The same shape already cost
+this project once: `LESSONS_LEARNED.md` #22's 45 broken binaries survived
+because every harness used `indi_apogee_ccd` as "the representative driver",
+and the fix applied then went into the smoke tests only. The upgrade tests
+kept their single representative for two more weeks.
+
+**Rule:** derive the set under test from what is actually present — the built
+artifacts, the installed packages — rather than restating it. Where derivation
+is genuinely impossible, assert the expected count so that a list falling
+behind fails loudly. And when a coverage bug is fixed in one harness, grep for
+the same shape in its siblings; the twin that shares its purpose is the most
+likely place for the identical defect to be sitting.
+
+*Evidence:* found 2026-09-08 while adding `eqmod`, which made the gap visible
+because it is a driver with no `-libs` counterpart at all and so could not be
+bolted onto a single vendor list. Both Debian harnesses now derive their lists
+and abort if the derivation yields nothing (#1); both drivers harnesses, RPM
+and Debian, now exercise one binary from *every* driver package after the
+upgrade rather than `indi_apogee_ccd` alone.

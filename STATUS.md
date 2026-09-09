@@ -439,16 +439,45 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   cross-check that they strip the dangling AHP GT entry identically. Full
   detail in `FEDORA.md`, "`eqmod` added — built and verified".
 
+  **All four upgrade-path harnesses pass, 2026-09-08**, run against genuine
+  `Release: 2` / `-2` scratch builds of *both* `-libs` and `-drivers` on both
+  distros (built via `scripts/bump-3rdparty-version.sh v2.2.4.1 2` in an
+  uncommitted scratch copy of the repo, which rewrote all 18 Debian pins). Both
+  `-drivers` harnesses now confirm every one of the ten driver packages
+  resolves and runs after the upgrade, eqmod included, not just
+  `indi_apogee_ccd`. **Three real defects in the harnesses themselves were
+  found by running them** — see `LESSONS_LEARNED.md` #25 and the note below.
+
   **What is left for eqmod:**
-  1. The two upgrade-path harnesses (`scripts/test-upgrade-path-drivers.sh`
-     and `-deb`) have **not** been run against a ten-package `-drivers` on
-     either distro. They are the remaining gap; everything else eqmod needed
-     has been exercised.
-  2. `-drivers` needs a `Release: 2` / `-2` revision before it can ship, the
+  1. `-drivers` needs a `Release: 2` / `-2` revision before it can ship, the
      upstream tag being unchanged while its contents have grown. Do not
      hand-edit it — the bump scripts own `Release:`, and the repackage path's
      `-N` suffix has never actually run in a runner (see the correction in
      the release-automation section below).
+  2. Nothing else. Build, install, coexistence, smoke test and upgrade path
+     are all verified on both distros.
+
+  **Three harness defects found by running them, all now fixed** — the tests
+  were wrong, the packaging was not, which is this project's usual ratio:
+  - Both **Debian** harnesses hardcoded an eight-vendor list and had silently
+    not covered `fishcamp` since 2026-08-27, nor could they express eqmod at
+    all (a driver with no `-libs` counterpart). They now derive the list from
+    the `.deb`s present and abort if it comes back empty. Their RPM twins glob
+    and were never affected. `LESSONS_LEARNED.md` #25.
+  - Both **`-drivers`** harnesses checked only `indi_apogee_ccd` after the
+    upgrade — the same single-representative flaw that let #22's 45 broken
+    binaries through. Fixed then in the smoke tests only; fixed here now.
+  - `scripts/test-upgrade-path-drivers.sh` and
+    `scripts/test-upgrade-path-3rdparty.sh` both defaulted `CORE_DIR` to
+    `$HOME/mock-result-pcfix`, which under `sudo` is `/root` — #4 again, in
+    two scripts that had never been run under `sudo` with the default.
+
+  **`mock`'s `cleanup_on_success=True` wipes `--install`ed RPMs from the
+  chroot after a *successful* build**, not just a failed one. Building `-libs`
+  at `-2` and then `-drivers` against it needs core's `-devel` reinstalled in
+  between, or the `-drivers` build fails at `No match for argument:
+  indi-stable-core-devel`. `FEDORA.md` already documented the
+  `cleanup_on_failure` half of this; this is its success-path twin.
 - **Widening past eqmod: the ~40 remaining non-blob drivers.** Still wanted,
   deliberately sequenced after eqmod. `DESIGN.md`'s dependency table was
   re-derived mechanically 2026-09-08 and had four wrong rows before that, so

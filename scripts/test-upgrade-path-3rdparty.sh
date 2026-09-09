@@ -38,7 +38,12 @@ set -u
 
 OLD_DIR=${1:?usage: test-upgrade-path-3rdparty.sh <old-rpm-dir> <new-rpm-dir> [core-rpm-dir]}
 NEW_DIR=${2:?usage: test-upgrade-path-3rdparty.sh <old-rpm-dir> <new-rpm-dir> [core-rpm-dir]}
-CORE_DIR=${3:-$HOME/mock-result-pcfix}
+# $HOME under sudo is /root, not the build user's home (LESSONS_LEARNED.md
+# #4) -- same defect and same fix as scripts/test-upgrade-path-drivers.sh,
+# both found by actually running them under sudo, 2026-09-08.
+BUILD_USER=${SUDO_USER:-$(id -un)}
+HOMEDIR=$(getent passwd "$BUILD_USER" | cut -d: -f6)
+CORE_DIR=${3:-$HOMEDIR/mock-result-pcfix}
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; exit 1; }

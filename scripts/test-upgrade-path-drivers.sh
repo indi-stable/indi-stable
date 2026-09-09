@@ -41,7 +41,14 @@ OLD_LIBS_DIR=${1:?usage: test-upgrade-path-drivers.sh <old-libs-dir> <new-libs-d
 NEW_LIBS_DIR=${2:?usage: test-upgrade-path-drivers.sh <old-libs-dir> <new-libs-dir> <old-drivers-dir> <new-drivers-dir> [core-dir]}
 OLD_DRIVERS_DIR=${3:?usage: test-upgrade-path-drivers.sh <old-libs-dir> <new-libs-dir> <old-drivers-dir> <new-drivers-dir> [core-dir]}
 NEW_DRIVERS_DIR=${4:?usage: test-upgrade-path-drivers.sh <old-libs-dir> <new-libs-dir> <old-drivers-dir> <new-drivers-dir> [core-dir]}
-CORE_DIR=${5:-$HOME/mock-result-pcfix}
+# $HOME under sudo is /root, not the build user's home, so a $HOME-based
+# default silently points at a directory that does not exist and the script
+# aborts claiming core was never built (LESSONS_LEARNED.md #4). Every other
+# root-run script here already derives the real home from SUDO_USER; this one
+# was missed until it was actually run under sudo, 2026-09-08.
+BUILD_USER=${SUDO_USER:-$(id -un)}
+HOMEDIR=$(getent passwd "$BUILD_USER" | cut -d: -f6)
+CORE_DIR=${5:-$HOMEDIR/mock-result-pcfix}
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; exit 1; }
@@ -176,6 +183,41 @@ POST_USAGE=$(/opt/indi-stable/bin/indi_apogee_ccd --help 2>&1)
 echo "$POST_USAGE" | grep -qi "INDI Device driver" \
   && pass "indi_apogee_ccd still runs and reports its usage banner after the upgrade" \
   || fail "indi_apogee_ccd no longer runs correctly after the upgrade"
+
+# One binary from EVERY driver subpackage, not just apogee. The block above
+# is apogee-specific because it is the only one that can assert a named
+# vendor library (libapogee.so) resolves; this loop is what makes the step
+# able to see a fault confined to a single subpackage. That distinction is
+# what LESSONS_LEARNED.md #22 cost: every harness here used indi_apogee_ccd
+# as "the representative driver", and apogee was one of the six vendors the
+# runtime-symlink defect could not affect, so 45 broken binaries went
+# unnoticed. smoke-test-3rdparty.sh was fixed then; this test was not, and
+# eqmod -- which has no vendor library at all -- is exactly the kind of
+# subpackage a single representative cannot speak for.
+#
+# The assertion is "it got past the dynamic loader and ran its own code", NOT
+# a specific banner: indi_asi_ccd and the touptek family print
+# "HotPlugManager: ... initialized." instead of a usage line.
+for pkg in $(rpm -qa 'indi-stable-3rdparty-drivers-*' | sort); do
+  bin=$(rpm -ql "$pkg" | grep '^/opt/indi-stable/bin/' | head -1)
+  test -n "$bin" && test -x "$bin" || { fail "$pkg: no executable driver found after the upgrade"; continue; }
+  if ldd "$bin" 2>&1 | grep -qi 'not found'; then
+    fail "$pkg: $(basename "$bin") has an unresolved dependency after the upgrade:"
+    ldd "$bin" 2>&1 | grep -i 'not found' | sed 's/^/        /'
+    continue
+  fi
+  STRAY=$(ldd "$bin" 2>&1 | grep -E 'libindi[A-Za-z]*\.so' | grep -v '=> */opt/indi-stable/' || true)
+  test -z "$STRAY" || { fail "$pkg: a libindi resolved OUTSIDE the private prefix:"; echo "$STRAY" | sed 's/^/        /'; }
+  OUT=$(timeout 10 "$bin" --help 2>&1)
+  if echo "$OUT" | grep -qi 'error while loading shared libraries\|cannot open shared object'; then
+    fail "$pkg: $(basename "$bin") died in the dynamic loader after the upgrade:"
+    echo "$OUT" | head -2 | sed 's/^/        /'
+  elif test -z "$OUT"; then
+    fail "$pkg: $(basename "$bin") --help produced no output at all after the upgrade"
+  else
+    pass "${pkg%%-2.*}: $(basename "$bin") resolves and runs after the upgrade"
+  fi
+done
 
 echo "############ STEP 6: the distro binary is still a bystander ############"
 if [ -n "$DISTRO_PRE" ]; then

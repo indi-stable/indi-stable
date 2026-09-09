@@ -46,7 +46,15 @@ NEW_VER=${NEW_VER:-2.2.4.1-2}
 CORE_VER=${CORE_VER:-2.2.4.2-1}
 W=$(mktemp -d /tmp/upgrade-3rdparty-deb.XXXXXX)
 
-VENDORS="apogee asi fli playerone inovasdk micam sbig touptek"
+# Derived from the .debs actually present, NOT hardcoded. The hardcoded list
+# this replaces ("apogee asi fli playerone inovasdk micam sbig touptek")
+# silently stopped covering fishcamp the day it was added, 2026-08-27 -- the
+# test kept passing on eight of nine vendors and said nothing about the one
+# it had never heard of. Its RPM twin globs the result directory and was
+# never affected. See LESSONS_LEARNED.md #25.
+VENDORS=$(ls "$NEW_DIR"/indi-stable-3rdparty-libs-*_"${NEW_VER}"_amd64.deb 2>/dev/null \
+  | sed -E "s|.*/indi-stable-3rdparty-libs-(.*)_${NEW_VER}_amd64\.deb|\1|" \
+  | grep -v -- '-dev$' | sort)
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: $W"; exit 1; }
@@ -67,6 +75,10 @@ pkg_names() { for v in $VENDORS; do echo "indi-stable-3rdparty-libs-$v"; echo "i
 
 echo "############ STEP 0: two genuinely different builds, both present ############"
 test "$(id -u)" -eq 0 || die "run under sudo"
+# VENDORS is derived, so an empty one would make every loop below iterate
+# zero times and the whole test pass vacuously (LESSONS_LEARNED.md #1).
+test -n "$VENDORS" || die "derived no vendors from $NEW_DIR at $NEW_VER"
+info "covering $(echo "$VENDORS" | wc -w) vendors: $(echo $VENDORS)"
 for f in $(old_debs) $(new_debs) \
          "$CORE_DIR/indi-stable-core_${CORE_VER}_amd64.deb" \
          "$CORE_DIR/indi-stable-core-libs_${CORE_VER}_amd64.deb" \

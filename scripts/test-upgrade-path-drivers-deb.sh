@@ -43,7 +43,23 @@ NEW_VER=${NEW_VER:-2.2.4.1-2}
 CORE_VER=${CORE_VER:-2.2.4.2-1}
 W=$(mktemp -d /tmp/upgrade-drivers-deb.XXXXXX)
 
-VENDORS="apogee asi fli playerone inovasdk micam sbig touptek"
+# Derived from the .debs actually present, NOT hardcoded. The hardcoded list
+# this replaces ("apogee asi fli playerone inovasdk micam sbig touptek")
+# silently stopped covering fishcamp the day it was added, 2026-08-27, and
+# would have done the same for eqmod: the test kept passing on eight of ten
+# packages and said nothing about the two it had never heard of. Its RPM
+# twin, scripts/test-upgrade-path-drivers.sh, was never affected because it
+# globs the result directory instead. See LESSONS_LEARNED.md #25.
+#
+# Two lists, because they are genuinely different shapes: every -libs vendor
+# has a runtime AND a -dev package, while eqmod is a driver with no vendor
+# blob and therefore no -libs counterpart at all.
+list_from() {   # $1 = dir, $2 = package-name prefix
+  ls "$1"/"$2"-*_"${NEW_VER}"_amd64.deb 2>/dev/null \
+    | sed -E "s|.*/$2-(.*)_${NEW_VER}_amd64\.deb|\1|"
+}
+LIBS_VENDORS=$(list_from "$NEW_LIBS_DIR" indi-stable-3rdparty-libs | grep -v -- '-dev$' | sort)
+DRIVER_PKGS=$(list_from "$NEW_DRIVERS_DIR" indi-stable-3rdparty-drivers | sort)
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: $W"; exit 1; }
@@ -59,19 +75,28 @@ old_libs_deb()     { echo "$OLD_LIBS_DIR/indi-stable-3rdparty-libs-$1_${OLD_VER}
 new_libs_deb()     { echo "$NEW_LIBS_DIR/indi-stable-3rdparty-libs-$1_${NEW_VER}_amd64.deb"; }
 old_drivers_deb()  { echo "$OLD_DRIVERS_DIR/indi-stable-3rdparty-drivers-$1_${OLD_VER}_amd64.deb"; }
 new_drivers_deb()  { echo "$NEW_DRIVERS_DIR/indi-stable-3rdparty-drivers-$1_${NEW_VER}_amd64.deb"; }
-old_libs_debs()    { for v in $VENDORS; do old_libs_deb "$v"; old_libs_deb "$v-dev"; done; }
-new_libs_debs()    { for v in $VENDORS; do new_libs_deb "$v"; new_libs_deb "$v-dev"; done; }
-old_drivers_debs() { for v in $VENDORS; do old_drivers_deb "$v"; done; }
-new_drivers_debs() { for v in $VENDORS; do new_drivers_deb "$v"; done; }
+old_libs_debs()    { for v in $LIBS_VENDORS; do old_libs_deb "$v"; old_libs_deb "$v-dev"; done; }
+new_libs_debs()    { for v in $LIBS_VENDORS; do new_libs_deb "$v"; new_libs_deb "$v-dev"; done; }
+old_drivers_debs() { for v in $DRIVER_PKGS; do old_drivers_deb "$v"; done; }
+new_drivers_debs() { for v in $DRIVER_PKGS; do new_drivers_deb "$v"; done; }
 pkg_names() {
-  for v in $VENDORS; do
+  for v in $LIBS_VENDORS; do
     echo "indi-stable-3rdparty-libs-$v"; echo "indi-stable-3rdparty-libs-$v-dev"
-    echo "indi-stable-3rdparty-drivers-$v"
   done
+  for v in $DRIVER_PKGS; do echo "indi-stable-3rdparty-drivers-$v"; done
 }
 
 echo "############ STEP 0: two genuinely different builds, both present ############"
 test "$(id -u)" -eq 0 || die "run under sudo"
+# The lists are derived, so an empty one would make every loop below iterate
+# zero times and the whole test pass vacuously (LESSONS_LEARNED.md #1). The
+# old-side files are checked by the loop that follows, which uses these same
+# derived names -- so a package present in NEW_* and absent from OLD_* aborts
+# with "missing ..." rather than quietly shrinking what is covered.
+test -n "$LIBS_VENDORS"  || die "derived no -libs vendors from $NEW_LIBS_DIR at $NEW_VER"
+test -n "$DRIVER_PKGS"   || die "derived no -drivers packages from $NEW_DRIVERS_DIR at $NEW_VER"
+info "covering $(echo "$LIBS_VENDORS" | wc -w) -libs vendors: $(echo $LIBS_VENDORS)"
+info "covering $(echo "$DRIVER_PKGS" | wc -w) -drivers packages: $(echo $DRIVER_PKGS)"
 for f in $(old_libs_debs) $(new_libs_debs) $(old_drivers_debs) $(new_drivers_debs) \
          "$CORE_DIR/indi-stable-core_${CORE_VER}_amd64.deb" \
          "$CORE_DIR/indi-stable-core-libs_${CORE_VER}_amd64.deb" \
@@ -196,6 +221,43 @@ POST_USAGE=$(/opt/indi-stable/bin/indi_apogee_ccd --help 2>&1)
 echo "$POST_USAGE" | grep -qi "INDI Device driver" \
   && pass "indi_apogee_ccd still runs and reports its usage banner after the upgrade" \
   || fail "indi_apogee_ccd no longer runs correctly after the upgrade"
+
+# One binary from EVERY driver package, not just apogee. The block above is
+# apogee-specific because it is the only one that can assert a named vendor
+# library (libapogee.so) resolves; this loop is what makes the step able to
+# see a fault confined to a single package. That distinction is exactly what
+# LESSONS_LEARNED.md #22 cost: every harness in this project used
+# indi_apogee_ccd as "the representative driver", and apogee was one of the
+# six vendors the runtime-symlink defect could not affect, so 45 broken
+# binaries went unnoticed. smoke-test-3rdparty-deb.sh was fixed then; this
+# test was not, and eqmod -- structurally unlike every other package here,
+# having no vendor library at all -- is precisely the kind of package a
+# single representative cannot speak for.
+#
+# The assertion is "it got past the dynamic loader and ran its own code", NOT
+# a specific banner: indi_asi_ccd and the touptek family print
+# "HotPlugManager: ... initialized." instead of a usage line, and requiring
+# one would fail working packages.
+for pkg in $(pkg_names | grep -- '-drivers-'); do
+  bin=$(dpkg -L "$pkg" 2>/dev/null | grep '^/opt/indi-stable/bin/' | head -1)
+  test -n "$bin" && test -x "$bin" || { fail "$pkg: no executable driver found after the upgrade"; continue; }
+  if ldd "$bin" 2>&1 | grep -qi 'not found'; then
+    fail "$pkg: $(basename "$bin") has an unresolved dependency after the upgrade:"
+    ldd "$bin" 2>&1 | grep -i 'not found' | sed 's/^/        /'
+    continue
+  fi
+  STRAY=$(ldd "$bin" 2>&1 | grep -E 'libindi[A-Za-z]*\.so' | grep -v '=> */opt/indi-stable/' || true)
+  test -z "$STRAY" || { fail "$pkg: a libindi resolved OUTSIDE the private prefix:"; echo "$STRAY" | sed 's/^/        /'; }
+  OUT=$(timeout 10 "$bin" --help 2>&1)
+  if echo "$OUT" | grep -qi 'error while loading shared libraries\|cannot open shared object'; then
+    fail "$pkg: $(basename "$bin") died in the dynamic loader after the upgrade:"
+    echo "$OUT" | head -2 | sed 's/^/        /'
+  elif test -z "$OUT"; then
+    fail "$pkg: $(basename "$bin") --help produced no output at all after the upgrade"
+  else
+    pass "$pkg: $(basename "$bin") resolves and runs after the upgrade"
+  fi
+done
 
 echo
 echo "############ STEP 6: the distro binary is still a bystander ############"
