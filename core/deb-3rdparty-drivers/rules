@@ -26,6 +26,15 @@ INDI_DATADIR := $(INDI_PREFIX)/share/indi
 %:
 	dh $@ --buildsystem=cmake
 
+# -DINDI_DATA_DIR is PINNED, not discovered, and that is load-bearing.
+# Nothing in indi-3rdparty ever assigns it -- FindINDI.cmake only documents
+# the name -- yet it turns up in CMakeCache as a PATH resolved from the build
+# host. On a machine with the distribution's libindi-data installed it came
+# out /usr/share/indi, and every catalogue except eqmod's (which sets its own
+# from CMAKE_INSTALL_PREFIX) installed OUTSIDE the private prefix. The Fedora
+# mock chroot has no libindi-data, so the same spec silently got it right
+# there. Same class of defect as WITH_WEBCAM/WITH_NUT in DESIGN.md: an
+# install path decided by what happens to be installed on the build machine.
 override_dh_auto_configure:
 	# toupcam_test and omegonprocam_test are vendor SDK diagnostic tools, not
 	# INDI drivers -- neither has an install() rule in
@@ -55,6 +64,7 @@ override_dh_auto_configure:
 		-DCMAKE_INSTALL_RPATH=$(INDI_LIBDIR) \
 		-DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON \
 		-DINDI_ROOT=$(INDI_PREFIX) \
+		-DINDI_DATA_DIR=$(INDI_DATADIR) \
 		-DCMAKE_PREFIX_PATH=$(INDI_PREFIX) \
 		-DBUILD_LIBS=OFF \
 		-DWITH_ASTROASIS=OFF \
@@ -64,7 +74,6 @@ override_dh_auto_configure:
 		-DWITH_SVBONY=OFF \
 		-DWITH_PENTAX=OFF \
 		-DWITH_QSI=OFF \
-		-DWITH_ARMADILLO=OFF \
 		-DWITH_ASTARBOX=OFF \
 		-DWITH_ASTROLINK4=OFF \
 		-DWITH_ASTROMECHFOC=OFF \
@@ -83,7 +92,6 @@ override_dh_auto_configure:
 		-DWITH_GPSD=OFF \
 		-DWITH_GPSNMEA=OFF \
 		-DWITH_LIMESDR=OFF \
-		-DWITH_MAXDOME=OFF \
 		-DWITH_MGEN=OFF \
 		-DWITH_NEXDOME=OFF \
 		-DWITH_NIGHTSCAPE=OFF \
@@ -114,6 +122,47 @@ override_dh_auto_install:
 	rm -f debian/tmp$(INDI_BINDIR)/asi_wheel_test
 	rm -f debian/tmp$(INDI_BINDIR)/playerone_camera_test
 	rm -f debian/tmp$(INDI_BINDIR)/playerone_camera_bench
+	# --- udev rules: re-home under a namespaced filename --------------------
+	# NEW with the armadillo-platypus slice. Until then nothing in THIS source
+	# package shipped a udev rule -- every rule this project installed came
+	# from core/deb-3rdparty-libs, whose rules file redirects
+	# UDEVRULES_INSTALL_DIR with a -D and re-homes out of that private
+	# directory.
+	#
+	# That approach does not work here, and the RPM side's first build is what
+	# proved it. Every lib* vendor directory declares UDEVRULES_INSTALL_DIR as
+	# set(... CACHE STRING ...), so a -D override wins. Five DRIVER
+	# directories -- armadillo-platypus, dsi, orion-ssg3, qsi, sx -- instead
+	# use RULES_INSTALL_DIR, hardcoded by a plain set() with no CACHE, which
+	# overwrites the command line at configure time. Neither -D can move them.
+	# So the rule installs itself straight to a hardcoded /usr/lib/udev/rules.d
+	# under upstream's own filename -- the exact name a distribution package
+	# for the same hardware owns. See DESIGN.md, "Upstream build-system facts".
+	#
+	# Re-home by DESTINATION rather than by source directory, which is robust
+	# to both upstream mechanisms. /usr/lib, not /lib: merged-usr.
+	mkdir -p debian/tmp/usr/lib/udev/rules.d
+	set -e; for rule in debian/tmp$(INDI_PREFIX)/udev-rules/*.rules \
+	                    debian/tmp/usr/lib/udev/rules.d/*.rules; do \
+		[ -e "$$rule" ] || continue; \
+		base=$$(basename "$$rule"); \
+		case "$$base" in *-indi-stable-3rdparty-*) continue ;; esac; \
+		mv "$$rule" "debian/tmp/usr/lib/udev/rules.d/$${base%%-*}-indi-stable-3rdparty-$${base#*-}"; \
+	done
+	rm -rf debian/tmp$(INDI_PREFIX)/udev-rules
+	# A loop that finds nothing must not pass as though it worked (#1).
+	# Exactly one driver in scope ships a rule; maxdomeii deliberately ships
+	# none, so assert a COUNT, not "at least one".
+	set -e; n=$$(ls -1 debian/tmp/usr/lib/udev/rules.d/*.rules 2>/dev/null | wc -l); \
+	test "$$n" -eq 1 \
+		|| { echo "ERROR: expected exactly 1 udev rule, found $$n:"; ls -1 debian/tmp/usr/lib/udev/rules.d/ 2>/dev/null; exit 1; }
+	test -e debian/tmp/usr/lib/udev/rules.d/99-indi-stable-3rdparty-armadilloplatypus.rules \
+		|| { echo "ERROR: the armadillo-platypus rule is not at its re-homed name"; ls -1 debian/tmp/usr/lib/udev/rules.d/; exit 1; }
+	# Nothing may be left at an upstream filename. This is the coexistence
+	# assertion, and the one the RPM side's first build failed.
+	set -e; bare=$$(ls -1 debian/tmp/usr/lib/udev/rules.d/*.rules 2>/dev/null | grep -v -- '-indi-stable-3rdparty-' || true); \
+	test -z "$$bare" \
+		|| { echo "ERROR: udev rules left at an upstream filename, where a distro rule belongs:"; echo "$$bare"; exit 1; }
 	# --- eqmod: drop the catalogue entry for the driver we do not build -----
 	# indi_eqmod.xml catalogues indi_ahpgt_telescope, which indi-eqmod's own
 	# local option(WITH_AHP_GT ... OFF) means we never build. Left alone it
@@ -183,7 +232,10 @@ override_dh_auto_install:
 	set -e; for bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
 	                   indi_inovaplx_ccd indi_mi_ccd indi_sbig_ccd indi_toupcam_ccd \
 	                   indi_fishcamp_ccd indi_eqmod_telescope indi_azgti_telescope \
-	                   indi_staradventurergti_telescope indi_staradventurer2i_telescope; do \
+	                   indi_staradventurergti_telescope indi_staradventurer2i_telescope \
+	                   indi_armadillo_focus indi_platypus_focus indi_seletek_rotator \
+	                   indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
+	                   indi_maxdomeii; do \
 		test -x debian/tmp$(INDI_BINDIR)/$$bin \
 			|| { echo "ERROR: $$bin did not install -- an upstream WITH_* default or driver name changed"; exit 1; }; \
 	done

@@ -478,6 +478,7 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DCMAKE_PREFIX_PATH=%{indi_prefix} \
     -DBUILD_LIBS=OFF \
     -DUDEVRULES_INSTALL_DIR=%{indi_prefix}/udev-rules \
+    -DINDI_DATA_DIR=%{indi_datadir} \
     -DWITH_ASTROASIS=OFF \
     -DWITH_ATIK=OFF \
     -DWITH_ATIK_EFW=OFF \

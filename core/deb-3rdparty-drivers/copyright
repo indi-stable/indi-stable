@@ -41,6 +41,22 @@ License: LGPL-2.0-only
  own, so there is no "or later" grant to upgrade the tag with. The
  conservative, defensible reading is the plain v2 text as written.
 
+Files: indi-armadillo-platypus/* indi-maxdomeii/*
+Copyright: 2017 Lunatico Astronomia, Jaime Alemany
+ 2009 Ferran Casarramona
+ Jasem Mutlaq and the INDI Library contributors
+License: LGPL-2.1-or-later
+ Unlike the vendor-driver stanza above, this one is NOT spot-checked: every
+ .cpp and .h file in both directories was read (2026-09-09), and all twelve
+ armadillo-platypus files and all four maxdomeii files carry the identical
+ "version 2.1 of the License, or (at your option) any later version" grant.
+ Neither directory ships a licence file of its own, so both rely on
+ indi-3rdparty's top-level LICENSE, which is the LGPL-2.1 text and therefore
+ the correct one for them.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
 Files: indi-eqmod/*
 Copyright: 2012-2017 Geehalel <geehalel@gmail.com>
  2020 Jasem Mutlaq

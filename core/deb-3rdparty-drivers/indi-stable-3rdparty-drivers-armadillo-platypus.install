@@ -1,0 +1,8 @@
+opt/indi-stable/bin/indi_armadillo_focus
+opt/indi-stable/bin/indi_platypus_focus
+opt/indi-stable/bin/indi_seletek_rotator
+opt/indi-stable/bin/indi_dragonfly
+opt/indi-stable/bin/indi_dragonfly_dome
+opt/indi-stable/bin/indi_beaver_dome
+opt/indi-stable/share/indi/indi_lunatico.xml
+usr/lib/udev/rules.d/99-indi-stable-3rdparty-armadilloplatypus.rules

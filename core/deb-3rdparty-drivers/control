@@ -25,8 +25,9 @@ Homepage: https://github.com/indilib/indi-3rdparty
 Rules-Requires-Root: no
 
 # Mirrors core/rpm/indi-stable-3rdparty-drivers.spec -- same private prefix,
-# same 9 vendor drivers plus eqmod, same scope decision (the ~40 other
-# non-blob indi-3rdparty drivers stay out of scope for now, STATUS.md).
+# same 9 vendor drivers plus eqmod, armadillo-platypus and maxdomeii, same
+# scope decision (the ~40 other non-blob indi-3rdparty drivers stay out of
+# scope for now, STATUS.md).
 # Read that spec's header comment for the full rationale; core/deb-
 # 3rdparty-drivers/rules carries only the Debian-specific mechanics.
 #
@@ -163,6 +164,43 @@ Description: EQMod / Skywatcher-protocol mount INDI drivers
  Needs no vendor SDK, so unlike every other package here it depends only on
  indi-stable-core-libs. Does not include indi_ahpgt_telescope, which
  upstream gates behind an option that is off by default.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+# Like eqmod, neither of these has a vendor blob and so neither carries an
+# indi-stable-3rdparty-libs Depends. Unlike eqmod they need nothing beyond
+# INDI itself -- no libnova, no libgsl -- so they added no build dependency
+# at all. Both are LGPL-2.1-or-later, read from every .cpp/.h header in both
+# directories rather than spot-checked; see debian/copyright.
+Package: indi-stable-3rdparty-drivers-armadillo-platypus
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Lunatico Armadillo, Platypus, Dragonfly, Seletek and Beaver INDI drivers
+ Six binaries from one source directory, for Lunatico Astronomia's
+ controller family: indi_armadillo_focus and indi_platypus_focus (focusers),
+ indi_seletek_rotator (rotator), indi_dragonfly and indi_dragonfly_dome
+ (relay controller and its dome front-end) and indi_beaver_dome.
+ .
+ The first package in this source package to ship a udev rule. It is
+ installed under a namespaced filename so it takes effect without colliding
+ with a distribution rule for the same hardware.
+ .
+ Its catalogue is indi_lunatico.xml, named for the vendor rather than for
+ the source directory or any binary in it.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-maxdomeii
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: MaxDome II observatory dome INDI driver
+ indi_maxdomeii, for the MaxDome II dome controller. Needs no vendor SDK and
+ no library beyond INDI itself.
+ .
+ Does not include test-maxdomeii, an upstream standalone test harness that
+ the default build compiles but never installs.
  .
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.
