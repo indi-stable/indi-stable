@@ -1070,6 +1070,360 @@ under any letter directory). `fedoraastro` — this project's own Fedora test
 VM — is Fedora 44, and gets nothing from Fedora's own repos for indi-3rdparty
 at all, not merely "incomplete coverage" as `README.md` currently says.
 
+### The ~50 non-blob drivers — real dependency survey, scope still undecided — 2026-09-08
+
+Investigated because Will needs `eqmod` for his mount (`indi-stable-3rdparty-drivers.spec`'s
+own `WITH_EQMOD=OFF` currently blocks it) and asked to look into building all of them, not
+just that one. This section is the survey; the scope decision itself is still open — see
+`STATUS.md`, "3rdparty — remaining" for what happens next.
+
+**Checked directly against the real upstream tree**, not inferred: downloaded the
+`v2.2.4.1` tarball this spec already builds from and read every driver directory's own
+`CMakeLists.txt`, rather than trusting the "11 of 61" blob count above, which predates the
+QSI/Fishcamp correction (2026-08-27) and is now demonstrably short — it omits `apogee` and
+`qsi` at minimum. **Before finalizing which of "the ~50" are actually blob-free, that count
+needs redoing against the current 9-vendor scope; nothing below depends on the stale number.**
+
+**The top-level `CMakeLists.txt` declares 74 `WITH_<X>` options.** Of those:
+
+- **44 are `On` by default and currently forced `Off`** by this spec's `%build` — the
+  "out of scope, not licence" list the file header already names.
+- **7 are `Off` by default even upstream**, and this spec doesn't need to touch them at all
+  because nothing forces them on: `WITH_GIGE` (industrial machine-vision, `ARAVIS`/`GLIB2`),
+  `WITH_LIBCAMERA` (Raspberry Pi camera stack), `WITH_BNO_IMU`/`WITH_ICM_IMU` (specific IMU
+  sensor SDKs with no source in the tree, no Fedora/Debian package either), `WITH_CELESTRON_ORIGIN`
+  (pulls in `Qt5`/`Qt6`/`OpenSSL`/`TIFF` for one driver), and **`WITH_AHP_XC`/`WITH_AHP_GT`, which
+  `execute_process(COMMAND git clone ...)` a separate repo at CMake **configure** time** — a
+  real build-hygiene problem independent of scope, since a `mock`/`pbuilder` chroot has no
+  business reaching out to the network mid-build. None of these seven belong in "the ~50"
+  regardless of how the scope question below is answered.
+- **2 more (`WITH_WEBCAM`, `WITH_NUT`) are neither** — upstream's own `CMakeLists.txt` sets
+  their default by running `find_package(FFmpeg)` / `find_package(NUTClient)` **at configure
+  time on whatever machine happens to be building**, not a fixed value. Left unset, either one
+  would silently flip on or off depending on what's installed in that day's `mock`/`pbuilder`
+  chroot — exactly the nondeterminism this project's reproducibility already guards against
+  elsewhere (`check-docs.sh`, pinned `Source0` hashes). Whatever the scope decision is, both
+  need an explicit `-DWITH_WEBCAM=...`/`-DWITH_NUT=...`, never left to discovery. `WITH_WEBCAM`
+  in particular needs `ffmpeg-devel`, which is **not in base Fedora** (RPM Fusion only, a repo
+  this project has never depended on) — a real reason to pin it `Off` rather than a reason to
+  chase down.
+
+**Dependency table for the 44, `find_package()` calls read directly from each driver's own
+`CMakeLists.txt`** (INDI/CFITSIO/ZLIB/USB1/Threads omitted — core's spec already covers
+those for every driver here):
+
+| Needs only `Nova` (`libnova-devel` / `libnova-dev`) | `indi-aok`, `indi-avalon`, `indi-bresserexos2`, `indi-celestronaux` (+`GSL`), `indi-eqmod` (+`GSL`), `indi-gpsnmea`, `indi-nexdome`, `indi-ocs`, `indi-rolloffino`, `indi-rtklib`, `indi-starbook-ten`, `indi-talon6` |
+|---|---|
+| No extra dependency beyond INDI itself | `indi-armadillo-platypus`, `indi-nightscape`, `indi-openogma`, `indi-shelyak`, `indi-aagcloudwatcher-ng`, `indi-dsi`, `indi-orion-ssg3`, `indi-maxdomeii`, `indi-beefocus`, `indi-atik-efw`\* |
+| `find_package(RT)` and nothing else | `indi-astarbox`. (`indi-asi-power` and `indi-rpi-gpio` were listed here and are **orphan directories the build never adds** — see the 2026-09-09 re-derivation below) |
+| `GTest`/`GMock` in `find_package()` but their result unused, so **not a real `BuildRequires`** | `indi-atik-efw`\*, `indi-beefocus`, `indi-maxdomeii`, `indi-starbook`, `indi-eqmod`. Two different mechanisms, both checked: `indi-atik-efw` and `indi-maxdomeii` wrap the call in `IF (INDI_BUILD_UNITTESTS)`, which this project never sets; `indi-eqmod` instead hardcodes `set(INDI_BUILD_UNITTESTS FALSE)` immediately *before* an unguarded `find_package(GTest)`, so the call runs but nothing consumes it. Neither form is REQUIRED, so neither fails configure when GTest is absent |
+| One extra library, ordinary Fedora/Debian package | `indi-duino` (`CURL`→`libcurl-devel`), `indi-starbook` (`CURL`+`Nova`), `indi-weewx-json` (`CURL`+`nlohmann_json`), `indi-avalonud` (`nlohmann_json`+`ZMQ`→`json-devel`+`cppzmq-devel`), `indi-sx` (`hidapi`→`hidapi-devel`), `indi-mgen` (`FTDI1`→`libftdi-devel` on Fedora / `libftdi1-dev` on Debian — note the Fedora name has no `1`; both confirmed present 2026-09-09), `indi-ffmv` (`DC1394`→`libdc1394-devel`, an EOL FireWire camera), `indi-limesdr` (`LIMESUITE` — **Debian-only**, no Fedora package; see the availability note below), `indi-gpsd` (`GPSD`→`gpsd-devel`/`libgps-dev`), ~~`indi-weather-mqtt` (`Mosquitto`)~~ — **orphan directory, never added by the build** |
+| `find_package(GPIOD)` wrapped in its own success check, so the driver silently doesn't build if the package is absent rather than failing configure | `indi-gpio` (Raspberry Pi GPIO; `libgpiod-devel` exists on both distros if wanted) |
+| Heaviest new surface | `indi-gphoto` (`GPHOTO2`+`JPEG`+`LibRaw`→`gphoto2-devel`+`libjpeg-turbo-devel`+`libraw-devel` — DSLR control, plausibly wanted for an astrophotography audience despite the dependency count) |
+
+**The table above was re-derived mechanically on 2026-09-08 and corrected; the
+hand-read first version had four wrong rows.** Read every `indi-*/CMakeLists.txt`
+in the tree with one `find_package()` extraction rather than by eye, after a
+spot-check of `indi-gpsd` contradicted what the table claimed. The four errors,
+all of the same kind — a dependency present in the file and missed by the reader:
+
+- **`indi-gpsd` needs `GPSD`**, not Nova alone. It is `find_package(INDI Nova
+  ZLIB GPSD)`. Listing it as dependency-free would have put `gpsd-devel` /
+  `libgps-dev` in a "no new BuildRequires" batch that then failed to configure.
+- **`indi-starbook` needs `CURL`**, and was listed in the Nova-only row.
+- **`indi-weewx-json` needs `nlohmann_json`** as well as `CURL`, and was
+  grouped with `indi-duino` as if the two had identical dependencies.
+- **`indi-astarbox` calls `find_package(RT)`**, and was listed as needing
+  nothing beyond INDI.
+
+**Availability confirmed on BOTH boxes, 2026-09-09.** `apt-cache policy` on
+`ubuntuastro` (Ubuntu 26.04) and `dnf repoquery` on `fedoraastro` (Fedora 44),
+run against every candidate at once. **Debian resolves all fifteen**:
+`libnova-dev`, `libgsl-dev`, `libcurl4-openssl-dev`, `nlohmann-json3-dev`,
+`libzmq3-dev`, `libhidapi-dev`, `libftdi1-dev`, `libdc1394-dev`,
+`libgpiod-dev`, `libgphoto2-dev`, `libjpeg-dev`, `libraw-dev`,
+`liblimesuite-dev`, `libgps-dev` and `libmosquitto-dev`.
+
+**Fedora does not, and three of the names this table gave for it were wrong.**
+The Fedora column cannot be derived from the Debian one by pattern:
+
+| This table said | Fedora reality |
+|---|---|
+| `libftdi1-devel` | **No such package.** It is `libftdi-devel`, which *is* libftdi1 (version 1.5) — the `1` is in the version, not the name |
+| `gphoto2-devel` | `libgphoto2-devel`. `gphoto2-devel` does not exist |
+| `libraw-devel` | `LibRaw-devel`. The lowercase spelling happens to resolve through `Provides`, so this one would not have failed |
+| `LimeSuite-devel` | **Absent from Fedora entirely**, base and updates both |
+
+**`indi-limesdr` is therefore Debian-only** unless this project takes a
+dependency on RPM Fusion or a COPR, which it never has. That is a scope
+decision, not a packaging problem, and it has to be made before `LIMESUITE`
+goes into any batch — a driver that builds on one distro and not the other
+breaks the "same package set on every distro" shape the rest of this
+document assumes. This section previously said the Ubuntu resolve "settles
+`LIMESUITE`". It settled only half of it.
+
+Everything else resolves on Fedora: `libnova-devel`, `gsl-devel`,
+`libcurl-devel`, `json-devel`, `cppzmq-devel`, `hidapi-devel`,
+`libdc1394-devel`, `libgpiod-devel`, `libjpeg-turbo-devel`, `gpsd-devel` and
+`mosquitto-devel`.
+
+**`libftdi-devel` being present does not reopen `WITH_QSI`.** QSI is excluded
+on a licence finding read in full from `libqsi/COPYING` — see "QSI and
+Fishcamp resolved" below — not on a missing build dependency. The dependency
+was only ever the reason its *configure* failed first.
+
+**Re-derived a THIRD time, 2026-09-09, after a build failure — the
+extraction itself was case-sensitive.** `indi-nightscape` requires `FTDI1`,
+and both earlier passes reported it as needing nothing: its `CMakeLists.txt`
+writes `FIND_PACKAGE(FTDI1 REQUIRED)` in **upper case**, and the regex both
+passes used matched only lower-case `find_package`. The build caught it at
+configure — `FTDI not found. Please install libftdi1-dev` — which is the
+only reason it was found. A survey defect, not a packaging one, and the
+third time this table has been wrong.
+
+Re-run case-insensitively over the whole tree, `indi-nightscape` is the
+**only** non-obsolete driver affected; the two other upper-case users are a
+test subdirectory and an obsolete driver. The damage was contained to one
+row, but the lesson is the ordinary one: the extraction that produces a
+table needs a control as much as any other check does.
+
+`FTDI1` resolves to `libftdi-devel` on Fedora and `libftdi1-dev` on Debian,
+both already confirmed present. `indi-nightscape` also calls
+`FIND_PACKAGE(D2XX)`, FTDI's proprietary driver; it is not `REQUIRED`,
+neither distro packages it, and the build falls back to libftdi.
+
+**Re-derived a second time, mechanically, 2026-09-09 — three of the table's
+entries are directories the build can never reach.** The 2026-09-08 pass read
+every `indi-*/CMakeLists.txt`, which is why its dependency columns hold up
+(all twelve Nova-only rows and all ten no-dependency rows re-confirmed
+unchanged). What it did not do is check that the top-level `CMakeLists.txt`
+ever *adds* those directories. Three of them it does not:
+
+- **`indi-asi-power`, `indi-rpi-gpio` and `indi-weather-mqtt` are orphans.**
+  Each ships its own `CMakeLists.txt`, and no `add_subdirectory()` anywhere
+  in the tree names any of them, nor does any `WITH_<X>` option mention them.
+  They are unbuildable at `v2.2.4.1` and cannot be enabled by a spec flag.
+  Two were the entire "`find_package(RT)` and nothing else" row apart from
+  `indi-astarbox`; the third is the only consumer of `Mosquitto`, so
+  `mosquitto-devel`/`libmosquitto-dev` — confirmed available on both boxes
+  above — is a dependency of nothing reachable.
+- **`indi-starbook` needs `Nova` as well as `CURL`.** The table's "one extra
+  library" row pairs it with `indi-duino` as if their dependencies matched.
+  `indi-duino` is `CURL` alone; `indi-starbook` is `find_package(CURL)` and
+  `find_package(Nova)` both.
+
+Two things that look like defects in this same pass and are not, both checked
+against the packaging rather than assumed:
+
+- **`WITH_TICFOCUSER-NG` is spelled with a hyphen**, not the underscore every
+  other option uses, so a `-DWITH_TICFOCUSER=OFF` override would silently miss
+  it. Both packagings already write `-DWITH_TICFOCUSER-NG=OFF` correctly.
+- **`indi-toupbase` is gated by no single option at all.** It is added only if
+  a `foreach` over `TOUPTEK_REBRANDS` sets `ADD_TOUPBASE`, which is the
+  eleven-brand mechanism already documented elsewhere in this file, not an
+  omission from the table.
+
+**`find_package(RT)` costs nothing.** `cmake_modules/FindRT.cmake` looks for
+`time.h` and `librt`, both of which come with glibc. `indi-astarbox` therefore
+needs no new `BuildRequires` and belongs with the no-dependency group, not in
+a row of its own.
+
+**The first widening batch is therefore 21 drivers with zero new build
+dependencies** beyond the `libnova`/`GSL` pair `eqmod` already added:
+`indi-aok`, `indi-avalon`, `indi-bresserexos2`, `indi-celestronaux`,
+`indi-gpsnmea`, `indi-nexdome`, `indi-ocs`, `indi-rolloffino`, `indi-rtklib`,
+`indi-starbook-ten`, `indi-talon6` (Nova, plus `GSL` for `celestronaux`);
+`indi-aagcloudwatcher-ng`, `indi-armadillo-platypus`, `indi-beefocus`,
+`indi-dsi`, `indi-maxdomeii`, `indi-nightscape`, `indi-openogma`,
+`indi-orion-ssg3`, `indi-shelyak` (nothing); and `indi-astarbox` (`RT`).
+`indi-atik-efw` is deliberately held back — it has no dependency either, but
+its licence relationship to `indi-atik`'s blob is the open question below.
+
+**Five of the spec's `WITH_<X>=OFF` overrides are dead options upstream.**
+`WITH_ASTROLINK4`, `WITH_ASTROMECHFOC`, `WITH_DREAMFOCUSER`, `WITH_RADIOSIM`
+and `WITH_SPECTRACYBER` are each declared by `option()` in the top-level
+`CMakeLists.txt` but have no `add_subdirectory()` consumer anywhere and no
+matching source directory in the tree. Forcing them off is harmless and they
+are left in place, but they inflate any count of "drivers we are excluding" —
+they exclude nothing.
+
+**Option names do not reliably match directory names**, which matters when
+turning a scope decision into spec edits. `WITH_SKYWALKER` builds
+`indi-aok`; `WITH_CAUX` builds `indi-celestronaux`; `WITH_MAXDOME` builds
+`indi-maxdomeii`; `WITH_CLOUDWATCHER` builds `indi-aagcloudwatcher-ng`;
+`WITH_MI` builds `indi-mi`; `WITH_INOVAPLX` builds `indi-inovaplx`. The table
+above is indexed by directory, the spec by option — map through the
+`add_subdirectory()` calls, not by assuming the two agree.
+
+\* `indi-qhy` and `indi-atik-efw` are worth a second look before inclusion: `qhy` needs the
+`QHY` blob this project already excludes for licence reasons (no `COPYING` file — "bundle by
+licence tier" above), and while `indi-atik-efw`'s own `find_package()` list has no vendor
+blob, it ships alongside `indi-atik` (which does) and its exact relationship to that licence
+decision had not been checked when this was written. **Checked and settled
+2026-09-09: there is no relationship.** `indi-atik-efw/CMakeLists.txt` calls
+`find_package` for INDI and Threads only and links `${INDI_LIBRARIES}` and
+`rt`; it talks to the filter wheel directly and shares nothing with
+`indi-atik` but a name prefix. It is packaged. `indi-qhy` still is not.
+
+**`eqmod` specifically is clean**: `find_package(INDI REQUIRED)`, `find_package(Nova REQUIRED)`,
+`find_package(ZLIB REQUIRED)`, `find_package(GSL REQUIRED)` — nothing else, no vendor blob,
+no licence question. `libnova-devel`/`gsl-devel` (Fedora) and `libnova-dev`/`libgsl-dev`
+(Debian) are both ordinary base-repo packages on `fedoraastro`/`ubuntuastro`, unconfirmed by
+an actual `dnf`/`apt` resolve yet. It installs **four** binaries, not one —
+`indi_eqmod_telescope`, `indi_azgti_telescope`, `indi_staradventurergti_telescope`,
+`indi_staradventurer2i_telescope` — covering Skywatcher/EQMod-protocol mounts, the ZWO AM5/AZ-GTi
+family, and both Star Adventurer GTi variants, since they share `skywatcher.cpp`'s motor-control
+code. A fifth (`indi_ahpgt_telescope`) is gated behind `indi-eqmod/CMakeLists.txt`'s own
+**local** `option(WITH_AHP_GT ... OFF)` — a same-named but independent option from the
+top-level `WITH_AHP_GT` above, defaults `Off` either way, not something enabling `eqmod`
+touches.
+
+### Decided: dsi is not shipped — 2026-09-09
+
+`indi-dsi` bundles `meade-deepskyimager.hex`, Meade's proprietary Cypress
+EZUSB FX2 device firmware, and **no file in the directory or the README
+states any terms for it**. That is the same "no licence at all" situation
+that already excluded `qsi` and `qhy` under "bundle by licence tier".
+
+Will researched the Meade firmware situation independently and concluded it
+is a hard no on Linux. Upstream's `INDI_INSTALL_FIRMWARE=OFF` would allow
+shipping the driver without the blob, and that was considered; it was
+rejected because the camera cannot enumerate as a DSI until firmware is
+loaded, so the result would be a package that installs cleanly and cannot
+work. Reopen only if the firmware's terms are established with Meade.
+
+One detail worth keeping if it is ever revisited: `indi-dsi` sets
+`FIRMWARE_INSTALL_DIR` with a plain `set()` to `/usr/lib/firmware`, so it is
+unredirectable by any `-D` flag — the same class of problem as
+`RULES_INSTALL_DIR`, and it would need the same re-home-by-destination
+treatment.
+
+**`rolloffino` is excluded for a different and simpler reason:** not one of
+its files states any grant and it ships no licence file, so unlike the
+headerless files elsewhere in this tree there is nothing in the directory
+for them to inherit. That needs upstream contact, not analysis.
+
+### Decided: ship the exact LGPL-2.0 text — 2026-09-09, after a correction
+
+Four drivers in the non-blob widening — `nexdome`, `talon6`, `ocs` and
+`starbook-ten` — grant "the GNU Library General Public License version 2 as
+published by the Free Software Foundation" with no "or later" clause. That is
+LGPL-2.0-only, the same conservative reading `inovaplx` and `eqmod`'s AZ-GTi
+sources already get here. None of the four bundles a matching licence text.
+
+**They ship `indi-inovaplx/COPYING.LIB`, the exact LGPL-2.0.** That is not an
+arbitrary pick from the tree: `indi-inovaplx` is a driver
+`indi-stable-3rdparty-drivers` already builds and already declares
+LGPL-2.0-only, and **this spec was already shipping that very file** with its
+`inovasdk` subpackage. Nor is the choice load-bearing — seven directories
+bundle this file (`indi-apogee`, `indi-gphoto`, `indi-inovaplx`,
+`indi-limesdr`, `indi-nightscape`, `indi-sbig`, `indi-sx`) and all seven are
+byte-identical, sha256 `c340cbee4974bb96…`, checked rather than assumed. On
+the Debian side no file is bundled at all: `debian/copyright` references
+`/usr/share/common-licenses/LGPL-2`, which Debian ships.
+
+**This decision replaces an earlier one taken on a false premise, and the
+false premise was mine.** Will was told that indi-3rdparty contained no
+LGPL-2.0 text anywhere, "checked rather than assumed", and decided on that
+basis to ship the nearest available text, the LGPL-2.1. Two candidate files
+had actually been checked — `indi-starbook-ten/COPYING.LESSER` (2.1) and
+`libinovasdk/LICENSE.lib` (a vendor notice) — and the conclusion was
+generalised from them. A `grep -rl` finds seven copies, one of which this
+package already ships. Told the correct facts, Will's decision was the exact
+text, and the packages were switched the same day.
+
+The generalisable point, and the reason this is written down rather than
+quietly fixed: **"checked rather than assumed" is a claim about method, and
+it has to be true of the whole claim, not of the two examples that came to
+hand.** The phrase appears throughout these documents. It earns its place
+only when the check was exhaustive.
+
+**`indi-ocs` needed a further call.** It bundles a `LICENSE.txt` that is the
+**GPL-2** text, contradicting every source header in its own directory. That
+is a genuine contradiction, not the staleness `indi-apogee` and `indi-sbig`
+carry, where an older LGPL sits beside headers granting a newer one. Its
+bundled file is therefore not shipped: a GPL text beside LGPL code overstates
+the terms in the one direction that can mislead a redistributor.
+`indi-starbook-ten`'s own `COPYING.LESSER` is unused for the same shape of
+reason — it is the 2.1, and its sources grant version 2 only.
+
+**Scope.** This settles the LGPL-2.0-only group. It does not extend to the
+GPL-2.0-or-later drivers still outstanding — `bresserexos2`, `rtklib`,
+`gpsnmea` and `shelyak`. GPL-2 text *does* exist in the tree
+(`indi-ocs/LICENSE.txt`, `indi-starbook-ten/COPYING`), so the same
+"point at a sibling directory" answer is available there, but it is a
+separate decision. See `STATUS.md`.
+
+### Decided: eqmod first, then widen — 2026-09-08
+
+**Scope decided with Will: build `eqmod` alone first, as a complete vertical
+slice, then widen.** The options weighed were EQMod alone, the full 44 minus the
+licence-adjacent `qhy`/`atik-efw` pair, and a curated "no new dependency surface"
+batch of roughly twenty (everything needing only `libnova`+`GSL`, or nothing).
+
+The deciding argument was not scope but *sequence*. Every widening option
+eventually wants the same thing — the build, install, coexistence and upgrade
+rigor the original 9-vendor work needed — and `LESSONS_LEARNED.md` #1's track
+record says the first non-blob driver will surface real defects. Doing that
+discovery against one driver rather than forty means each defect is
+unambiguous about what caused it. Widening afterward is repetition of a proven
+shape rather than new risk, so this is a decision about ordering, not a cap:
+the remaining drivers are still wanted.
+
+**A second decision, also Will's: one subpackage per driver**, not a grouped
+`-misc` lump. It keeps the shape the 9 vendor subpackages already established,
+and it keeps heavy dependencies isolated — installing `eqmod` must never pull
+`libraw` in on behalf of `gphoto`. The cost, once the widening happens, is
+roughly forty `%package` stanzas and forty Debian binary packages.
+
+**`eqmod` is the only subpackage here that is not LGPL**, found by reading
+every `.cpp`/`.h` header in `indi-eqmod/` on 2026-09-08 rather than
+spot-checking one, and it is genuinely two bodies of code:
+
+- Geehalel's original Skywatcher-protocol driver (`eqmod*`, `skywatcher*`,
+  `align/`, `scope-limits/`, `simulator/`) grants "either version 3 of the
+  License, or (at your option) any later version" and the directory ships a
+  full GPLv3 `COPYING` — **GPL-3.0-or-later**.
+- The 2020 AZ-GTi and Star Adventurer additions (`azgtibase`,
+  `staradventurergtibase`, `staradventurer2ibase`) grant "GNU Library General
+  Public License version 2" with **no** "or later" clause — **LGPL-2.0-only**,
+  the same conservative reading `indi-inovaplx` already gets, for the same
+  reason.
+
+All four binaries compile `skywatcher.cpp`, so all four are GPL-3.0-or-later as
+distributed; LGPL-2.0's own section 3 is what permits that combination.
+
+**This forced a packaging decision about the `License:` tag.** Adding
+`GPL-3.0-or-later` to the spec's top-level `License:` was tried first and was
+wrong: rpm propagates that tag to every subpackage that does not override it,
+so all nine vendor subpackages — none of which contain a line of GPL-3 code —
+would have declared it. Caught by running `rpmspec -q --qf '%{license}'` over
+the built package list rather than by reading the spec back. The top-level tag
+stays the LGPL aggregate and `eqmod` alone carries its own `License:`. The
+cost is that the SRPM's tag understates the SRPM's contents; the benefit is
+that all ten binary RPMs — the artifacts anyone actually installs and
+redistributes — declare exactly what they hold. Debian has no equivalent
+tension: `debian/copyright` is per-file-glob by construction, so `eqmod`'s two
+grants are simply two more `Files:` stanzas.
+
+**One real defect found while adding it, before any build ran**, and it
+generalized into `LESSONS_LEARNED.md` #24: `indi_eqmod.xml` catalogues
+`indi_ahpgt_telescope`, a driver gated behind an upstream option that defaults
+off and which this project therefore never builds. Left alone that entry would
+have survived the catalogue rewrite as a *bare* name — and a bare name is what
+`indiserver` resolves through `PATH`, making it the one entry in our own
+catalogue capable of launching a distribution binary. Both packagings now strip
+the `<device>` block and then assert that no `<driver>` entry anywhere survives
+as a bare name.
+
+`eqmod` also installs **five** XML files, not one: `indi_eqmod.xml` is the
+driver catalogue, and the four `*_sk.xml` are INDI property skeletons. The
+skeletons match the rewrite loop's own `indi_*.xml` glob but contain no
+`<driver>` element at all (checked), so the rewrite correctly leaves them
+untouched.
+
+See `STATUS.md` for what remains.
+
 ### Three more absolute paths found while writing `indi-stable-3rdparty-libs.spec` — 2026-08-26
 
 Found by reading every bundled vendor's `CMakeLists.txt` for `install()`
@@ -1215,8 +1569,11 @@ neither actually links `INDI_LIBRARIES` — so `indi-stable-3rdparty-libs` needs
 documented `-DINDI_ROOT=<path>` is what lets it find core in the private
 prefix rather than a standard system location. Combined with the
 libs-before-drivers ordering already decided, the real sequence a promotion
-pipeline must respect is **core, then 3rdparty-libs, then 3rdparty-drivers** —
-not yet reflected in any build automation, since none exists yet.
+pipeline must respect is **core, then 3rdparty-libs, then 3rdparty-drivers**.
+This said "not yet reflected in any build automation, since none exists yet"
+until 2026-09-09; three release workflows have existed in
+`.github/workflows/` since 2026-09-04 and have each run end to end on this
+repo (`STATUS.md`).
 
 ## `pyindi-client` — packaging decisions, established 2026-08-26
 
@@ -1333,8 +1690,31 @@ packaging without knowing them reintroduces a bug that was already fixed.
   rename the files**, preserving the numeric prefix because udev applies rules
   in lexical order. They land in `/usr/lib/udev/rules.d` rather than `/lib`:
   Debian 12+ and Ubuntu 22.04+ are merged-usr where `/lib` is an alias symlink,
-  and that path also matches Fedora's `%{_udevrulesdir}`. A grep for other
-  absolute `DESTINATION`s found none — this is the only one.
+  and that path also matches Fedora's `%{_udevrulesdir}`.
+
+  **This said "a grep for other absolute `DESTINATION`s found none — this is
+  the only one" until 2026-09-09, and that was wrong.** It held for the `core`
+  tree it was written about and for every `lib*` vendor directory in
+  indi-3rdparty, all of which declare the variable as
+  `set(UDEVRULES_INSTALL_DIR ... CACHE STRING ...)`, which is exactly why a
+  `-D` override has always worked there. But **five indi-3rdparty *driver*
+  directories — `indi-armadillo-platypus`, `indi-dsi`, `indi-orion-ssg3`,
+  `indi-qsi` and `indi-sx` — use a second, differently named variable,
+  `RULES_INSTALL_DIR`, hardcoded to `/usr/lib/udev/rules.d` by a plain
+  `set()` with no `CACHE`.** A plain `set()` overwrites whatever the command
+  line supplied, so neither `-DUDEVRULES_INSTALL_DIR=` (wrong name) nor
+  `-DRULES_INSTALL_DIR=` (overwritten at configure time) can move it. Three
+  other drivers — `indi-ffmv`, `indi-gphoto`, `indi-nightscape` — do use the
+  cache variable and behave as this entry originally described.
+
+  Consequence for the packaging: **a driver's udev rule cannot be redirected
+  by any flag, so it must be re-homed by destination in `%install`/`rules`
+  after the fact.** `indi-stable-3rdparty-drivers` does exactly that, renaming
+  whatever lands in either location and then asserting that nothing is left at
+  an upstream filename. Found by that assertion failing on the first build of
+  the armadillo-platypus slice, not by reading — the rule had installed itself
+  straight to `/usr/lib/udev/rules.d/99-armadilloplatypus.rules`, the exact
+  name a distribution package for the same hardware would use.
 - **`CMAKE_INSTALL_LIBDIR` must be passed RELATIVE (`lib`).** Fedora's `%cmake`
   macro passes it absolute, and INDI derives `PKGCONFIG_INSTALL_PREFIX` straight
   from it (`CMakeLists.txt:83`), so an absolute value drops `libindi.pc` into

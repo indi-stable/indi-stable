@@ -17,16 +17,27 @@ Build-Depends: debhelper-compat (= 13),
                indi-stable-3rdparty-libs-micam-dev (= 2.2.4.1-1),
                indi-stable-3rdparty-libs-sbig-dev (= 2.2.4.1-1),
                indi-stable-3rdparty-libs-touptek-dev (= 2.2.4.1-1),
-               indi-stable-3rdparty-libs-fishcamp-dev (= 2.2.4.1-1)
+               indi-stable-3rdparty-libs-fishcamp-dev (= 2.2.4.1-1),
+               libnova-dev,
+               libgsl-dev,
+               libftdi1-dev
 Standards-Version: 4.6.2
 Homepage: https://github.com/indilib/indi-3rdparty
 Rules-Requires-Root: no
 
 # Mirrors core/rpm/indi-stable-3rdparty-drivers.spec -- same private prefix,
-# same 9 vendor drivers, same scope decision (the ~50 other indi-3rdparty
-# drivers that need no vendor blob are deliberately out of scope, STATUS.md).
+# same 9 vendor drivers plus the same 21 non-blob drivers, same scope
+# decision (only dsi and rolloffino are left out, both on licence grounds --
+# STATUS.md and DESIGN.md).
 # Read that spec's header comment for the full rationale; core/deb-
 # 3rdparty-drivers/rules carries only the Debian-specific mechanics.
+#
+# libftdi1-dev is nightscape's, and only nightscape's. Fedora spells the
+# same library libftdi-devel, with no 1 -- see core/rpm's own comment.
+#
+# libnova-dev and libgsl-dev are eqmod's, and only eqmod's -- no vendor
+# driver here needs either. They are the entire new build-dependency surface
+# this package took on to gain eqmod.
 #
 # Every Depends: on indi-stable-3rdparty-libs-<vendor> below is pinned to a
 # LITERAL version (= X.Y.Z-1), not a substvar -- there is no dpkg
@@ -135,6 +146,292 @@ Description: Fishcamp Engineering CCD camera INDI driver
  indi_fishcamp_ccd, linked against the bundled Fishcamp library
  (indi-stable-3rdparty-libs-fishcamp). Added 2026-08-27 once Fishcamp's
  licence was confirmed clear (DESIGN.md).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+# The only binary package here with no indi-stable-3rdparty-libs-<vendor>
+# Depends, because eqmod has no vendor blob behind it -- it talks the
+# Skywatcher serial/network protocol directly. libnova and libgsl arrive
+# through ${shlibs:Depends} on their own, both being ordinary distribution
+# packages that ship real shlibs files.
+Package: indi-stable-3rdparty-drivers-eqmod
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: EQMod / Skywatcher-protocol mount INDI drivers
+ indi_eqmod_telescope, indi_azgti_telescope,
+ indi_staradventurergti_telescope and indi_staradventurer2i_telescope --
+ four binaries, not one, sharing skywatcher.cpp's motor-control code:
+ EQMod-protocol Skywatcher mounts (including the Wave 100i/150i), the AZ-GTi
+ in equatorial WiFi mode, and both Star Adventurer GTi and 2i variants.
+ .
+ Needs no vendor SDK, so unlike every other package here it depends only on
+ indi-stable-core-libs. Does not include indi_ahpgt_telescope, which
+ upstream gates behind an option that is off by default.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+# Like eqmod, neither of these has a vendor blob and so neither carries an
+# indi-stable-3rdparty-libs Depends. Unlike eqmod they need nothing beyond
+# INDI itself -- no libnova, no libgsl -- so they added no build dependency
+# at all. Both are LGPL-2.1-or-later, read from every .cpp/.h header in both
+# directories rather than spot-checked; see debian/copyright.
+Package: indi-stable-3rdparty-drivers-armadillo-platypus
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Lunatico Armadillo, Platypus, Dragonfly, Seletek and Beaver INDI drivers
+ Six binaries from one source directory, for Lunatico Astronomia's
+ controller family: indi_armadillo_focus and indi_platypus_focus (focusers),
+ indi_seletek_rotator (rotator), indi_dragonfly and indi_dragonfly_dome
+ (relay controller and its dome front-end) and indi_beaver_dome.
+ .
+ The first package in this source package to ship a udev rule. It is
+ installed under a namespaced filename so it takes effect without colliding
+ with a distribution rule for the same hardware.
+ .
+ Its catalogue is indi_lunatico.xml, named for the vendor rather than for
+ the source directory or any binary in it.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-maxdomeii
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: MaxDome II observatory dome INDI driver
+ indi_maxdomeii, for the MaxDome II dome controller. Needs no vendor SDK and
+ no library beyond INDI itself.
+ .
+ Does not include test-maxdomeii, an upstream standalone test harness that
+ the default build compiles but never installs.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+# Three more non-blob drivers. They link libnova, and celestronaux also
+# libgsl, both already build dependencies here since eqmod -- so this slice
+# added none. All three are LGPL-2.1-or-later; see debian/copyright.
+Package: indi-stable-3rdparty-drivers-aok
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Astro-Electronic AOK Skywalker mount INDI driver
+ indi_lx200aok, an LX200-protocol driver for AOK Skywalker mount
+ controllers.
+ .
+ The source directory is indi-aok, the upstream build option is
+ WITH_SKYWALKER, the binary is indi_lx200aok and the catalogue is
+ indi_aok.xml. None of those can be derived from the others.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-avalon
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Avalon StarGo mount INDI driver
+ indi_lx200stargo, an LX200-protocol driver for Avalon Instruments StarGo
+ mount controllers. Its catalogue is indi_avalon.xml, named for the vendor
+ rather than the binary.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-celestronaux
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Celestron AUX-protocol mount INDI driver
+ indi_celestron_aux, speaking Celestron's AUX protocol directly rather than
+ the NexStar serial protocol the core INDI driver uses. The only driver
+ here that needs libgsl as well as libnova.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+# The LGPL-2.0-only group: every source file grants the Library GPL "version
+# 2" with no "or later" clause. See debian/copyright, which also records why
+# these ship the exact LGPL-2.0 text.
+Package: indi-stable-3rdparty-drivers-nexdome
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: NexDome observatory dome INDI driver (firmware v3+)
+ indi_nexdome, for NexDome domes running firmware v3 or later. Upstream
+ rewrote this driver completely for v3; firmware v1 is not supported.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-talon6
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Talon6 roll-off roof controller INDI driver
+ indi_talon6, for the Talon6 observatory roof controller.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-ocs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: OnCue OCS observatory control system INDI driver
+ indi_ocs, for the OnCue Observatory Control System.
+ .
+ Upstream bundles a LICENSE.txt in this driver's directory which is the
+ GPL-2 text and contradicts every source header in it. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-starbook-ten
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Vixen Starbook TEN mount INDI driver
+ indi_starbook_ten, for Vixen Starbook TEN mount controllers, which it
+ drives over HTTP rather than a serial protocol.
+ .
+ The only package here containing MIT code: it bundles cpp-httplib, which
+ is genuinely compiled in rather than merely present.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-aagcloudwatcher-ng
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: AAG CloudWatcher weather station INDI driver
+ indi_aagcloudwatcher_ng, for Lunatico AAG CloudWatcher cloud and rain
+ sensors. The "ng" is upstream's own name for the rewritten driver.
+ .
+ Does not include aagcloudwatcher_test_ng, a standalone CLI test tool
+ upstream installs alongside the driver. It is in no catalogue and is not
+ an INDI driver.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-nightscape
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Celestron Nightscape 8300 CCD INDI driver
+ indi_nightscape_ccd, for the Celestron Nightscape 8300 camera.
+ .
+ No source file in this driver carries a licence header; its bundled
+ COPYING.LIB is the only statement of terms. See debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-openogma
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: OpenOGMA camera INDI driver
+ indi_openogma, for OpenOGMA cameras.
+ .
+ The only AGPL-licensed package in this project. Neither source file
+ carries a licence header, so the bundled AGPL-3 LICENSE.txt governs. The
+ Affero clause binds operators who offer modified versions over a network;
+ it adds no condition on redistributing this package.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-orion-ssg3
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Orion StarShoot G3 CCD INDI driver
+ indi_orion_ssg3_ccd, for the Orion StarShoot G3 camera.
+ .
+ Its bundled LICENSE is the GPL-3 text and contradicts its own source
+ headers, which grant LGPL-2.1-or-later. See debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-atik-efw
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Atik EFW filter wheel INDI driver
+ indi_atik_efw, for Atik electronic filter wheels.
+ .
+ Despite the name this has no relationship to indi-atik or to the Atik
+ vendor SDK, which this project excludes on licence grounds. Its
+ CMakeLists.txt asks only for INDI and Threads, and it talks to the filter
+ wheel over USB HID directly.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+# The GPL-2.0-or-later group: the plain GPL, a different licence family from
+# the LGPL most of this package carries. See debian/copyright.
+Package: indi-stable-3rdparty-drivers-bresserexos2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Bresser Messier EXOS-2 GoTo mount INDI driver
+ indi_bresserexos2, for the Bresser Messier EXOS-2 mount with the EXOS-2
+ GoTo controller.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-rtklib
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: RTKLIB GNSS receiver INDI driver
+ indi_rtklib, reading position from an RTKLIB rtkrcv GNSS receiver.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-shelyak
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Shelyak eShel and SPOX spectrograph INDI drivers
+ indi_shelyakeshel_spectrograph and indi_shelyakspox_spectrograph, for
+ Shelyak Instruments spectrographs.
+ .
+ Its source headers grant the plain GPL while directing the reader to a
+ COPYING.LIB and a LICENSE that do not exist in the directory. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-gpsnmea
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: NMEA 0183 GPS receiver INDI driver
+ indi_gpsnmea, for GPS receivers speaking NMEA 0183 over serial.
+ .
+ Bundles minmea, a single-header NMEA parser under the WTFPL. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-astarbox
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: AStarBox observatory controller INDI driver
+ indi_astarbox, for the AStarBox Raspberry Pi observatory controller.
+ .
+ Genuinely two licences: the driver itself is GPL-2.0-or-later and its
+ bundled PCA9685 PWM chip driver is LGPL-2.1-or-later. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-beefocus
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: BeeFocus network focuser INDI driver
+ indi_beefocus, for the BeeFocus WiFi focuser, which the driver reaches
+ over a network socket rather than a serial port.
+ .
+ Two source trees under different licences are compiled into the single
+ binary: driver/ is LGPL-2.0-only and firmware/ is LGPL-2.1-only. See
+ debian/copyright.
  .
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.

@@ -37,14 +37,20 @@ BUILD_USER=${SUDO_USER:-$(id -un)}
 R=${1:-$(getent passwd "$BUILD_USER" | cut -d: -f6)/rpmbuild/RPMS/x86_64}
 
 FAIL=0
-die()  { echo; echo "*** ABORT: $* ***"; exit 1; }
+die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: ${W:-<none>}"; exit 1; }
 fail() { echo "  *** FAIL: $* ***"; FAIL=1; }
 pass() { echo "  PASS: $*"; }
+
+# Baseline snapshot + restore, shared with the other RPM harnesses that had
+# no teardown. See scripts/lib-baseline.sh for why it is a library.
+. "$(cd "$(dirname "$0")" && pwd)/lib-baseline.sh"
+W=$(mktemp -d /tmp/snapshot-b-coexist.XXXXXX)
 
 echo "############ STEP 0: the Snapshot B precondition ############"
 echo "  looking for RPMs in: $R"
 ls $R/indi-stable-core-2*.x86_64.rpm $R/indi-stable-core-libs-2*.x86_64.rpm \
   || die "built RPMs not found under $R -- build them first (see FEDORA.md)"
+baseline_record "$W" || die "could not record the baseline"
 
 # libindi, NOT libindi-libs. libindi is the package that owns /usr/bin/indiserver.
 rpm -q libindi >/dev/null 2>&1 \
@@ -215,4 +221,9 @@ echo "     It reports which case it saw rather than guessing. Do NOT judge"
 echo "     it from the Ekos driver list: both catalogues carry the same 290"
 echo "     labels, and the GUI shows the label, not the binary path that is"
 echo "     the only field differing between them."
+
+echo
+echo "############ RESTORE: by diffing rather than by naming ############"
+baseline_restore "$W" || FAIL=1
+if test "$FAIL" -eq 0; then rm -rf "$W"; else echo "  logs: $W"; fi
 exit $FAIL

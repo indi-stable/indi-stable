@@ -22,7 +22,7 @@ inside an unpacked upstream tree:
 sudo apt-get install -y devscripts debhelper dpkg-dev
 tar xf indi-v2.2.4.2.tar.gz && cd indi-2.2.4.2
 rm -rf debian                             # SEE BELOW -- not optional
-cp -r ~/src/packaging/core/deb debian     # the repo clone, NOT ~/src/indi-stable
+cp -r ~/src/indi-stable/core/deb debian   # the repo clone, NOT ~/src/packaging (retired)
 sudo apt-get build-dep .
 dpkg-buildpackage -us -uc -b 2>&1 | tee /tmp/indi-stable-deb.log
 lintian --profile debian ../indi-stable-core_*.changes
@@ -324,7 +324,7 @@ Read that spec's header comment for the full rationale; `core/deb-
 sudo apt-get install -y devscripts debhelper dpkg-dev
 tar xf indi-3rdparty-v2.2.4.1.tar.gz && cd indi-3rdparty-2.2.4.1
 rm -rf debian                                       # SEE core/deb's own note -- load-bearing here too
-cp -r ~/src/packaging/core/deb-3rdparty-libs debian
+cp -r ~/src/indi-stable/core/deb-3rdparty-libs debian
 sudo dpkg -i indi-stable-core-libs_*.deb indi-stable-core-dev_*.deb   # Build-Depends
 sudo apt-get build-dep -y .
 dpkg-buildpackage -us -uc -b 2>&1 | tee /tmp/indi-stable-3rdparty-libs-deb.log
@@ -449,19 +449,23 @@ rather than an RPM `Release:` bump. All checks passed on the first run,
 ## Building and testing `indi-stable-3rdparty-drivers`
 
 `core/deb-3rdparty-drivers/` is the packaging source, mirroring
-`core/rpm/indi-stable-3rdparty-drivers.spec` exactly: same 8 vendor
-drivers, same 47-entry `WITH_<X>=OFF` scope list, same `apogee_ccd.cpp`
-`CFLAGS` fix, same `toupcam_test`/`omegonprocam_test` `EXCLUDE_FROM_ALL`
-patch. Read that spec's header and `%build` comments for the full
-rationale; `core/deb-3rdparty-drivers/rules` carries only the
+`core/rpm/indi-stable-3rdparty-drivers.spec` exactly: same 9 vendor drivers
+plus the same 21 non-blob drivers, same `WITH_<X>=OFF` scope list, same
+`apogee_ccd.cpp` `CFLAGS` fix, same `toupcam_test`/`omegonprocam_test`
+`EXCLUDE_FROM_ALL` patch. Read that spec's header and `%build` comments for
+the full rationale; `core/deb-3rdparty-drivers/rules` carries only the
 Debian-specific mechanics.
 
 ```bash
 tar xf indi-3rdparty-v2.2.4.1.tar.gz && cd indi-3rdparty-2.2.4.1
 rm -rf debian                                              # ships its own, same trap as -libs's
-cp -r ~/src/packaging/core/deb-3rdparty-drivers debian
-sudo dpkg -i indi-stable-core*.deb indi-stable-3rdparty-libs-*.deb   # Build-Depends
-sudo apt-get build-dep -y .
+cp -r ~/src/indi-stable/core/deb-3rdparty-drivers debian
+# Build-Depends. Install the versions control actually pins -- ~/build holds
+# more than one revision of most of these, so a bare glob picks the wrong set.
+sudo apt-get install -y --no-install-recommends \
+    ./indi-stable-core{,-libs,-dev}_2.2.4.2-1_amd64.deb \
+    ./indi-stable-3rdparty-libs-*_2.2.4.1-1_amd64.deb
+dpkg-checkbuilddeps                                        # confirm before building, not after
 dpkg-buildpackage -us -uc -b 2>&1 | tee /tmp/indi-stable-3rdparty-drivers-deb.log
 lintian --profile debian ../indi-stable-3rdparty-drivers_*.changes
 ```
@@ -538,6 +542,279 @@ completely absent, `ubuntuastro` back at its exact documented Configuration
 B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
+
+### Both upgrade harnesses re-run at full scope — 2026-09-09
+
+`scripts/test-upgrade-path-3rdparty-deb.sh` and
+`scripts/test-upgrade-path-drivers-deb.sh`, both green across all 30 driver
+packages. **Neither needed changing** — the `LESSONS_LEARNED.md` #25 fix
+already made them derive their lists, and the drivers one loops over the
+installed packages, so both scaled on their own.
+
+**The `-2` side had to be rebuilt, and that is the part worth getting
+right.** The existing `_2.2.4.1-2_` drivers set held 10 packages from the
+eqmod slice, so the harness would have "upgraded" between two versions of a
+package that no longer exists in that shape — passing while testing a third
+of the scope.
+
+Rebuild it with the bump script run in a **copy** of the repo, never in the
+working tree:
+
+```bash
+cp -r ~/src/indi-stable /tmp/repo-rel2 && cd /tmp/repo-rel2
+DEBFULLNAME="Will Snyder" DEBEMAIL=william@williamlsnyder.org \
+  bash scripts/bump-3rdparty-version.sh v2.2.4.1 2
+```
+
+It rewrites both changelogs, both specs and all 18 `-libs` control pins in
+place — `git status` in the real tree must come back empty afterward, and
+was checked. Build `-drivers` from that copy's `debian/` with the `-libs`
+**`-2`** `-dev` packages installed, not the `-1` ones, or the pinned
+`Build-Depends` resolves against the wrong headers.
+
+Every control fired on both runs: the planted stray file under
+`/opt/indi-stable` was reported by the orphan check, and the planted
+package-set difference was reported by the restore-by-diff check.
+`ubuntuastro` back to 1839 packages, diffed by name — note the harness's own
+"matches the baseline exactly (1841)" line is relative to *its* start, with
+`libftdi1-dev` installed for the build; that was purged afterward.
+
+### `beefocus` added — verified 2026-09-09
+
+Thirty binary packages, 86 driver binaries, `lintian` **0 errors**. The last
+driver of the non-blob batch.
+
+`debian/copyright` gains **two** stanzas for this one driver, which is the
+point of it: `indi-beefocus/driver/*` is LGPL-2.0-only and
+`indi-beefocus/firmware/*` is LGPL-2.1-only, and three files from the second
+are compiled into the binary rather than merely shipped as source.
+
+The firmware stanza is worth reading before assuming a headerless file is
+ungoverned. No file in `firmware/` carries a licence header, but the
+directory ships its own full LGPL-2.1 as `firmware/LICENSE` — which a
+licence survey that globs only `<driver>/LICENSE*` will not find. See
+`LESSONS_LEARNED.md` #26.
+
+### The GPL-2.0-or-later group added — verified 2026-09-09
+
+`bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine
+binary packages, 85 driver binaries, `lintian` **0 errors** and no new
+warning class.
+
+Nothing is bundled on this side: all five stanzas reference
+`/usr/share/common-licenses/GPL-2`. Two packages carry a second licence and
+both needed their text written out, because neither exists in the tarball or
+in `common-licenses`:
+
+- **`gpsnmea`** bundles minmea under the **WTFPL**. Its own header points at
+  a `COPYING` file `indi-gpsnmea` does not contain. SPDX `WTFPL`; lintian
+  accepted the stanza without complaint.
+- **`astarbox`** is genuinely two licences — its own sources
+  GPL-2.0-or-later, its bundled PCA9685 PWM driver LGPL-2.1-or-later — so it
+  gets two `Files:` stanzas rather than a combined tag.
+
+`shelyak` is worth knowing about when reading headers elsewhere: all four of
+its files grant the plain GPL while naming the *Library* GPL in the next
+sentence and pointing at a `COPYING.LIB` that does not exist. The operative
+grant clause governs; the rest is vestigial boilerplate.
+
+### The remaining no-dependency drivers added — verified 2026-09-09
+
+`aagcloudwatcher-ng`, `nightscape`, `openogma`, `orion-ssg3`, `atik-efw`.
+Twenty-four binary packages, 79 driver binaries, `lintian` **0 errors**.
+
+**`libftdi1-dev` is a new build dependency**, for `indi-nightscape` alone —
+found by the Fedora build failing at configure, not by the survey. Fedora
+spells the same library `libftdi-devel`, with no `1`. Both dependency
+generators pick up the runtime library on their own: the `.deb` gains
+`libftdi1-2 (>= 1.2)` through `${shlibs:Depends}` and the RPM gains
+`libftdi1.so.2()(64bit)`, neither hand-written.
+
+`debian/copyright` gains four stanzas, including the project's first
+**AGPL-3** one for `openogma`. Its full text is shipped with the binary
+package, since `/usr/share/common-licenses` does not carry the AGPL.
+
+The `appstream-metadata-missing-modalias-provide` warning now fires for all
+four rule-shipping packages rather than one. Still no override, for the
+reason given when it first appeared: the tag is accurate and AppStream
+metadata is out of scope.
+
+**`ubuntuastro` was restored by package NAME, not count.** Building this
+slice installed `libftdi1-dev` and pulled `libftdi1-doc` with it; both were
+purged afterward and the package set diffed against the pre-build list,
+coming back identical rather than merely back to 1839 (#6).
+
+### The LGPL-2.0-only group added — verified 2026-09-09
+
+`nexdome`, `talon6`, `ocs` and `starbook-ten`. Nineteen binary packages, 74
+driver binaries, `lintian --profile debian` **0 errors and no new warning** —
+notable because this slice adds the first `MIT` stanza to `debian/copyright`
+and lintian is fussy about copyright formatting.
+
+`debian/copyright` carries the substance here. The `License:` field states
+`LGPL-2.0-only` and the stanza references
+`/usr/share/common-licenses/LGPL-2`, which Debian ships — so unlike the RPM
+side, nothing needs bundling. `httplib.h` gets its own `Files:` stanza with
+the full MIT text, since `common-licenses` has no MIT to point at.
+
+**Every binary package ships the whole `debian/copyright`**, so grepping one
+package's copyright for `common-licenses/LGPL-2` also turns up the `LGPL-2.1`
+references belonging to other drivers' stanzas. That is correct, not a
+defect; read the stanza that names the driver, not the file as a whole.
+
+Smoke test passed runtime-only, 74 binaries, one driver from each of the
+nineteen packages executing. Coexistence re-verified in configuration B; all
+four new binaries resolve `libindidriver.so.2` into the private prefix.
+`ubuntuastro` restored to its exact 1839-package baseline.
+
+Both packagings independently report **74 driver binaries and 90 catalogue
+entries**.
+
+### `aok`, `avalon` and `celestronaux` added — verified 2026-09-09
+
+Third slice, fifteen binary packages. Clean `dpkg-buildpackage`, and
+`lintian --profile debian` reports **0 errors** with no new warning — the
+only one outstanding is still armadillo-platypus's
+`appstream-metadata-missing-modalias-provide`, since none of these three
+ships a udev rule.
+
+`scripts/smoke-test-3rdparty-deb.sh` passed on a runtime-only install: **70
+driver binaries** where there were 67, and one driver from each of the
+fifteen packages executing. Coexistence re-verified in configuration B —
+`indi_lx200aok`, `indi_lx200stargo` and `indi_celestron_aux` all resolve
+`libindidriver.so.2` to `/opt/indi-stable/lib` against a distribution
+`libindi1` carrying the same SONAME, with `dpkg -V` clean on `libindi1`,
+`indi-bin` and `libindi-data` and `/usr/bin/indiserver` unchanged.
+`ubuntuastro` restored to its exact 1839-package baseline afterward.
+
+**Count catalogues from the `.deb`s, not from the installed system.** A first
+attempt at the cross-distro check read
+`/opt/indi-stable/share/indi/*.xml` on the running box and got 376 entries
+against Fedora's 86. Nothing was wrong: the installed tree also holds core's
+own `drivers.xml`, which the `-drivers` packages do not ship. Comparing the
+same thing on both sides gives 86 and 86.
+
+### `armadillo-platypus` and `maxdomeii` added — built and verified 2026-09-09
+
+Second non-blob slice, twelve binary packages where there were ten. Clean
+`dpkg-buildpackage` and `lintian --profile debian` with **0 errors**.
+
+**The real finding here was `INDI_DATA_DIR`, and it is the more dangerous of
+the slice's two defects because nothing in the build complains.**
+
+Nothing in indi-3rdparty ever assigns that variable — `FindINDI.cmake` only
+documents the name — yet it appears in `CMakeCache.txt` as a `PATH` resolved
+from the build host. On `ubuntuastro`, where the distribution's `libindi-data`
+owns `/usr/share/indi`, it resolved there, and **every catalogue except
+`eqmod`'s installed outside the private prefix**. `eqmod` was unaffected only
+because `indi-eqmod/CMakeLists.txt` sets its own from `CMAKE_INSTALL_PREFIX`;
+the drivers that simply use `${INDI_DATA_DIR}` — which is most of them — went
+to `/usr/share/indi`.
+
+The build did not fail on this. `dh_install` failed later, complaining about
+missing touptek catalogues, which points nowhere near the cause. What it means
+in the general case: **a driver catalogue installed into `/usr/share/indi` is
+a file this project owns landing in the directory `libindi-data` owns.**
+
+Fedora never showed it, because a `mock` chroot has no distribution
+`libindi-data` for the probe to find — a case where the clean-room build
+*hides* a host-dependent path instead of exposing it. Both packagings now pin
+`-DINDI_DATA_DIR` explicitly. Same class as `WITH_WEBCAM`/`WITH_NUT` in
+`DESIGN.md`: a build decision taken from whatever happens to be installed on
+the build machine.
+
+**The udev finding is `DESIGN.md`'s**, under "Upstream build-system facts" —
+five driver directories use `RULES_INSTALL_DIR`, set without `CACHE`, so no
+`-D` can redirect them. Caught by the RPM side's assertion first; the Debian
+rules file carries the same re-home-by-destination fix and the same three
+assertions.
+
+Verified against the built `.deb`s and on the running system:
+
+- **12 binary packages**; nothing under `/usr/bin` from any of them, and no
+  catalogue outside `/opt` anywhere.
+- `scripts/smoke-test-3rdparty-deb.sh` passed on a **runtime-only** install
+  (no `-dev` packages, which is the point of #22): **67 driver binaries**
+  where there were 60, all libraries resolving inside the private prefix, and
+  one driver from every one of the twelve packages executing —
+  `indi_armadillo_focus` and `indi_maxdomeii` among them.
+- **Coexistence in configuration B**, against a distribution `libindi1`
+  carrying a byte-identical `libindidriver.so.2` SONAME: `ldd` on the new
+  binaries resolves to `/opt/indi-stable/lib`, `dpkg -V` clean on `libindi1`,
+  `indi-bin` and `libindi-data`, `/usr/bin/indiserver` hash unchanged, and our
+  own binary offered separately as `indiserver-stable`.
+- The udev rule installs only as
+  `99-indi-stable-3rdparty-armadilloplatypus.rules`, alongside the
+  distribution's own untouched `99-indi_auxiliary.rules`.
+- **One new lintian warning, not an error**:
+  `appstream-metadata-missing-modalias-provide`. It fires because this is the
+  first rule this project ships that carries a full `idVendor`+`idProduct`
+  pair, from which lintian can construct a modalias; the vendor rules in
+  `-libs` match on vendor alone. No override added — AppStream metadata is out
+  of scope, and silencing a tag that is telling the truth would be worse.
+
+`ubuntuastro` restored to its exact baseline afterward: **1839 packages**, no
+`indi-stable` package, `/opt/indi-stable` absent, none of our udev rules left
+behind, distribution rule intact.
+
+**Cross-checked against the Fedora build:** both packagings independently
+report **67 driver binaries and 70 catalogue `<driver>` entries**.
+
+### `eqmod` added — built and verified 2026-09-08
+
+**Built clean on the first real `dpkg-buildpackage`, no build-time defects**,
+producing ten binary packages where there were nine. The three defects this
+addition did surface were all found while *writing* the packaging, before a
+compiler ran — see `DESIGN.md`, "Decided: eqmod first, then widen", and
+`LESSONS_LEARNED.md` #24.
+
+Verified against the built `.deb`, not the build log:
+
+- **The catalogue rewrite went from 56 entries to 63**, which is the check
+  that the AHP GT strip did exactly what it claimed: `indi_eqmod.xml`
+  declares eight `<device>` entries, one of them for the
+  `indi_ahpgt_telescope` we never build, and seven survived. All seven carry
+  absolute paths and `grep -c ahpgt` on the shipped file is 0.
+- **`Depends:` is `indi-stable-core-libs, libc6, libgcc-s1, libnova-0.16-0t64,
+  libstdc++6`** — no `indi-stable-3rdparty-libs-<vendor>` at all, which is
+  the point of eqmod being the first blob-free driver here.
+- **`libgsl` is absent from `Depends:` and that is correct.** Confirmed with
+  `readelf -d` rather than assumed: the binary's `DT_NEEDED` list has no
+  `libgsl` entry, so `--as-needed` dropped a library the driver links but
+  never calls a symbol from. `GSL` remains a real `Build-Depends` because
+  `find_package(GSL REQUIRED)` fails configure without it. Same shape as the
+  `libz`/`libcfitsio` absence already documented for `pyindi-client`.
+- **`RUNPATH` is `/opt/indi-stable/lib`** and the package puts nothing under
+  `/usr/bin`.
+- **`lintian --profile debian`: 0 errors**, and eqmod's only tag is the
+  `initial-upload-closes-no-bugs` warning every package here carries. Its two
+  overrides (`dir-or-file-in-opt`, `custom-library-search-path`) are the
+  standard pair, and neither was reported unused.
+
+**Coexistence verified in configuration B, the tightest collision case**:
+all four eqmod binaries resolve `libindidriver.so.2`,
+`libindiAlignmentDriver.so.2` and `libindiclient.so.2` into
+`/opt/indi-stable/lib` while the distro's own `libindi1` ships a
+byte-identical `libindidriver.so.2` SONAME in `/usr/lib` (`dpkg -S` confirms
+the collision is real, not assumed). `dpkg -V` clean on
+`libindi1`/`indi-bin`/`libindi-dev` and `/usr/bin/indiserver` still owned by
+`indi-bin`.
+
+**`scripts/smoke-test-3rdparty-deb.sh` passed with eqmod included**, needing
+no edit — it is driven by package contents rather than a hardcoded vendor
+list, and picked the tenth package up on its own: 60 driver binaries checked
+where there were 56, all resolving inside the private prefix, and
+`indi_azgti_telescope` executed and printed its usage banner in the
+per-vendor loop. **The `-dev` packages installed to satisfy `Build-Depends`
+were removed before that run**, deliberately: this gate answers "does a clean
+*runtime* install work", and leaving `-dev` in place is exactly what would
+have supplied the missing symlink that hid `LESSONS_LEARNED.md` #22.
+
+`ubuntuastro` restored to its exact baseline afterward — package set **diffed
+against a pre-work snapshot rather than counted** (#6), byte-identical, and
+`/opt/indi-stable` completely absent rather than left as empty directories,
+confirming the shared-directory ownership discipline (#20) held with a tenth
+package added.
 
 **The upgrade path is scripted too**,
 `scripts/test-upgrade-path-drivers-deb.sh`, run together with `-libs`'s own
@@ -643,7 +920,7 @@ ordinary system Python location rather than `/opt/indi-stable`.
 sudo apt-get install -y devscripts dh-python swig pkg-config
 pip download --no-deps -d /tmp/pyindi pyindi-client   # or fetch the sdist directly
 tar xzf pyindi_client-2.2.0.tar.gz && cd pyindi_client-2.2.0
-cp -r ~/src/packaging/pyindi-client/deb debian
+cp -r ~/src/indi-stable/pyindi-client/deb debian
 sudo dpkg -i indi-stable-core*.deb   # Build-Depends
 dpkg-buildpackage -us -uc -b 2>&1 | tee /tmp/indi-stable-pyindi-client-deb.log
 lintian --profile debian ../indi-stable-pyindi-client_*.changes

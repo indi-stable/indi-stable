@@ -51,9 +51,14 @@ OLD_CORE_DIR=${2:-$HOMEDIR/mock-result-pcfix}
 NEW_CORE_DIR=${3:-$HOMEDIR/mock-result-core-rel2}
 
 FAIL=0
-die()  { echo; echo "*** ABORT: $* ***"; exit 1; }
+die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: ${W:-<none>}"; exit 1; }
 fail() { echo "  *** FAIL: $* ***"; FAIL=1; }
 pass() { echo "  PASS: $*"; }
+
+# Baseline snapshot + restore, shared with the other RPM harnesses that had
+# no teardown. See scripts/lib-baseline.sh.
+. "$(cd "$(dirname "$0")" && pwd)/lib-baseline.sh"
+W=$(mktemp -d /tmp/pyindi-coexist-upgrade.XXXXXX)
 ctl()  { echo "  CONTROL: $*"; }
 
 # Anchored to *.x86_64.rpm, excluding debuginfo/debugsource and the .src.rpm
@@ -76,6 +81,8 @@ echo "  new core: $NEW_NVR"
 [ -n "$OLD_NVR" ] && [ -n "$NEW_NVR" ] || die "could not read a core NVR from one of the two directories"
 [ "$OLD_NVR" != "$NEW_NVR" ] \
   || die "old and new core are the SAME NVR -- an 'upgrade' to an identical package is a reinstall, not an upgrade"
+
+baseline_record "$W" || die "could not record the baseline"
 
 echo "############ STEP 0b: start from a clean slate ############"
 rpm -qa | grep -q '^indi-stable-' && dnf remove -y $(rpm -qa | grep '^indi-stable-') 2>/dev/null
@@ -204,9 +211,15 @@ else
 fi
 
 echo
+echo "############ RESTORE: by diffing rather than by naming ############"
+baseline_restore "$W" || FAIL=1
+
+echo
 if [ $FAIL -eq 0 ]; then
   echo "############ PYINDI-CLIENT COEXIST + UPGRADE PATH: ALL CHECKS PASSED ############"
+  rm -rf "$W"
 else
   echo "############ PYINDI-CLIENT COEXIST + UPGRADE PATH: ONE OR MORE CHECKS FAILED ############"
+  echo "  logs: $W"
 fi
 exit $FAIL

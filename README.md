@@ -4,7 +4,7 @@ Maintained RPM and DEB packages for the [INDI Library](https://indilib.org),
 built from INDI's own **stable release tags**.
 
 > **Status: packages are built and released automatically, but there is no
-> `dnf`/`apt` repository to add yet.** Every component — core, the per-vendor
+> `dnf`/`apt` repository to add yet.** Every component — core, the
 > `3rdparty` drivers, and `pyindi-client` — is built on both Fedora and
 > Debian/Ubuntu, gated by an automated install-and-run check, and published
 > as [GitHub Releases](../../releases) whenever a new upstream version

@@ -1,8 +1,15 @@
-# indi-stable-3rdparty-drivers -- the INDI drivers for the same 9 vendors
-# indi-stable-3rdparty-libs bundles the vendor SDKs for, built from the SAME
-# upstream indi-3rdparty tag with -DBUILD_LIBS=OFF, so this build links
-# against the -devel subpackages -libs already produces rather than building
-# any vendor SDK a second time.
+# indi-stable-3rdparty-drivers -- the INDI drivers for the 9 vendors
+# indi-stable-3rdparty-libs bundles the vendor SDKs for, plus 21 non-blob
+# drivers, built
+# from the SAME upstream indi-3rdparty tag with -DBUILD_LIBS=OFF, so this
+# build links against the -devel subpackages -libs already produces rather
+# than building any vendor SDK a second time.
+#
+# eqmod is the FIRST driver here with no vendor blob behind it, added
+# 2026-09-08: it needs no -libs subpackage at all, only libnova and GSL, and
+# so Requires only indi-stable-core-libs. It is the pathfinder for the
+# remaining non-blob drivers rather than a one-off -- see DESIGN.md, "The ~50
+# non-blob drivers", for the survey and the eqmod-first scope decision.
 #
 # Builds, installs and removes cleanly alongside indi-stable-core and
 # indi-stable-3rdparty-libs as of 2026-08-26 (see STATUS.md) -- verified
@@ -14,12 +21,26 @@
 # git history for this file) -- LESSONS_LEARNED.md #1/#2 held again. Fishcamp
 # added 2026-08-27 once its licence was confirmed clear (DESIGN.md).
 #
-# Deliberately scoped to the SAME 9 vendors -libs bundles (apogee, asi, fli,
-# playerone, inovasdk, micam, sbig, touptek, fishcamp) and no others.
-# indi-3rdparty ships roughly 50 more drivers (eqmod, gpsd, celestronaux, ...)
-# that need no vendor blob at all and have no dependency on -libs whatsoever
-# -- a deliberately separate, not-yet-made scope decision (confirmed with
-# Will, 2026-08-26). See STATUS.md, "3rdparty -- remaining".
+# Scoped to the 9 vendors -libs bundles (apogee, asi, fli, playerone,
+# inovasdk, micam, sbig, touptek, fishcamp) plus 21 non-blob drivers, which
+# need no vendor blob and have no dependency on -libs whatsoever. 30
+# subpackages, 86 driver binaries.
+#
+# Of the non-blob drivers upstream ships, only dsi and rolloffino are left
+# out, both on licence grounds rather than packaging ones -- see DESIGN.md,
+# "Decided: dsi is not shipped".
+#
+# Scope decided with Will 2026-09-08: eqmod alone first, as a complete
+# build/install/coexistence/upgrade slice on both distros, then widen -- so
+# that the defects a first non-blob driver brings surface against one driver
+# rather than forty. Widening then resumed 2026-09-09 with a deliberately
+# small second slice, again Will's call, chosen for the MECHANISMS it forces
+# rather than for driver count: armadillo-platypus is the first subpackage in
+# this spec to ship a udev rule, the first with six binaries from one source
+# directory, and the first whose catalogue filename (indi_lunatico.xml)
+# matches neither its directory nor any binary in it; maxdomeii is the first
+# with an upstream test target that the default build compiles but nothing
+# installs. See STATUS.md, "3rdparty -- remaining".
 #
 # See DESIGN.md, "Resolution -- two source packages, not one and not
 # sixty-one", for why this is a second source package rather than a second
@@ -58,7 +79,7 @@
 Name:           indi-stable-3rdparty-drivers
 Version:        2.2.4.1
 Release:        1%{?dist}
-Summary:        INDI drivers for 9 vendor camera/focuser SDKs (stable upstream release, private prefix)
+Summary:        INDI drivers for 9 vendor camera/focuser SDKs plus non-blob mount, focuser and dome drivers (stable upstream release, private prefix)
 
 # Aggregate across 9 driver source trees, confirmed by reading actual SOURCE
 # FILE license headers (not the bundled COPYING file alone -- two of them,
@@ -86,10 +107,58 @@ Summary:        INDI drivers for 9 vendor camera/focuser SDKs (stable upstream r
 #                                 defensible reading is the plain v2 text as
 #                                 written, not v2.1-or-later by analogy to
 #                                 its siblings.
+#   eqmod                     -- GPL-3.0-or-later AND LGPL-2.0-only. The ONLY
+#                                 subpackage here that is not LGPL, and the
+#                                 reason it carries its own License: tag
+#                                 below rather than inheriting this one.
+#                                 indi-eqmod/ is genuinely two bodies of code
+#                                 with different grants, read directly from
+#                                 every .cpp/.h header in the directory
+#                                 (2026-09-08, not spot-checked): Geehalel's
+#                                 original Skywatcher-protocol driver
+#                                 (eqmod*, skywatcher*, align/, scope-limits/,
+#                                 simulator/) reads "either version 3 of the
+#                                 License, or (at your option) any later
+#                                 version" and ships a full GPLv3 COPYING;
+#                                 the 2020 AZ-GTi/Star Adventurer additions
+#                                 (azgtibase, staradventurer*base) read
+#                                 "Library General Public License version 2"
+#                                 with NO "or later" grant -- LGPL-2.0-only,
+#                                 the same conservative reading inovasdk gets
+#                                 above and for the same reason. All four
+#                                 binaries compile skywatcher.cpp, so all four
+#                                 are GPL-3.0-or-later as built; LGPL-2.0's
+#                                 own section 3 is what permits that
+#                                 combination.
 # %%license below points at indi-3rdparty's own top-level LICENSE (correct
 # 2.1 text) rather than apogee's/fli's/micam's/sbig's own bundled files where
 # those are missing or stale -- packaging a license file whose TEXT actually
 # matches the declared tag, not merely whatever happened to be closest.
+# Deliberately NOT stated as a count here, because a count in a comment goes
+# stale the next time a driver is added and this file has already had four
+# such numbers rot. The rule instead: any subpackage whose own License: tag
+# differs from the aggregate points at text matching ITS tag, not at the
+# top-level LICENSE. Where its own directory has no such text, it borrows a
+# sibling's -- indi-inovaplx/COPYING.LIB for LGPL-2.0 and
+# indi-starbook-ten/COPYING for GPL-2. Use that second one and not
+# indi-ocs/LICENSE.txt, which is an 86-line abridgement rather than the
+# licence; the two are indistinguishable from their first two lines.
+# beefocus points at two files because it links two differently-licensed
+# source trees.
+#
+# To see the current state, ask rpm rather than reading this comment:
+#   rpmspec -q --qf '%%{name}: %%{license}\n' <this spec>
+#
+# This tag is the DEFAULT every subpackage inherits, not a description of the
+# source tarball, and that distinction is load-bearing here. Adding eqmod's
+# GPL-3.0-or-later to it was tried first and was wrong: rpm propagated it to
+# all 9 vendor subpackages, none of which contain a line of GPL-3 code, so
+# every installed RPM would have overstated its own licence. eqmod carries its
+# own License: tag instead, and it is no longer alone in doing so -- see the
+# rpmspec one-liner above for which subpackages override this default.
+# The cost is that the SRPM's tag understates what the SRPM contains; the
+# benefit is that all 10 binary RPMs -- the things anyone actually installs
+# and redistributes -- declare exactly what they hold.
 License:        LGPL-2.1-or-later AND LGPL-2.0-only
 URL:            https://github.com/indilib/indi-3rdparty
 Source0:        https://github.com/indilib/indi-3rdparty/archive/refs/tags/%{upstream_tag}.tar.gz#/indi-3rdparty-%{upstream_tag}.tar.gz
@@ -121,16 +190,34 @@ BuildRequires:  indi-stable-3rdparty-libs-micam-devel = %{version}-%{release}
 BuildRequires:  indi-stable-3rdparty-libs-sbig-devel = %{version}-%{release}
 BuildRequires:  indi-stable-3rdparty-libs-touptek-devel = %{version}-%{release}
 BuildRequires:  indi-stable-3rdparty-libs-fishcamp-devel = %{version}-%{release}
+# eqmod only. find_package(Nova REQUIRED) and find_package(GSL REQUIRED) in
+# indi-eqmod/CMakeLists.txt, and nothing else beyond INDI/ZLIB, which the
+# 9 vendor drivers already pull in. Neither is needed by any other driver
+# built here -- they arrive with eqmod and would leave with it.
+BuildRequires:  libnova-devel
+BuildRequires:  gsl-devel
+# nightscape's, and only nightscape's. NOTE THE NAME: Fedora has no
+# libftdi1-devel -- the package is libftdi-devel and IS libftdi1, the 1
+# living in the version (1.5) rather than the name. Debian's really is
+# libftdi1-dev. See DESIGN.md's dependency survey, where that asymmetry is
+# recorded along with two other Fedora names that cannot be derived from
+# their Debian counterparts.
+#
+# indi-nightscape also FIND_PACKAGE(D2XX), FTDI's proprietary driver, which
+# is not REQUIRED and is packaged by neither distro. Left unfound
+# deliberately: the build falls back to libftdi.
+BuildRequires:  libftdi-devel
 
 %description
 INDI drivers for the 9 vendor camera/focuser SDKs indi-stable-3rdparty-libs
-bundles, built with -DBUILD_LIBS=OFF from the same upstream indi-3rdparty tag
-that project builds from with -DBUILD_LIBS=ON.
+bundles, plus the EQMod/Skywatcher mount drivers, built with -DBUILD_LIBS=OFF
+from the same upstream indi-3rdparty tag that project builds from with
+-DBUILD_LIBS=ON.
 
 Installs into %{indi_prefix}, the same private prefix as indi-stable-core and
 indi-stable-3rdparty-libs, so it never collides with any distribution-
-provided INDI or driver package. Only drivers for the 9 already-bundled
-vendors are built here -- see DESIGN.md for the scope decision.
+provided INDI or driver package. The remaining non-blob drivers upstream
+ships are not built here yet -- see DESIGN.md for the scope decision.
 
 This is an unofficial third-party build. It is not affiliated with or
 endorsed by the INDI project.
@@ -210,6 +297,346 @@ indi_fishcamp_ccd, linked against the bundled Fishcamp library
 (indi-stable-3rdparty-libs-fishcamp). Added 2026-08-27 once Fishcamp's
 licence was confirmed clear (DESIGN.md).
 
+# The only subpackage here with no indi-stable-3rdparty-libs-<vendor>
+# Requires, because eqmod has no vendor blob behind it: it talks the
+# Skywatcher serial/network protocol directly. libnova and libgsl are picked
+# up as ordinary auto-generated SONAME Requires -- deliberately NOT added to
+# %%global __requires_exclude above, which covers only libraries this project
+# ships inside the private prefix. These two come from the distribution, so
+# rpm SHOULD depend on them by soname, exactly as it would for libc.
+%package eqmod
+Summary:        EQMod / Skywatcher-protocol mount INDI drivers
+License:        GPL-3.0-or-later AND LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description eqmod
+indi_eqmod_telescope, indi_azgti_telescope, indi_staradventurergti_telescope
+and indi_staradventurer2i_telescope -- four binaries, not one, sharing
+skywatcher.cpp's motor-control code: EQMod-protocol Skywatcher mounts
+(including the Wave 100i/150i), the AZ-GTi in equatorial WiFi mode, and both
+Star Adventurer GTi and 2i variants.
+
+Needs no vendor SDK, so unlike every other subpackage here it depends only on
+indi-stable-core-libs. Does NOT include indi_ahpgt_telescope, which
+indi-eqmod/CMakeLists.txt gates behind its own local option(WITH_AHP_GT ...
+OFF) -- a same-named but independent option from the top-level WITH_AHP_GT,
+and off by default either way. Its catalogue entry is stripped in %%install
+rather than left dangling; see there for why that matters.
+
+# Like eqmod, these two have no vendor blob and so no -libs Requires. Unlike
+# eqmod they need nothing beyond INDI itself -- no libnova, no GSL -- so they
+# add no BuildRequires either. Both are LGPL-2.1-or-later, matching this
+# spec's top-level License:, so neither carries its own License: tag; that
+# was read from every .cpp/.h header in both directories on 2026-09-09, not
+# spot-checked (all 12 armadillo files and all 4 maxdomeii files carry the
+# identical "version 2.1 ... or (at your option) any later version" grant).
+%package armadillo-platypus
+Summary:        Lunatico Armadillo, Platypus, Dragonfly, Seletek and Beaver INDI drivers
+Requires:       indi-stable-core-libs%{?_isa}
+%description armadillo-platypus
+Six binaries from one source directory, for Lunatico Astronomia's controller
+family: indi_armadillo_focus and indi_platypus_focus (focusers),
+indi_seletek_rotator (rotator), indi_dragonfly and indi_dragonfly_dome
+(relay controller and its dome front-end) and indi_beaver_dome.
+
+The first subpackage in this spec to ship a udev rule -- every rule this
+project previously installed came from indi-stable-3rdparty-libs. It is
+re-homed under the same namespaced filename pattern -libs uses, so it takes
+effect without colliding with a distribution rule for the same hardware.
+
+Its catalogue is indi_lunatico.xml, named for the vendor rather than for the
+source directory or any binary in it -- worth knowing before globbing.
+
+%package maxdomeii
+Summary:        MaxDome II observatory dome INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description maxdomeii
+indi_maxdomeii, for the MaxDome II dome controller. Needs no vendor SDK and
+no library beyond INDI itself.
+
+Does NOT include test-maxdomeii, an upstream standalone test harness that
+indi-maxdomeii/CMakeLists.txt builds as part of the default target but never
+install()s -- so unlike the asi and playerone diagnostic tools removed in
+%%install, it never reaches the buildroot and needs no removal.
+
+# Three more non-blob drivers, added 2026-09-09 as the third slice. Like
+# armadillo-platypus and maxdomeii they need no vendor blob and so carry no
+# -libs Requires; unlike those two they do link libnova, and celestronaux
+# also GSL -- both already BuildRequires here since eqmod, so this slice
+# added no new build dependency at all.
+#
+# All three are LGPL-2.1-or-later and therefore carry no License: tag of
+# their own, read from every .cpp/.h in each directory rather than
+# spot-checked. celestronaux has two files with no licence header at all
+# (adaptive_tuner.cpp/.h, a PID helper); they carry no contradicting grant,
+# so the directory's own reading stands. See STATUS.md for the several
+# NEIGHBOURING drivers in this same dependency group that are NOT here,
+# each held back on a real licence question rather than on packaging.
+%package aok
+Summary:        Astro-Electronic AOK Skywalker mount INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description aok
+indi_lx200aok, an LX200-protocol driver for AOK Skywalker mount controllers.
+
+Note the three-way name mismatch this package documents rather than hides:
+the source directory is indi-aok, the upstream option is WITH_SKYWALKER, the
+binary is indi_lx200aok and the catalogue is indi_aok.xml. None of them can
+be derived from the others.
+
+%package avalon
+Summary:        Avalon StarGo mount INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description avalon
+indi_lx200stargo, an LX200-protocol driver for Avalon Instruments StarGo
+mount controllers. Catalogue is indi_avalon.xml, named for the vendor
+rather than the binary.
+
+%package celestronaux
+Summary:        Celestron AUX-protocol mount INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description celestronaux
+indi_celestron_aux, speaking Celestron's AUX protocol directly rather than
+the NexStar serial protocol the core INDI driver uses. The only driver in
+this package that needs GSL as well as libnova.
+
+# --- The LGPL-2.0-only group -------------------------------------------------
+# Four drivers whose every source file grants "the GNU Library General Public
+# License version 2 as published by the Free Software Foundation" with NO "or
+# later" clause -- read per file, not spot-checked. That is LGPL-2.0-only, the
+# same conservative reading inovasdk and eqmod's azgti sources already get
+# here, so each carries its own License: tag rather than inheriting the
+# LGPL-2.1-or-later half of this spec's aggregate.
+#
+# %%license for these ships the exact LGPL-2.0 text, taken from
+# indi-inovaplx/COPYING.LIB because none of the four directories bundles it.
+#
+# They shipped the LGPL-2.1 text briefly, on a survey claim that no LGPL-2.0
+# text existed anywhere in indi-3rdparty. Seven directories bundle it, all
+# byte-identical. Switched 2026-09-09 once that was found; see DESIGN.md for
+# the correction and the re-made decision.
+%package nexdome
+Summary:        NexDome observatory dome INDI driver (firmware v3+)
+License:        LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description nexdome
+indi_nexdome, for NexDome domes running firmware v3 or later. Upstream
+rewrote this driver completely for v3; firmware v1 is not supported.
+
+%package talon6
+Summary:        Talon6 roll-off roof controller INDI driver
+License:        LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description talon6
+indi_talon6, for the Talon6 observatory roof controller.
+
+%package ocs
+Summary:        OnCue OCS observatory control system INDI driver
+License:        LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description ocs
+indi_ocs, for the OnCue Observatory Control System.
+
+Does not ship its own bundled LICENSE.txt, which is the GPL-2 text and
+contradicts every source header in the directory. That is a genuine
+contradiction rather than the staleness apogee and sbig carry, and a GPL
+text alongside LGPL code would overstate the terms in the more restrictive
+direction.
+
+%package starbook-ten
+Summary:        Vixen Starbook TEN mount INDI driver
+License:        LGPL-2.0-only AND MIT
+Requires:       indi-stable-core-libs%{?_isa}
+%description starbook-ten
+indi_starbook_ten, for Vixen Starbook TEN mount controllers, which it drives
+over HTTP rather than a serial protocol.
+
+The only subpackage here carrying MIT code: it bundles cpp-httplib
+(httplib.h, Copyright (c) 2020 Yuji Hirose), which is genuinely compiled in
+-- both starbook_ten.h and connectionhttp.h include it -- and so appears in
+this subpackage's License: tag. Its own bundled COPYING.LESSER is the LGPL-2.1
+and is therefore not shipped, its sources granting version 2 only.
+
+# --- The remaining no-vendor-dependency drivers ------------------------------
+# Five drivers needing nothing beyond INDI itself. Their licences are the
+# most varied group in this spec and every one was read per file: three carry
+# a tag of their own, and two of the five ship a bundled licence file that
+# CONTRADICTS their own source headers rather than merely being stale.
+%package aagcloudwatcher-ng
+Summary:        AAG CloudWatcher weather station INDI driver
+License:        GPL-3.0-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description aagcloudwatcher-ng
+indi_aagcloudwatcher_ng, for Lunatico AAG CloudWatcher cloud and rain
+sensors. The "ng" is upstream's own name for the rewritten driver; the
+obsolete original lives in indi-3rdparty's obsolete/ directory and is not
+built here.
+
+The only GPL-3 subpackage besides eqmod, and unlike eqmod its bundled
+LICENSE.txt is the matching GPL-3 text, so that is what it ships.
+
+Does NOT include aagcloudwatcher_test_ng, a standalone CLI test tool
+upstream installs alongside the driver. It is in no catalogue and is not an
+INDI driver, so it is removed in %%install, the same treatment the asi and
+playerone diagnostic tools get.
+
+%package nightscape
+Summary:        Celestron Nightscape 8300 CCD INDI driver
+License:        LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description nightscape
+indi_nightscape_ccd, for the Celestron Nightscape 8300 camera.
+
+No source file in this driver carries a licence header at all; the only
+statement is its bundled COPYING.LIB, which is the LGPL-2.0 text. That
+makes it the one subpackage here whose licence text is BOTH bundled by
+upstream and an exact match for its tag.
+
+%package openogma
+Summary:        OpenOGMA camera INDI driver
+License:        AGPL-3.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description openogma
+indi_openogma, for OpenOGMA cameras.
+
+The only AGPL subpackage in this project. Neither of its two source files
+carries a licence header, so its bundled LICENSE.txt -- the GNU Affero
+General Public License v3 -- is the only statement of terms and governs.
+The Affero clause binds operators who offer modified versions over a
+network; it places no additional condition on redistributing this package.
+
+%package orion-ssg3
+Summary:        Orion StarShoot G3 CCD INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description orion-ssg3
+indi_orion_ssg3_ccd, for the Orion StarShoot G3 camera.
+
+Inherits this spec's LGPL-2.1-or-later aggregate on the strength of its own
+source headers. Its bundled LICENSE is the GPL-3 text, which contradicts
+them, so it is not shipped -- the same call indi-ocs's contradictory file
+gets, and for the same reason: a GPL text beside LGPL code overstates the
+terms in the direction that can mislead a redistributor.
+
+%package atik-efw
+Summary:        Atik EFW filter wheel INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description atik-efw
+indi_atik_efw, for Atik electronic filter wheels.
+
+Despite the name it has NO relationship to indi-atik or to the Atik vendor
+SDK, which this project excludes on licence grounds. Checked directly
+rather than inferred from the shared prefix: its CMakeLists.txt calls
+find_package for INDI and Threads only, and links ${INDI_LIBRARIES} and rt.
+It talks to the filter wheel over USB HID directly, and all three of its
+source files are plainly LGPL-2.1-or-later.
+
+# --- The GPL-2.0-or-later group ----------------------------------------------
+# Five drivers whose sources grant the PLAIN GPL "either version 2 ... or (at
+# your option) any later version" -- a different licence family from the
+# LGPL most of this package carries, so each takes its own License: tag.
+#
+# None bundles a matching text, so %%license points at
+# indi-starbook-ten/COPYING, the full 339-line GPL-2. Two GPL-2 texts exist
+# in this tarball and they are NOT interchangeable: indi-ocs/LICENSE.txt is
+# an 86-line abridgement, not the licence. Checked by line count and sha256,
+# not by the first two lines, which are identical.
+#
+# Both files belong to drivers this spec deliberately does NOT ship them
+# for -- ocs and starbook-ten are LGPL-2.0-only and their bundled GPL text
+# contradicts their own headers. That is not a contradiction here: what is
+# wrong for ocs is the pairing, not the text.
+%package bresserexos2
+Summary:        Bresser Messier EXOS-2 GoTo mount INDI driver
+License:        GPL-2.0-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description bresserexos2
+indi_bresserexos2, for the Bresser Messier EXOS-2 mount with the EXOS-2
+GoTo controller. IndiSerialWrapper.cpp carries no licence header and states
+no contradicting grant, so the directory governs.
+
+%package rtklib
+Summary:        RTKLIB GNSS receiver INDI driver
+License:        GPL-2.0-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description rtklib
+indi_rtklib, reading position from an RTKLIB rtkrcv GNSS receiver. All
+three source files agree on the grant.
+
+%package shelyak
+Summary:        Shelyak eShel and SPOX spectrograph INDI drivers
+License:        GPL-2.0-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description shelyak
+indi_shelyakeshel_spectrograph and indi_shelyakspox_spectrograph, for
+Shelyak Instruments spectrographs.
+
+All four source files grant the plain GPL "either version 2 ... or any
+later version", while the SAME headers direct the reader to a COPYING.LIB
+and a LICENSE that do not exist in the directory -- vestigial LGPL
+boilerplate under an operative GPL grant. The grant governs; the dangling
+filenames are ignored.
+
+%package gpsnmea
+Summary:        NMEA 0183 GPS receiver INDI driver
+License:        GPL-2.0-or-later AND WTFPL
+Requires:       indi-stable-core-libs%{?_isa}
+%description gpsnmea
+indi_gpsnmea, for GPS receivers speaking NMEA 0183 over serial.
+
+Bundles minmea (minmea.h, Copyright 2014 Kosma Moczek), a single-header
+NMEA parser under the Do What The Fuck You Want To Public License v2 --
+a free licence accepted by both Fedora and Debian, SPDX WTFPL. Its header
+refers to a COPYING file that indi-gpsnmea does not contain, so no WTFPL
+text ships here; the tag declares it and debian/copyright carries the full
+text, the same treatment starbook-ten's MIT half gets.
+
+%package astarbox
+Summary:        AStarBox observatory controller INDI driver
+License:        GPL-2.0-or-later AND LGPL-2.1-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description astarbox
+indi_astarbox, for the AStarBox Raspberry Pi observatory controller.
+
+Genuinely two licences rather than an aggregate for tidiness:
+indi-astarbox.cpp and its header are GPL-2.0-or-later, while PCA9685.cpp
+and its header (the PWM chip driver) are LGPL-2.1-or-later. Five further
+files carry no header and state no contradicting grant. The linked binary
+is GPL-2.0-or-later as distributed, which is what its shipped licence text
+is; LGPL-2.1 section 3 is what permits the combination, the same mechanism
+eqmod relies on.
+
+Its bundled COPYING.LGPL is not shipped: despite the name it holds the
+GPL-3 text, matching neither grant in the directory.
+
+# The last driver in the non-blob batch, and the one whose licence took the
+# most reading. Its two source directories are under DIFFERENT licences and
+# both are compiled into the single binary, so it carries both.
+%package beefocus
+Summary:        BeeFocus network focuser INDI driver
+License:        LGPL-2.0-only AND LGPL-2.1-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description beefocus
+indi_beefocus, for the BeeFocus WiFi focuser, which the driver reaches over
+a network socket rather than a serial port.
+
+Two licences, because two source trees are compiled into one binary:
+
+  driver/     LGPL-2.0-only. Five of its six files grant "the GNU Library
+              General Public License version 2" with no "or later" clause;
+              beesimfirmware.cpp carries no header while its own .h does.
+  firmware/   LGPL-2.1-only. No file here carries a licence header at all,
+              but the directory ships its own full LGPL-2.1 as
+              firmware/LICENSE, which is the only statement of terms for it
+              and therefore governs. Three of these files --
+              command_parser.cpp, focuser_state.cpp and
+              hardware_interface.cpp -- are in this driver's add_executable,
+              so this is not a licence on shipped-but-unused source.
+
+Both texts are shipped. Neither is guessed at: firmware/LICENSE is the
+driver's own file, and the LGPL-2.0 comes from indi-inovaplx/COPYING.LIB,
+the same file the inovasdk and LGPL-2.0-only subpackages here already use.
+
+unit_tests/ is not built -- indi-beefocus/CMakeLists.txt gates it behind
+INDI_BUILD_UNITTESTS, which this project never sets.
+
 %package touptek
 Summary:        Touptek and rebranded-Touptek camera INDI drivers (11 brands)
 Requires:       indi-stable-core-libs%{?_isa}
@@ -272,7 +699,10 @@ sed -i '/add_executable(omegonprocam_test /a set_target_properties(omegonprocam_
 # libindi*.so (core) and the vendor libraries (-libs), both of which live in
 # the SAME %%{indi_libdir}, so one RPATH entry covers both.
 #
-# 46 WITH_<X>=OFF overrides -- the full "everything except our 9" list, and
+# 27 WITH_<X>=OFF overrides -- the full "everything except our 9 vendors and
+# the 21 non-blob drivers" list. It was 47 when only eqmod was built; every
+# driver added since has removed its own entry, so this count moves with the
+# scope rather than being a number to preserve. And it is
 # the single biggest way this %%build differs from -libs's own. Found the
 # hard way on the first real build attempt (2026-08-26): -DBUILD_LIBS=ON (the
 # libs phase) only ever processes "lib*" subdirectories, and non-blob vendors
@@ -286,10 +716,11 @@ sed -i '/add_executable(omegonprocam_test /a set_target_properties(omegonprocam_
 # each behind the next `CMake Error` in turn) despite it never having been
 # part of this project's 8-vendor scope at all.
 #
-# Generated by diffing the complete `option(WITH_...)` list in CMakeLists.txt
-# (65 default-On entries) against the 19 flags this project actually wants on
-# (9 vendors -- MI, FLI, SBIG, INOVAPLX, APOGEE, ASICAM, PLAYERONE, FISHCAMP,
-# plus the 11 individually-flagged Touptek brands) -- not hand-picked, so
+# Originally generated by diffing the complete `option(WITH_...)` list in
+# CMakeLists.txt (65 default-On entries) against the flags this project
+# actually wants on -- the 9 vendors (MI, FLI, SBIG, INOVAPLX, APOGEE,
+# ASICAM, PLAYERONE, FISHCAMP, plus the 11 individually-flagged Touptek
+# brands), and since 2026-09-09 the 21 non-blob drivers as well -- not hand-picked, so
 # nothing already off (WITH_GIGE, WITH_LIBCAMERA, WITH_BNO_IMU, WITH_ICM_IMU,
 # WITH_CELESTRON_ORIGIN, WITH_AHP_XC, WITH_AHP_GT -- the last two for the
 # SAME execute_process(COMMAND git clone ...)-at-configure-time reason
@@ -312,10 +743,22 @@ sed -i '/add_executable(omegonprocam_test /a set_target_properties(omegonprocam_
 # add_subdirectory(indi-fishcamp)` branch is what actually runs, not the
 # library-build fallback.
 #
-# The other 38 are entirely out of THIS project's scope, not excluded for
-# any licence reason -- non-blob drivers this packaging effort has not yet
-# decided whether to bundle at all (STATUS.md, "3rdparty -- remaining"; the
-# file header above).
+# The other 37 are out of THIS project's CURRENT scope, not excluded for any
+# licence reason -- non-blob drivers deferred by the eqmod-first decision
+# (STATUS.md, "3rdparty -- remaining"; the file header above), to be revisited
+# once eqmod has been through the full verification cycle on both distros.
+#
+# The last two, WITH_WEBCAM and WITH_NUT, are a DIFFERENT case from every
+# other line here and must stay pinned whatever the scope becomes. Neither is
+# a fixed upstream default: indi-3rdparty's own top-level CMakeLists.txt sets
+# each one by running find_package(FFmpeg) / find_package(NUTClient) at
+# CONFIGURE time, so leaving either unset makes the build's contents depend on
+# what happens to be installed in that day's mock chroot -- the exact
+# nondeterminism this project's pinned Source0 hashes exist to prevent. Pinned
+# Off rather than On because WITH_WEBCAM needs ffmpeg-devel, which is not in
+# base Fedora at all (RPM Fusion only, a repo this project has never
+# depended on). Found by reading upstream's CMakeLists.txt, 2026-09-08;
+# neither had ever been passed explicitly before.
 #
 # Extra -I%%{indi_includedir}: found on the first real build (2026-08-26),
 # indi-apogee/apogee_ccd.cpp mixes BOTH include styles for the same vendor
@@ -344,52 +787,35 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DINDI_ROOT=%{indi_prefix} \
     -DCMAKE_PREFIX_PATH=%{indi_prefix} \
     -DBUILD_LIBS=OFF \
+    -DUDEVRULES_INSTALL_DIR=%{indi_prefix}/udev-rules \
+    -DINDI_DATA_DIR=%{indi_datadir} \
     -DWITH_ASTROASIS=OFF \
     -DWITH_ATIK=OFF \
-    -DWITH_ATIK_EFW=OFF \
     -DWITH_QHY=OFF \
     -DWITH_SVBONY=OFF \
     -DWITH_PENTAX=OFF \
     -DWITH_QSI=OFF \
-    -DWITH_ARMADILLO=OFF \
-    -DWITH_ASTARBOX=OFF \
     -DWITH_ASTROLINK4=OFF \
     -DWITH_ASTROMECHFOC=OFF \
-    -DWITH_AVALON=OFF \
     -DWITH_AVALONUD=OFF \
-    -DWITH_BEEFOCUS=OFF \
-    -DWITH_BRESSEREXOS2=OFF \
-    -DWITH_CAUX=OFF \
-    -DWITH_CLOUDWATCHER=OFF \
     -DWITH_DREAMFOCUSER=OFF \
     -DWITH_DSI=OFF \
     -DWITH_DUINO=OFF \
-    -DWITH_EQMOD=OFF \
     -DWITH_FFMV=OFF \
     -DWITH_GPHOTO=OFF \
     -DWITH_GPIO=OFF \
     -DWITH_GPSD=OFF \
-    -DWITH_GPSNMEA=OFF \
     -DWITH_LIMESDR=OFF \
-    -DWITH_MAXDOME=OFF \
     -DWITH_MGEN=OFF \
-    -DWITH_NEXDOME=OFF \
-    -DWITH_NIGHTSCAPE=OFF \
-    -DWITH_OCS=OFF \
-    -DWITH_OPENOGMA=OFF \
-    -DWITH_ORION_SSG3=OFF \
     -DWITH_RADIOSIM=OFF \
     -DWITH_ROLLOFFINO=OFF \
-    -DWITH_RTKLIB=OFF \
-    -DWITH_SHELYAK=OFF \
-    -DWITH_SKYWALKER=OFF \
     -DWITH_SPECTRACYBER=OFF \
     -DWITH_STARBOOK=OFF \
-    -DWITH_STARBOOK_TEN=OFF \
     -DWITH_SX=OFF \
-    -DWITH_TALON6=OFF \
     "-DWITH_TICFOCUSER-NG=OFF" \
-    -DWITH_WEEWX_JSON=OFF
+    -DWITH_WEEWX_JSON=OFF \
+    -DWITH_WEBCAM=OFF \
+    -DWITH_NUT=OFF
 %cmake_build
 
 %install
@@ -421,6 +847,114 @@ rm -f %{buildroot}%{indi_bindir}/asi_camera_bench
 rm -f %{buildroot}%{indi_bindir}/asi_wheel_test
 rm -f %{buildroot}%{indi_bindir}/playerone_camera_test
 rm -f %{buildroot}%{indi_bindir}/playerone_camera_bench
+# aagcloudwatcher_test_ng is the same class: a standalone CLI test tool, a
+# real install(TARGETS) target upstream, in no catalogue, and not an INDI
+# driver. Removed rather than merely omitted from %%files, for the same
+# reason as the six above -- rpmbuild's unpackaged-file check would
+# otherwise fail the build on it. Note this is UNLIKE maxdomeii's
+# test-maxdomeii, which upstream builds but never installs, so never
+# reaches the buildroot at all.
+rm -f %{buildroot}%{indi_bindir}/aagcloudwatcher_test_ng
+
+# --- eqmod: drop the catalogue entry for the driver we do not build ---------
+# indi_eqmod.xml catalogues indi_ahpgt_telescope, but indi-eqmod's own local
+# option(WITH_AHP_GT ... OFF) means that binary is never built here. Left
+# alone it would survive the rewrite below as a BARE name (the rewrite only
+# substitutes names it found an installed binary for), and a bare name is
+# strictly worse than a missing entry: indiserver resolves it through PATH,
+# so a distribution-provided indi_ahpgt_telescope would be what actually ran
+# out of OUR catalogue -- precisely the coexistence violation the rewrite
+# exists to prevent (DESIGN.md, "Driver-manifest discoverability").
+# The count assertion is LESSONS_LEARNED.md #1: a deletion that silently
+# matched nothing would otherwise look identical to a successful one.
+_ahpgt_before=$(grep -c 'indi_ahpgt_telescope' %{buildroot}%{indi_datadir}/indi_eqmod.xml)
+test "$_ahpgt_before" -eq 1 \
+    || { echo "ERROR: expected exactly 1 indi_ahpgt_telescope catalogue entry, found $_ahpgt_before -- indi_eqmod.xml.cmake changed upstream"; exit 1; }
+sed -i '/<device label="AHP GT Mount"/,/<\/device>/d' %{buildroot}%{indi_datadir}/indi_eqmod.xml
+grep -q 'indi_ahpgt_telescope' %{buildroot}%{indi_datadir}/indi_eqmod.xml \
+    && { echo "ERROR: indi_ahpgt_telescope still present in indi_eqmod.xml after the device-block delete"; exit 1; }
+# The four real eqmod drivers must survive that delete, not be collateral.
+for _d in indi_eqmod_telescope indi_azgti_telescope \
+          indi_staradventurergti_telescope indi_staradventurer2i_telescope; do
+    grep -q "${_d}" %{buildroot}%{indi_datadir}/indi_eqmod.xml \
+        || { echo "ERROR: ${_d} lost from indi_eqmod.xml -- the AHP GT device-block delete over-matched"; exit 1; }
+done
+
+# --- udev rules: re-home under a namespaced filename ------------------------
+# NEW as of the armadillo-platypus/maxdomeii slice: until then no subpackage
+# in THIS spec shipped a udev rule at all -- every rule this project put in
+# /usr/lib/udev/rules.d came from -libs. Confirmed before writing this rather
+# than assumed: `rpm -qlp` over all ten 2.2.4.1-1 driver RPMs matched zero
+# paths under rules.d.
+#
+# THIS DOES NOT WORK THE WAY -libs's EQUIVALENT DOES, and the first build
+# proved it. -libs redirects UDEVRULES_INSTALL_DIR with a -D flag and then
+# re-homes out of that private scratch directory. Every lib* vendor
+# directory declares that variable as `set(... CACHE STRING ...)`, so the
+# -D wins. Driver directories are split, and five of them -- armadillo-
+# platypus, dsi, orion-ssg3, qsi and sx -- instead use a DIFFERENT variable,
+# RULES_INSTALL_DIR, declared with a plain `set()` and no CACHE. A plain
+# set() overwrites whatever the command line supplied, so:
+#
+#   -DUDEVRULES_INSTALL_DIR=...  does nothing for these five (wrong name)
+#   -DRULES_INSTALL_DIR=...      does nothing either (overwritten at configure)
+#
+# The rule is therefore installed straight to a hardcoded /usr/lib/udev/
+# rules.d, under upstream's own un-namespaced filename, and no -D flag can
+# move it. That is a coexistence problem, not a tidiness one: 99-armadillo
+# platypus.rules is the exact filename a distribution package for the same
+# hardware would use, so shipping it as-is puts a file this project owns
+# where a distro file belongs. DESIGN.md's "Upstream build-system facts"
+# calls UDEVRULES_INSTALL_DIR "the one non-derived install path"; that is
+# now known to be incomplete.
+#
+# So re-home by DESTINATION rather than by source directory: take whatever
+# landed in either place and rename it, which is robust to both upstream
+# mechanisms and to a driver switching between them. Same namespaced pattern
+# -libs uses, so everything this project installs into rules.d is one
+# greppable set. See core's spec for why four percent signs are needed in
+# ${base%%%%-*} under RPM macro expansion.
+mkdir -p %{buildroot}%{_udevrulesdir}
+for rule in %{buildroot}%{indi_prefix}/udev-rules/*.rules \
+            %{buildroot}%{_udevrulesdir}/*.rules; do
+    [ -e "$rule" ] || continue
+    base=$(basename "$rule")
+    case "$base" in
+        *-indi-stable-3rdparty-*) continue ;;   # already re-homed
+    esac
+    mv "$rule" "%{buildroot}%{_udevrulesdir}/${base%%%%-*}-indi-stable-3rdparty-${base#*-}"
+done
+rm -rf %{buildroot}%{indi_prefix}/udev-rules
+
+# A loop that finds nothing must not pass as though it worked (#1). Exactly
+# one driver in this spec's current scope ships a rule -- armadillo-platypus.
+# maxdomeii deliberately ships none, so this asserts a COUNT, not merely "at
+# least one": a second rule appearing means a driver started shipping one and
+# needs a %%files line, which would otherwise surface much later as an
+# unpackaged-file failure with nothing pointing at the cause.
+# Four drivers in scope ship one rule each. Asserting the COUNT rather than
+# "at least one" is what makes a fifth appearing -- an upstream driver newly
+# shipping a rule -- fail here with an explanation, instead of much later as
+# an unpackaged file.
+#
+# These four reach /usr/lib/udev/rules.d by THREE different upstream
+# mechanisms, which is why the loop above keys on destination rather than on
+# any one variable: nightscape uses UDEVRULES_INSTALL_DIR (a CACHE variable,
+# so the -D redirect works); armadillo-platypus and orion-ssg3 use
+# RULES_INSTALL_DIR (a plain set(), so no -D can move it); and openogma
+# hardcodes the literal path in its install() call with no variable at all.
+_rules=$(ls -1 %{buildroot}%{_udevrulesdir}/*.rules 2>/dev/null | wc -l)
+test "$_rules" -eq 4 \
+    || { echo "ERROR: expected exactly 4 udev rules from this package, found $_rules:"; ls -1 %{buildroot}%{_udevrulesdir}/ 2>/dev/null; exit 1; }
+for _r in armadilloplatypus nightscape openogma orionssg3; do
+    test -e %{buildroot}%{_udevrulesdir}/99-indi-stable-3rdparty-${_r}.rules \
+        || { echo "ERROR: the ${_r} rule is not at its re-homed name. Found:"; ls -1 %{buildroot}%{_udevrulesdir}/; exit 1; }
+done
+# And nothing may be left at an upstream, un-namespaced filename -- that is
+# the actual coexistence assertion, and the one the first build failed.
+_bare_rules=$(ls -1 %{buildroot}%{_udevrulesdir}/*.rules 2>/dev/null | grep -v -- '-indi-stable-3rdparty-' || true)
+test -z "$_bare_rules" \
+    || { echo "ERROR: udev rules left at an upstream filename, where a distro package's own rule belongs:"; echo "$_bare_rules"; exit 1; }
 
 # --- driver catalogue: absolute paths, not bare names -----------------------
 # Same defect, same fix, same verification method as core's %%install -- see
@@ -447,11 +981,35 @@ rm -f "$_sed"
 test "$_rewritten" -gt 0 || { echo "ERROR: rewrote 0 catalogue entries across every indi_*.xml; the <driver> form changed upstream"; exit 1; }
 echo "driver catalogues: rewrote $_rewritten entries to %{indi_bindir}"
 
+# Every <driver> entry must now name an absolute path. Any that does not is a
+# catalogue entry for a binary this package did not build, and would resolve
+# through PATH to whatever the distribution provides -- the AHP GT case
+# stripped above, found 2026-09-08 while adding eqmod, generalized so the
+# next one cannot arrive silently. Verified non-vacuous before being relied
+# on: run against the already-shipped 2.2.4.1-1 packages all 56 entries were
+# already absolute, and against an unstripped indi_eqmod.xml it fires.
+_bare=$(grep -hoE '<driver[^>]*>[^<]+</driver>' %{buildroot}%{indi_datadir}/indi_*.xml \
+        | grep -vE '>%{indi_bindir}/' || true)
+test -z "$_bare" || { echo "ERROR: catalogue entries left as bare names, which resolve via PATH to a distro binary:"; echo "$_bare"; exit 1; }
+
 # Assert every vendor this spec means to ship actually landed, rather than
 # trusting a clean cmake_build exit (LESSONS_LEARNED.md #1 and #5).
+# All four eqmod binaries are listed, not one representative: they are four
+# separate add_executable() targets whose only shared fate is skywatcher.cpp,
+# so any one of them can go missing on its own.
 for _bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
             indi_inovaplx_ccd indi_mi_ccd indi_sbig_ccd indi_toupcam_ccd \
-            indi_fishcamp_ccd; do
+            indi_fishcamp_ccd indi_eqmod_telescope indi_azgti_telescope \
+            indi_staradventurergti_telescope indi_staradventurer2i_telescope \
+            indi_armadillo_focus indi_platypus_focus indi_seletek_rotator \
+            indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
+            indi_maxdomeii indi_lx200aok indi_lx200stargo \
+            indi_celestron_aux indi_nexdome indi_talon6 indi_ocs \
+            indi_starbook_ten indi_aagcloudwatcher_ng indi_nightscape_ccd \
+            indi_openogma indi_orion_ssg3_ccd indi_atik_efw \
+            indi_bresserexos2 indi_rtklib indi_gpsnmea indi_astarbox \
+            indi_shelyakeshel_spectrograph indi_shelyakspox_spectrograph \
+            indi_beefocus; do
     test -x %{buildroot}%{indi_bindir}/${_bin} \
         || { echo "ERROR: ${_bin} did not install -- an upstream WITH_* default or driver name changed"; exit 1; }
 done
@@ -552,6 +1110,256 @@ done
 %dir %{indi_datadir}
 %{indi_bindir}/indi_fishcamp_ccd
 %{indi_datadir}/indi_fishcamp.xml
+
+# The only %%license here pointing at a driver directory's own file rather
+# than indi-3rdparty's top-level LICENSE: indi-eqmod/COPYING is real GPLv3
+# text, which is what this subpackage's own License: tag declares. The
+# top-level LICENSE is LGPL-2.1 and would be the wrong text for it.
+# The four *_sk.xml files are INDI property skeletons, not driver
+# catalogues -- they carry no <driver> element at all (checked, 2026-09-08),
+# so the catalogue rewrite in %%install correctly leaves them untouched
+# despite matching its indi_*.xml glob.
+%files eqmod
+%license indi-eqmod/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_eqmod_telescope
+%{indi_bindir}/indi_azgti_telescope
+%{indi_bindir}/indi_staradventurergti_telescope
+%{indi_bindir}/indi_staradventurer2i_telescope
+%{indi_datadir}/indi_eqmod.xml
+%{indi_datadir}/indi_eqmod_sk.xml
+%{indi_datadir}/indi_eqmod_simulator_sk.xml
+%{indi_datadir}/indi_align_sk.xml
+%{indi_datadir}/indi_eqmod_scope_limits_sk.xml
+
+# Neither directory ships a licence file of its own, so both point at
+# indi-3rdparty's top-level LICENSE -- which is the correct text here,
+# unlike eqmod's case: that file IS the LGPL-2.1 these two grant. Checked,
+# not assumed: LICENSE's first lines read "GNU LESSER GENERAL PUBLIC
+# LICENSE / Version 2.1, February 1999".
+%files armadillo-platypus
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_armadillo_focus
+%{indi_bindir}/indi_platypus_focus
+%{indi_bindir}/indi_seletek_rotator
+%{indi_bindir}/indi_dragonfly
+%{indi_bindir}/indi_dragonfly_dome
+%{indi_bindir}/indi_beaver_dome
+%{indi_datadir}/indi_lunatico.xml
+%{_udevrulesdir}/*-indi-stable-3rdparty-*armadilloplatypus*.rules
+
+%files maxdomeii
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_maxdomeii
+%{indi_datadir}/indi_maxdomeii.xml
+
+# None of these three ships a licence file of its own, so all three point at
+# indi-3rdparty's top-level LICENSE -- which is the right text for them: it
+# is the LGPL-2.1 these directories grant.
+%files aok
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_lx200aok
+%{indi_datadir}/indi_aok.xml
+
+%files avalon
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_lx200stargo
+%{indi_datadir}/indi_avalon.xml
+
+%files celestronaux
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_celestron_aux
+%{indi_datadir}/indi_celestronaux.xml
+
+# These four grant LGPL-2.0-only and now ship the EXACT LGPL-2.0 text.
+#
+# None of the four directories bundles it, so all four point at
+# indi-inovaplx/COPYING.LIB. That is not an arbitrary pick: indi-inovaplx is
+# a driver this same spec builds and already declares LGPL-2.0-only, so the
+# reference stays inside this package's own build scope. Nor is the choice
+# load-bearing -- seven directories in this tarball bundle this file
+# (indi-apogee, indi-gphoto, indi-inovaplx, indi-limesdr, indi-nightscape,
+# indi-sbig, indi-sx) and all seven are byte-identical, sha256
+# c340cbee4974bb96... , checked rather than assumed.
+#
+# They shipped the LGPL-2.1 text until 2026-09-09, on a survey claim that no
+# LGPL-2.0 text existed in the tree. That claim was wrong, and conspicuously
+# so: THIS SPEC WAS ALREADY SHIPPING THE FILE, from %%files inovasdk above.
+# See DESIGN.md.
+%files nexdome
+%license indi-inovaplx/COPYING.LIB
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_nexdome
+%{indi_datadir}/indi_nexdome.xml
+
+%files talon6
+%license indi-inovaplx/COPYING.LIB
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_talon6
+%{indi_datadir}/indi_talon6.xml
+
+%files ocs
+%license indi-inovaplx/COPYING.LIB
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_ocs
+%{indi_datadir}/indi_ocs.xml
+
+# starbook-ten's own COPYING.LESSER is the 2.1 and so is NOT used, despite
+# being in its own directory. Its MIT half (httplib.h) has no separate text
+# file anywhere in the tarball -- the notice lives in the header's own
+# comment block -- so the License: tag carries it and debian/copyright holds
+# the full text; nothing is shipped for it here.
+%files starbook-ten
+%license indi-inovaplx/COPYING.LIB
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_starbook_ten
+%{indi_datadir}/indi_starbook_ten.xml
+
+%files aagcloudwatcher-ng
+%license indi-aagcloudwatcher-ng/LICENSE.txt
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_aagcloudwatcher_ng
+%{indi_datadir}/indi_aagcloudwatcher_ng.xml
+%{indi_datadir}/indi_aagcloudwatcher_ng_sk.xml
+
+# The one subpackage whose bundled licence text exactly matches its tag.
+%files nightscape
+%license indi-nightscape/COPYING.LIB
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_nightscape_ccd
+%{indi_datadir}/indi_nightscape.xml
+%{_udevrulesdir}/*-indi-stable-3rdparty-*nightscape*.rules
+
+%files openogma
+%license indi-openogma/LICENSE.txt
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_openogma
+%{indi_datadir}/indi_openogma.xml
+%{_udevrulesdir}/*-indi-stable-3rdparty-*openogma*.rules
+
+# Top-level LICENSE, not the driver's own: see the %%package block.
+%files orion-ssg3
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_orion_ssg3_ccd
+%{indi_datadir}/indi_orion_ssg3.xml
+%{_udevrulesdir}/*-indi-stable-3rdparty-*orionssg3*.rules
+
+%files atik-efw
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_atik_efw
+%{indi_datadir}/indi_atik_efw.xml
+
+# All five ship indi-starbook-ten/COPYING, the full GPL-2 -- see the
+# %%package block for why that file and not indi-ocs/LICENSE.txt.
+%files bresserexos2
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_bresserexos2
+%{indi_datadir}/indi_bresserexos2.xml
+
+%files rtklib
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_rtklib
+%{indi_datadir}/indi_rtklib.xml
+
+%files shelyak
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_shelyakeshel_spectrograph
+%{indi_bindir}/indi_shelyakspox_spectrograph
+%{indi_datadir}/indi_shelyak.xml
+
+%files gpsnmea
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_gpsnmea
+%{indi_datadir}/indi_gpsnmea.xml
+
+%files astarbox
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_astarbox
+%{indi_datadir}/indi_astarbox.xml
+
+# The only subpackage here shipping TWO licence texts, because it genuinely
+# links two differently-licensed source trees. See the %%package block.
+%files beefocus
+%license indi-inovaplx/COPYING.LIB
+%license indi-beefocus/firmware/LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_beefocus
+%{indi_datadir}/indi_beefocus.xml
 
 %files touptek
 %license indi-toupbase/COPYING.LGPL

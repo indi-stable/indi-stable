@@ -19,7 +19,7 @@ Two rules keep it living rather than growing:
 |---|---|
 | **Fedora `core/`** | **Testing complete.** Built, installed, coexisting (runtime, metadata, `-devel`, and Ekos in *both* the opt-in and bystander cases), upgraded and removed — all verified, and the whole suite re-run green on 2026-08-26. The one item left is release tooling, not a test. |
 | **Debian `core/`** | **Testing complete.** Built, installed, coexisting (runtime, metadata, `-dev`), upgraded and removed — verified in **configuration B**, against a distribution INDI carrying the same SONAME and the same upstream release, and now scripted as four harnesses in `scripts/`. Nothing outstanding is a test. |
-| **`3rdparty/`** | RPM and Debian sides both complete for both source packages, all three verified together (`indi-stable-core`, `-3rdparty-libs`, `-3rdparty-drivers`), on both distros. 9 vendors. **A serious defect was found and fixed 2026-09-04 that all of the earlier verification had missed: 45 of 56 driver binaries could not load on a runtime-only install**, because 17 vendor blobs carry an unversioned SONAME and their bare `.so` symlink was shipped in `-devel`/`-dev` rather than the runtime package (`LESSONS_LEARNED.md` #22). Fixed and re-verified on both distros — see the dated section below. See "3rdparty — remaining" for what is still genuinely open (QSI stays excluded for a confirmed reason; `flipro`/`flialgo` licence coverage; non-blob drivers). |
+| **`3rdparty/`** | RPM and Debian sides both complete for both source packages, all three verified together (`indi-stable-core`, `-3rdparty-libs`, `-3rdparty-drivers`), on both distros. **9 vendors plus 21 non-blob drivers as of 2026-09-09 — 30 `-drivers` packages, 86 driver binaries**, added across seven slices and each one built, installed, coexistence- and smoke-verified on both distros. None of it ships yet: `-drivers` needs a `Release: 2`/`-2` bump first, because its contents grew while the upstream tag stayed put. Only `dsi` and `rolloffino` remain unbuilt, both on licence grounds rather than packaging ones. **A serious defect was found and fixed 2026-09-04 that all of the earlier verification had missed: 45 of 56 driver binaries could not load on a runtime-only install**, because 17 vendor blobs carry an unversioned SONAME and their bare `.so` symlink was shipped in `-devel`/`-dev` rather than the runtime package (`LESSONS_LEARNED.md` #22). Fixed and re-verified on both distros — see the dated section below. See "3rdparty — remaining" for what is still genuinely open (QSI stays excluded for a confirmed reason; `flipro`/`flialgo` licence coverage; non-blob drivers). |
 | **`pyindi-client/`** | Both sides built, installed, imported for real, and coexistence/upgrade-tested via scripted harnesses: Debian 2026-08-26/27 (`pyindi-client/deb/`), RPM 2026-08-27 (`pyindi-client/rpm/`). Release automation added 2026-09-04, including a smoke check that every symbol the SWIG wrapper references is actually exported — the `DESIGN.md` 2026-09-03 incident's failure mode, which `import PyIndi` and `BaseClient()` both survive. Nothing outstanding on the packaging itself. |
 | **CI (all three)** | **Verified end to end ON THIS REPO, 2026-09-04**, not just inherited from the seed's own history. Core, 3rdparty and pyindi-client each ran a real (not dry-run) check → build → smoke-test → promote cycle here for the first time, each publishing a real GitHub Release and pushing a real promotion commit: `indi-stable-core-v2.2.4.2` (6 assets), `indi-stable-3rdparty-v2.2.4.1` (54 assets, at a clean `Release: 1` — see below for why that needed a real fix first), `indi-stable-pyindi-client-2.2.0` (2 assets, symbol-check counts 1172/1199 confirmed substantive, not vacuous). All three promote jobs now create the GitHub Release **before** committing the version bump (`53cef94`) — closing a real, if narrow, window where a downstream workflow reading `versions.json` could see a release referenced before it existed; confirmed on this run by the release's `publishedAt` and the promote commit's own timestamp landing in the same second, not by trusting the reorder alone. |
 | **3rdparty's first real run here failed, and the cause was worth finding.** The fresh-history seed carried over the archived repo's already-bumped state (`Release: 2%{?dist}`, changelogs and all 18 control pins at `-2` — leftover from a repackage test run there). This repo's own release history starts fresh, so the first real promotion attempt collided: Debian's `dch` correctly refused to write a lower version than what its changelog already claimed, but the RPM side's plain `sed` had no equivalent check and **silently regressed `Release: 2` back down to `1`**, reporting success. Fixed in two parts, `01b52b9`: the seed's phantom `-2` content reset to a clean `-1` (nothing describing that content ever actually shipped from this repo), and all three bump scripts hardened to refuse moving RPM `Release:` backward for an unchanged upstream version, matching what `dch` already enforced on the Debian side. Re-run afterward: all 8 jobs passed. |
@@ -74,15 +74,90 @@ force-pushes/deletion are disabled. Confirmed by testing, not just reading
 the settings back — a direct push to `main` was rejected with GitHub's own
 `GH006` error before this was trusted.
 
-**Switching machines?** The clone on the box you are moving *to* will be behind
-— `git pull` on `development` first. Both clones were in sync at the end of
-2026-08-26. Two per-clone git settings, both already applied on both clones —
-re-apply them on any new one, because neither travels with a `git clone`:
+**Switching machines?** **Both boxes now have a clone of this repo at
+`~/src/indi-stable`**, `fedoraastro`'s added 2026-09-09 and both sitting on
+`development` at the same commit. `fedoraastro` still also carries
+`~/src/packaging`, the retired predecessor repo — do not confuse the two; the
+spec-copying workaround the 2026-09-08 Fedora build needed is no longer
+required.
+
+The box you are moving *to* will be behind — `git pull` on `development`
+first. Two per-clone git settings, applied on both clones — re-apply them on
+any new clone, because neither travels with a `git clone`:
 
 ```bash
 git config user.email william@williamlsnyder.org   # commit authorship
 git config core.hooksPath .githooks                # or the pre-commit hook is inert
 ```
+
+**Baselines, both boxes, end of 2026-09-08.** Neither carries any
+`indi-stable` package and `/opt/indi-stable` is absent on both.
+
+- **`fedoraastro`: 2167 packages as of 2026-09-09, and there is now a NAME
+  list**, `~/fedoraastro-baseline-2026-09-09.txt`. It had only ever had a
+  count, which is what `LESSONS_LEARNED.md` #6 says not to rely on, and the
+  gap showed: `scripts/test-snapshot-a-depsolve.sh` moved it from 2153 to
+  2167 and there was no name list to attribute the difference against.
+  Attributed from `dnf history` instead — 12 packages from that harness's
+  `dnf install -y stellarium`, plus 2 from reinstalling `kstars`, which the
+  same harness had removed and not put back.
+  **The box is not restorable to 2153**: that transaction also upgraded 11
+  `qt6` packages in place from 6.11.1 to 6.11.2, because it installs from
+  the live repositories. Re-baseline from 2167 and from the name list.
+  `dnf autoremove` is NOT the way to close the gap — it offers to remove 11
+  packages dated April and August, all of them baseline packages merely
+  orphaned by the churn.
+- **`ubuntuastro`: 1839 packages, not the 1832 this file used to say.** The
+  difference is **not** leftover work — it is `unattended-upgrades` running a
+  kernel and security update mid-session (7.0.0-30 → 7.0.0-31, plus
+  openssl/sssd/webkit/bind9), which added seven `linux-*` packages and removed
+  none. Diffed by package *name* to establish that, not by count. Re-baseline
+  from 1839 rather than treating the delta as contamination — and note this is
+  a live desktop that will drift again, so diff names, never counts (#6).
+
+**Build artifacts left on both boxes**, reusable rather than rebuilt:
+
+| Box | Path | What |
+|---|---|---|
+| `fedoraastro` | `~/mock-result-pcfix` | core `2.2.4.2-1` |
+| `fedoraastro` | `~/mock-result-symlinkfix` | `-libs` `2.2.4.1-1`, **post**-#22 fix |
+| `fedoraastro` | `~/mock-result-drivers-eqmod` | `-drivers` `2.2.4.1-1` **with eqmod**, 10 subpackages |
+| `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests, 18 RPMs |
+| `fedoraastro` | `~/mock-result-drivers-rel2full` | `-drivers` `2.2.4.1-2` scratch at **full scope, 30 subpackages** — replaces `-rel2new`, which held the 10-subpackage eqmod-era build |
+| `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
+| `fedoraastro` | `~/mock-result-drivers-slice7` | `-drivers` `2.2.4.1-1`, **30 subpackages** — the current build |
+| `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is the current **30-package** build |
+| `ubuntuastro` | `~/build/slice7-stage/` | the runtime-only 41-deb set the slice-7 smoke test ran against, one version of each |
+| `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`: `-libs` 18, `-drivers` **30**, the latter rebuilt at full scope 2026-09-09 (it held 10 from the eqmod slice). All 30 share one mtime, so there is no stale mix |
+
+**Disk cleanup, 2026-09-09.** `ubuntuastro` reached 99% full (643 MB free)
+during the driver widening. The cause was seven unpacked `indi-3rdparty`
+build trees, one per slice, at ~1.5 GB each. All were deleted, along with
+six superseded smoke-test staging directories and, on `fedoraastro`, the
+six superseded `mock-result-drivers-slice*` sets. `ubuntuastro` went to 71%
+used, `fedoraastro` to 59%.
+
+**None of that was an artifact.** `dpkg-buildpackage` writes the `.deb`s to
+the *parent* of the build tree, so they were always in `~/build` itself, and
+every staging directory was a copy of files already there — both checked
+before deleting rather than assumed. The trees are regenerable in one
+`tar xf` from `~/build/indi-3rdparty-v2.2.4.1.tar.gz`, which is kept.
+
+**`ubuntuastro` still holds ~9 GB of older unpacked trees from previous
+sessions** — `indi-2.2.4.2`, `rel2-libs`, `rel2-drivers`,
+`indi-3rdparty-2.2.4.1-libsfix`, `-drivers` and `-eqmod`. They were left
+alone because they predate this session. `-eqmod` in particular is the tree
+the upstream source surveys read from, so deleting it costs a re-unpack;
+the rest look like ordinary leftovers.
+
+`~/mock-result-3rdparty` and `~/mock-result-3rdparty-fishcamp` on
+`fedoraastro` both **predate the #22 runtime-symlink fix** and must not be
+used. They hold 18 RPMs each, exactly like `~/mock-result-symlinkfix`, and are
+indistinguishable by name — tell them apart by asking whether the *runtime*
+touptek RPM owns the bare `libtoupcam.so` (`FEDORA.md`).
+
+The `~/build/*-2*.deb` set was rebuilt from the current packaging on
+2026-09-08, replacing an older `-2` set that predated both fishcamp and eqmod.
 
 ---
 
@@ -202,6 +277,49 @@ baseline: 2153 packages, `/opt/indi-stable` completely absent (not even an
 empty directory, across all three source packages' worth of shared
 `%dir` declarations), only the distribution's own `99-indi_auxiliary.rules`
 left in `/usr/lib/udev/rules.d`.
+
+**All four upgrade harnesses re-run green at full scope, 2026-09-09** — RPM
+and Debian, `-libs` and `-drivers`. **None of the four needed changing:** all
+of them glob their inputs, and both `-drivers` harnesses loop over the
+installed package list rather than naming vendors, so all four scaled from
+8 packages to 30 on their own. That is the state the `LESSONS_LEARNED.md`
+#25 fix left them in; the coexistence harness was the one that had been
+missed, and is fixed separately.
+
+What did need rebuilding was the scratch input on both distros. Each
+`-drivers` `-2` set held 10 subpackages and dated from the eqmod slice, so
+it would have tested an upgrade between two versions of a package that no
+longer exists in that shape. Rebuilt at 30 on both: Fedora via the
+documented "bump `Release` in a scratch copy, never commit it" trick, Debian
+via `scripts/bump-3rdparty-version.sh v2.2.4.1 2` run in a **copy** of the
+repo — the working tree here was confirmed clean afterward, since that
+script rewrites changelogs and all 18 control pins in place.
+
+**All 30 driver packages were individually confirmed to resolve and run
+after the upgrade** on both distros, not one representative. Every control
+fired: the orphan check on all four (a planted stray file under
+`/opt/indi-stable` must be reported), and on the Debian pair the
+restore-by-diff control as well. Both boxes back to exact baseline,
+`fedoraastro` at 2153 with `gcc` still absent, `ubuntuastro` at 1839 diffed
+by package name.
+
+**Detail on the RPM pair, 2026-09-09.**
+`-libs` against its own `-2` scratch, and `-drivers` against a fresh `-2`
+scratch built at 30 subpackages — the previous one held 10 and dated from
+eqmod. Neither harness needed changing: both glob their inputs and the
+drivers one loops over `rpm -qa 'indi-stable-3rdparty-drivers-*'`, so both
+scaled on their own. **All 30 driver packages were individually confirmed to
+resolve and run after the upgrade**, not one representative.
+
+Both controls fired: each harness plants a stray file under
+`/opt/indi-stable` and requires its orphan check to report it. `fedoraastro`
+back to its exact 2153-package baseline afterward, `gcc` still absent,
+`rpm -V` clean on `libindi`/`libindi-libs`/`kstars`.
+
+One thing worth not misreading in the teardown log: a distribution package,
+`rtl-sdr`, appears in the removal list. It is pulled in by
+`indi-stable-core`, not by anything here — checked, no `-drivers` subpackage
+requires it — and the diff-based restore removed it correctly.
 
 **Upgrade path also verified, 2026-08-26,
 `scripts/test-upgrade-path-drivers.sh`.** Run together with `-libs`'s own
@@ -392,15 +510,268 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   this repo will resolve it. See `DESIGN.md`, "QSI and Fishcamp resolved",
   for how the other two members of this same "never actually read" group
   were settled the same day.
-- **The ~50 non-blob indi-3rdparty drivers (eqmod, gpsd, celestronaux,
-  ticfocuser-ng, ...) are entirely out of scope for `-drivers` as written.**
-  Deliberately not decided either way (confirmed with Will, 2026-08-26) — they
-  need no vendor blob and have no dependency on `-libs` at all, so bundling
-  them is a wholly separate question from everything this spec's own scope
-  answers. The 46 `-DWITH_<X>=OFF` overrides in `%build` are what currently
-  keeps them out; extending this package to cover any of them means editing
-  that list deliberately, not something a future add_subdirectory() upstream
-  adds should silently slip through.
+- **`eqmod` is packaged on both distros but has never been built.** Scope
+  decided with Will 2026-09-08 — eqmod alone first as a complete vertical
+  slice, then widen; one subpackage per driver. See `DESIGN.md`, "Decided:
+  eqmod first, then widen", for the reasoning, the licence finding
+  (`eqmod` is the only non-LGPL subpackage here) and the catalogue defect
+  found while writing it.
+
+  Done, no build yet: `-DWITH_EQMOD=OFF` removed and
+  `-DWITH_WEBCAM=OFF`/`-DWITH_NUT=OFF` pinned in both
+  `core/rpm/indi-stable-3rdparty-drivers.spec` and
+  `core/deb-3rdparty-drivers/rules`; `libnova`/`GSL` BuildRequires added on
+  both; `%package`/`%files eqmod` and the Debian `-eqmod` binary package,
+  `.install` and `.lintian-overrides` written; `debian/copyright` given
+  eqmod's two licence stanzas; the AHP GT catalogue entry stripped and a
+  no-bare-names assertion added to both packagings.
+
+  **The Debian side is done, 2026-09-08.** Built clean on the first real
+  `dpkg-buildpackage` (ten binary packages now, not nine), `lintian` 0
+  errors, coexistence verified in configuration B against a distro
+  `libindi1` carrying a byte-identical `libindidriver.so.2` SONAME, and
+  `scripts/smoke-test-3rdparty-deb.sh` passed with eqmod included — 60
+  driver binaries where there were 56, `indi_azgti_telescope` executing in
+  the per-vendor loop. `ubuntuastro` restored to its exact baseline, package
+  set diffed rather than counted. Full detail in `DEBIAN.md`, "`eqmod` added
+  — built and verified".
+
+  **The Fedora side is done too, 2026-09-08.** Built clean through `mock` on
+  the first attempt (44s, ten subpackages), `libnova-devel`/`gsl-devel`
+  confirmed present in the base `fedora` repo — the one dependency question
+  that had been open — and `scripts/smoke-test-3rdparty.sh` passed with eqmod
+  included, 60 driver binaries where there were 56. Coexistence verified
+  against Fedora 44's own `libindi-libs` at the identical SONAME;
+  `fedoraastro` restored to its exact 2153-package baseline. Both packagings
+  independently reported the same 63 catalogue entries, which is the
+  cross-check that they strip the dangling AHP GT entry identically. Full
+  detail in `FEDORA.md`, "`eqmod` added — built and verified".
+
+  **All four upgrade-path harnesses pass, 2026-09-08**, run against genuine
+  `Release: 2` / `-2` scratch builds of *both* `-libs` and `-drivers` on both
+  distros (built via `scripts/bump-3rdparty-version.sh v2.2.4.1 2` in an
+  uncommitted scratch copy of the repo, which rewrote all 18 Debian pins). Both
+  `-drivers` harnesses now confirm every one of the ten driver packages
+  resolves and runs after the upgrade, eqmod included, not just
+  `indi_apogee_ccd`. **Three real defects in the harnesses themselves were
+  found by running them** — see `LESSONS_LEARNED.md` #25 and the note below.
+
+  **What is left for eqmod:**
+  1. `-drivers` needs a `Release: 2` / `-2` revision before it can ship, the
+     upstream tag being unchanged while its contents have grown. Do not
+     hand-edit it — the bump scripts own `Release:`, and the repackage path's
+     `-N` suffix has never actually run in a runner (see the correction in
+     the release-automation section below).
+  2. Nothing else. Build, install, coexistence, smoke test and upgrade path
+     are all verified on both distros.
+
+  **Three harness defects found by running them, all now fixed** — the tests
+  were wrong, the packaging was not, which is this project's usual ratio:
+  - Both **Debian** harnesses hardcoded an eight-vendor list and had silently
+    not covered `fishcamp` since 2026-08-27, nor could they express eqmod at
+    all (a driver with no `-libs` counterpart). They now derive the list from
+    the `.deb`s present and abort if it comes back empty. Their RPM twins glob
+    and were never affected. `LESSONS_LEARNED.md` #25.
+  - Both **`-drivers`** harnesses checked only `indi_apogee_ccd` after the
+    upgrade — the same single-representative flaw that let #22's 45 broken
+    binaries through. Fixed then in the smoke tests only; fixed here now.
+  - `scripts/test-upgrade-path-drivers.sh` and
+    `scripts/test-upgrade-path-3rdparty.sh` both defaulted `CORE_DIR` to
+    `$HOME/mock-result-pcfix`, which under `sudo` is `/root` — #4 again, in
+    two scripts that had never been run under `sudo` with the default.
+
+  **`mock`'s `cleanup_on_success=True` wipes `--install`ed RPMs from the
+  chroot after a *successful* build**, not just a failed one. Building `-libs`
+  at `-2` and then `-drivers` against it needs core's `-devel` reinstalled in
+  between, or the `-drivers` build fails at `No match for argument:
+  indi-stable-core-devel`. `FEDORA.md` already documented the
+  `cleanup_on_failure` half of this; this is its success-path twin.
+- **Widening past eqmod: the ~40 remaining non-blob drivers.** Still wanted,
+  deliberately sequenced after eqmod. `DESIGN.md`'s dependency table was
+  re-derived mechanically 2026-09-08, corrected again 2026-09-09, and has been
+  wrong twice — build any batch from the table as it stands now, not from
+  memory. `qhy` and `atik-efw` specifically need their licence relationship to
+  the existing "bundle by licence tier" decision checked before either is
+  included, not assumed clear by omission from the blob-driver list.
+
+  **Slice 2 is built and verified on both distros, 2026-09-09:
+  `armadillo-platypus` and `maxdomeii`.** Twelve `-drivers` packages now, 67
+  driver binaries where there were 60. Chosen small, and for the mechanisms
+  rather than the count: first six-binary subpackage, first udev rule in this
+  source package, first catalogue whose filename matches neither its directory
+  nor any binary in it (`indi_lunatico.xml`), first uninstalled upstream test
+  target. Both LGPL-2.1-or-later, read per file. Build, install,
+  runtime-only smoke test and coexistence all pass on both distros; both boxes
+  restored to exact baseline. Detail in `FEDORA.md` and `DEBIAN.md`.
+
+  **Two real defects found, both by building rather than by reading:**
+  1. **The udev rule installed itself un-namespaced**, to the exact filename a
+     distribution package for the same hardware owns. Five driver directories
+     use `RULES_INSTALL_DIR` set without `CACHE`, which no `-D` can override,
+     so the `-libs` redirect approach silently does nothing. Fixed by
+     re-homing on destination in both packagings, with an assertion that
+     nothing is left at an upstream filename.
+  2. **`INDI_DATA_DIR` was resolved from the build host.** On `ubuntuastro`,
+     where the distro's `libindi-data` owns `/usr/share/indi`, every catalogue
+     except `eqmod`'s installed outside the private prefix. Fedora never
+     showed it — a `mock` chroot has no `libindi-data` to find. Both
+     packagings now pin it. The build failed later and elsewhere, at
+     `dh_install` complaining about touptek, which pointed nowhere near the
+     cause.
+
+  **Slice 3 done, 2026-09-09: `aok`, `avalon`, `celestronaux`.** Fifteen
+  `-drivers` packages, 70 driver binaries. No new build dependency —
+  `libnova` and `GSL` have been `BuildRequires` here since `eqmod`. Built,
+  smoke-tested runtime-only and coexistence-verified on both distros, both
+  packagings independently reporting 70 binaries and 86 catalogue entries;
+  both boxes back at baseline. **No defects.** First slice in this line of
+  work to find nothing, which is what "repetition of a proven shape" is
+  supposed to look like — the udev and `INDI_DATA_DIR` fixes from slice 2
+  carried these three with no new work.
+
+  These three were chosen because they are the only members of the Nova-only
+  group whose licence is unambiguous. The licence survey that picked them is
+  the real output of this slice, and it blocks most of the rest.
+
+  **Slice 4 done, 2026-09-09: `nexdome`, `talon6`, `ocs`, `starbook-ten`.**
+  Nineteen `-drivers` packages, 74 driver binaries. Unblocked by Will's
+  decision on what licence text an LGPL-2.0-only driver should ship — see
+  `DESIGN.md`, "Decided: ship the exact LGPL-2.0 text". All four carry their own
+  `License: LGPL-2.0-only`; `starbook-ten` is `LGPL-2.0-only AND MIT`,
+  because it compiles in cpp-httplib. `ocs`'s own bundled `LICENSE.txt` is
+  deliberately not shipped: it is the GPL-2 text and contradicts every
+  source header in its directory. No defects. Both packagings independently
+  report 74 binaries and 90 catalogue entries; both boxes back at baseline.
+
+  **Slice 5 done, 2026-09-09: `aagcloudwatcher-ng`, `nightscape`,
+  `openogma`, `orion-ssg3`, `atik-efw`.** Twenty-four `-drivers` packages, 79
+  driver binaries. The udev rule count went 1 → 4 and the exact-count
+  assertion in both packagings moved with it. Both packagings independently
+  report 79 binaries and 96 catalogue entries; both boxes at exact baseline,
+  `ubuntuastro` diffed by package NAME and identical, not merely 1839 again.
+
+  Licence outcomes, all read per file: `aagcloudwatcher-ng` is
+  GPL-3.0-or-later with a matching bundled GPL-3 text. `nightscape` has no
+  source header anywhere and its bundled `COPYING.LIB` is the LGPL-2.0 text,
+  so it is the one driver here whose shipped text exactly matches its tag.
+  `openogma` is **AGPL-3.0-only**, the only AGPL package in this project.
+  `orion-ssg3` bundles a GPL-3 `LICENSE` contradicting its own
+  LGPL-2.1-or-later headers, so that file is not shipped. `atik-efw` has **no
+  relationship to the Atik vendor SDK** — checked directly, its CMakeLists
+  asks only for INDI and Threads.
+
+  **`nightscape` needed a new build dependency nobody had found, and it took
+  a build failure.** `FIND_PACKAGE(FTDI1 REQUIRED)` is upper case, and the
+  survey regex that produced `DESIGN.md`'s dependency table was
+  case-sensitive, so two passes both reported nightscape as needing nothing.
+  It is the only non-obsolete driver affected. `libftdi-devel` /
+  `libftdi1-dev` added to both packagings; both dependency generators pick up
+  the runtime `libftdi1.so.2` on their own.
+
+### Closed: the LGPL-2.0 licence text, re-decided on correct facts
+
+`nexdome`, `talon6`, `ocs` and `starbook-ten` now ship the **exact LGPL-2.0
+text**, `indi-inovaplx/COPYING.LIB` on the RPM side and a
+`/usr/share/common-licenses/LGPL-2` reference on the Debian side. Verified by
+extracting the licence file from each built RPM and reading its version line,
+not from the `%license` line.
+
+They briefly shipped the LGPL-2.1, because Will was told no LGPL-2.0 text
+existed in the tree. Seven directories bundle it, byte-identical, and this
+package was already shipping one of them with its `inovasdk` subpackage. The
+error and its lesson are recorded in `DESIGN.md` where the decision lives.
+
+  **Slice 7 done, 2026-09-09: `beefocus`, and its licence was not what the
+  file count suggested.** Thirty `-drivers` packages, 86 driver binaries.
+  The concern that deferred it — 24 of 29 files carrying no licence header,
+  three of them compiled in — dissolved on a proper read: `firmware/` ships
+  **its own full LGPL-2.1 text as `firmware/LICENSE`**, missed earlier
+  because the licence-file check only looked at each driver's top level. So
+  the headerless firmware sources are governed by their own directory's
+  licence, not inherited by inference.
+
+  `beefocus` is genuinely two licences and is the only subpackage here
+  shipping **two** licence texts: `driver/` is LGPL-2.0-only (five of six
+  files grant "version 2" with no "or later") and `firmware/` is
+  LGPL-2.1-only. Both texts come from the tarball, neither is guessed at.
+  `unit_tests/` is gated behind `INDI_BUILD_UNITTESTS` and never built.
+
+  **Slice 6 done, 2026-09-09: the GPL-2.0-or-later group** —
+  `bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine
+  `-drivers` packages, 85 driver binaries. No new build dependency, no udev
+  rules, no defects. Both packagings independently report 85 binaries and
+  102 catalogue entries; both boxes identical to baseline by package name.
+
+  Unblocked by the same sibling-directory answer the LGPL-2.0 group got.
+  All five ship `indi-starbook-ten/COPYING`, and **which GPL-2 file matters**:
+  the tarball has two, and `indi-ocs/LICENSE.txt` is an 86-line abridgement,
+  not the licence. `indi-starbook-ten/COPYING` is the full 339 lines. They
+  are indistinguishable from their first two lines; tell them apart by line
+  count or sha256.
+
+  Two carry a second licence: `gpsnmea` bundles minmea under the **WTFPL**
+  (SPDX `WTFPL`, accepted by both distros, text in `debian/copyright` since
+  the tarball has none), and `astarbox` is genuinely mixed — its own sources
+  GPL-2.0-or-later, its bundled PCA9685 PWM driver LGPL-2.1-or-later.
+  `astarbox`'s `COPYING.LGPL` is misnamed and holds GPL-3, so it is not
+  shipped.
+
+### Closed: the RPM harnesses now restore, and all four ran green
+
+`scripts/test-snapshot-a-depsolve.sh`, `scripts/test-snapshot-b-coexist.sh`,
+`scripts/test-upgrade-path.sh` and
+`scripts/test-pyindi-client-coexist-upgrade.sh` had **no teardown and no
+baseline check**, and none said so. All four now snapshot at the start and
+restore by diffing, via `scripts/lib-baseline.sh`.
+
+**It is a library, not four pasted copies**, deliberately: four call sites at
+once is precisely how `LESSONS_LEARNED.md` #25 and #27 happen, and the Debian
+harnesses each carrying their own inline version is why the coexistence one
+still had an eight-vendor literal a day after its two siblings were fixed.
+
+It does one thing the Debian pattern never needed: **it puts back what the run
+removed.** `test-snapshot-a-depsolve.sh` removes `kstars` and `libindi` as
+part of the test, and a restore that only removes what was added is not a
+restore. On the re-run it reinstalled both, which is the exact failure that
+exposed all of this.
+
+**The library was tested before being trusted**, by planting both failure
+shapes at once — install a package the baseline lacks, remove a leaf package
+it has — and requiring the restore to undo both. The first attempt planted
+`tree`, which was already installed, so it proved nothing; the second used
+`sl` and `tree` and exercised both paths for real.
+
+That test also found a bug in the drift detector: `join` on the package name
+cross-products the six names a Fedora box installs twice (`kernel`,
+`kernel-core`, `kernel-modules`, `kernel-modules-core`,
+`kernel-modules-extra`, `gpg-pubkey`) and invented twelve
+`6.19.10 -> 7.1.9` and `7.1.9 -> 6.19.10` upgrades on a run that changed
+nothing. Now compared only for names installed exactly once on both sides.
+
+All four re-ran green with `fedoraastro` **identical to its captured name
+baseline**, not merely back to the same count.
+
+### Genuinely open, not just untested — continued
+
+**Batch 1 is finished except for two drivers, and neither is packaging
+work.** 30 of the 32 non-blob drivers originally scoped are built and
+verified on both distros — 86 driver binaries, 30 `-drivers` packages.
+
+- **`dsi` — decided 2026-09-09, not shipping.** Will researched the Meade
+  firmware situation independently and found it a hard no on Linux. The
+  driver bundles `meade-deepskyimager.hex`, Meade's proprietary EZUSB FX2
+  device firmware, with no licence statement anywhere in the directory or
+  the README — the same "no COPYING" situation that excluded QSI and QHY.
+  Upstream's `INDI_INSTALL_FIRMWARE=OFF` would let the driver ship without
+  the blob, but the camera cannot enumerate as a DSI until firmware is
+  loaded, so that ships something unusable. Reopen only if the firmware's
+  terms are established with Meade. (Its `FIRMWARE_INSTALL_DIR` is also a
+  plain `set()` to `/usr/lib/firmware`, unredirectable, the same class as
+  `RULES_INSTALL_DIR` — relevant only if it is ever revisited.)
+- **`rolloffino` — nothing to reason from.** Not one of its files states any
+  grant, and it ships no licence file. Unlike the headerless files elsewhere
+  here, there is no grant anywhere in the directory for them to inherit.
+  Needs upstream contact, not analysis.
 - **The License: tag's precision is a defensible aggregate, not a full
   per-file audit** — read in `indi-stable-3rdparty-libs.spec`'s own header
   comment for exactly which licences were read in full text versus inferred,
@@ -761,23 +1132,42 @@ Release tags: release 1 keeps the plain name so existing tags stay valid; a
 repackage gets an explicit `-N` suffix, without which `gh release create`
 fails on the already-existing tag.
 
-**Verified end to end on 3rdparty, 2026-09-04.** All 8 jobs passed:
-`check` resolved `2.2.4.1-1 -> 2.2.4.1-2`, both specs built as `-2` (they
-must move together, and `-drivers` building at all proves they did), the 18
-Debian pins rewrote to `(= 2.2.4.1-2)` in CI, and the release published as
-`indi-stable-3rdparty-v2.2.4.1-2` — the `-N` suffix avoiding the collision
-with the existing `-v2.2.4.1` tag. Confirmed against the published
-artifacts: RPM NVR `2.2.4.1-2.fc44`, deb `2.2.4.1-2`, the runtime-symlink
-fix still present, and the drivers deb depending on
-`indi-stable-3rdparty-libs-touptek (= 2.2.4.1-2)` rather than `-1`.
-`versions.json` correctly did NOT move, a repackage being a rebuild rather
-than a new upstream version.
+**NOT verified end to end — see the correction below.** This paragraph
+previously claimed a 2026-09-04 run in which all 8 jobs passed, both specs
+built as `-2`, the 18 Debian pins rewrote to `(= 2.2.4.1-2)` and a release
+published as `indi-stable-3rdparty-v2.2.4.1-2`. No such release, tag or
+`Release: 2` spec state exists anywhere, and the claim was checked and
+withdrawn on 2026-09-08. What is genuinely verified is the bump-script half:
+the scripts rewrite `Release:` and the Debian revision together, refuse to
+move `Release:` backward, and were exercised locally. What is **not** verified
+is any of that running inside a runner and producing a `-N`-suffixed release.
 
 That run also surfaced one cosmetic defect, fixed in `0e5d28d`: the promote
 commit subject omitted the release, so the repackage commit was
-byte-identical to the original promotion's. **`3rdparty` therefore now sits
-at `Release: 2` with a published `-2` release that is functionally identical
-to `-1`** — the cost of proving the path, agreed in advance.
+byte-identical to the original promotion's.
+
+**Correction, 2026-09-08: the `-2` release described above does not exist,
+and `3rdparty` is at `Release: 1`.** This section previously claimed
+`3rdparty` "now sits at `Release: 2` with a published `-2` release",
+contradicting this same file's own table entry above it, which says the
+release published "at a clean `Release: 1`". Checked directly rather than
+choosing between the two claims: `git ls-remote --tags` has exactly one
+`3rdparty` tag (`indi-stable-3rdparty-v2.2.4.1`, no `-2` suffix),
+`gh release list` has exactly one `3rdparty` release, and `Release:` reads
+`1%{?dist}` in the spec on both `development` and `origin/main`. The table
+entry was right; this section was wrong.
+
+**What actually happened, and it was never recorded:** the scheduled run on
+2026-09-05 (`33969183934`) built all four packages successfully over ten
+minutes and then **failed at `Create GitHub Release`** — consistent with
+`gh release create` refusing the already-existing
+`indi-stable-3rdparty-v2.2.4.1` tag, the same failure mode this file already
+documents for core. Its `Commit to development` step never ran, which is
+exactly why `Release:` stayed at 1 and no `-2` artifact exists anywhere. The
+repackage path's `-N` suffix logic is therefore **not** verified end to end;
+treat the claim above that it was as covering the bump scripts only.
+Subsequent scheduled runs (09-06, 09-07, 09-08) all complete in ~13s with
+`check` correctly finding nothing, so nothing is failing now.
 
 ## Debian / Ubuntu — remaining
 
@@ -787,8 +1177,19 @@ of the tests that mattered", are scripted, were run on `ubuntuastro` on
 watched firing.
 
 For `3rdparty/`: nothing. Coexistence is scripted,
-`scripts/test-3rdparty-coexist-deb.sh` — verified 2026-08-26, see the
-`indi-stable-3rdparty-drivers` — Debian side section above. The upgrade path
+`scripts/test-3rdparty-coexist-deb.sh` — **re-run green 2026-09-09 across
+all 30 driver packages**, 48 3rdparty packages in one transaction, with all
+three of its controls firing: the SONAME collision shown real (same soname,
+different sha256), `LD_LIBRARY_PATH` shown able to override `DT_RUNPATH` so
+the clean result in the step before it is a real outcome and not a blind
+check, and the restore diff shown able to report a planted difference.
+`ubuntuastro` back to baseline, diffed by package name.
+
+Its first run that day aborted, and correctly: the vendor list had just been
+made derived, and a **literal `24` further down** — 8 vendors × 2 plus 8
+drivers — no longer matched the 48 actually installed. Both the list and the
+count are derived now. Originally verified 2026-08-26, when it covered 8 of
+what were then 8 driver packages. The upgrade path
 is also scripted, `scripts/test-upgrade-path-3rdparty-deb.sh` and
 `scripts/test-upgrade-path-drivers-deb.sh` — both verified 2026-08-26.
 

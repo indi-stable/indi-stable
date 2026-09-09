@@ -51,7 +51,7 @@ From a bare OS:
 ```bash
 sudo dnf install -y rpm-build rpmdevtools mock
 rpmdev-setuptree
-cd ~/src/packaging          # the repo clone -- NOT ~/src/indi-stable
+cd ~/src/indi-stable        # the repo clone -- NOT ~/src/packaging, which is retired
 
 # Fetch the upstream tarball named in the spec's Source0
 spectool -g -R core/rpm/indi-stable-core.spec
@@ -394,7 +394,7 @@ payload** and needs neither root nor an install:
 ```bash
 mkdir /tmp/x && cd /tmp/x
 rpm2cpio ~/mock-result-pcfix/indi-stable-core-2*.x86_64.rpm | cpio -idm
-cd ~/src/packaging
+cd ~/src/indi-stable
 bash scripts/test-catalogue-rewrite.sh \
      /tmp/x/opt/indi-stable/share/indi/drivers.xml /tmp/x/opt/indi-stable/bin
 ```
@@ -505,9 +505,11 @@ core's own upgrade test (`STATUS.md`, machine state).
 
 ## Testing `indi-stable-3rdparty-drivers`
 
-Scoped to the same 8 vendors `-libs` bundles — see that spec's own file
-header and `STATUS.md`, "3rdparty — remaining" for why the other ~50
-non-blob drivers upstream ships are deliberately out of scope here.
+Scoped to the 9 vendors `-libs` bundles plus **21 non-blob drivers**, added
+across seven slices between 2026-09-08 and 2026-09-09 — 30 subpackages, 86
+driver binaries. See that spec's own file header and `STATUS.md` for what
+is still out of scope and why (only `dsi` and `rolloffino` remain, both on
+licence grounds rather than packaging ones).
 
 Same `mock --install` pattern as `-libs`, extended: this SRPM's
 `BuildRequires` need core's `-devel` **and** every one of `-libs`'s runtime
@@ -541,6 +543,227 @@ real build failures found and how each was fixed. Read it before assuming a
 clean `%build` on the next upstream tag bump means nothing changed; at least
 one of those (the 47-entry `WITH_<X>=OFF` list) is a static list that a
 future indi-3rdparty release could silently grow past.
+
+### `eqmod` added — built and verified 2026-09-08
+
+**`libnova-devel` 0.16.0 and `gsl-devel` 2.8 are both in the base `fedora`
+repo**, checked with `dnf info` on `fedoraastro` itself. That closes the one
+dependency question `STATUS.md` had flagged as unconfirmed, and it mattered:
+`WITH_QSI` had already failed on this box for exactly this class of missing
+`-devel`.
+
+**Built clean through `mock` on the first attempt, 44 seconds**, producing
+ten subpackages where there were nine, using the `--init` → `--install` →
+`rpmbuild -bs` → `--no-clean` sequence above with `CORE=~/mock-result-pcfix`
+and **`LIBS=~/mock-result-symlinkfix`** — not `~/mock-result-3rdparty`, which
+predates the `LESSONS_LEARNED.md` #22 runtime-symlink fix. The two are the
+same size (18 RPMs) and indistinguishable by name; tell them apart by asking
+which one's *runtime* touptek RPM owns the bare `libtoupcam.so`
+(`rpm -qlp ... | grep 'libtoupcam\.so$'`), not by date or directory name.
+Results in `~/mock-result-drivers-eqmod`.
+
+Verified against the built RPMs:
+
+- **`License:` on the eqmod subpackage alone reads
+  `GPL-3.0-or-later AND LGPL-2.0-only`** while the other nine still read the
+  LGPL aggregate — the subpackage override behaving as intended on a real
+  build, not just under `rpmspec`.
+- **`Requires:` is `indi-stable-core-libs(x86-64)` (unversioned, the
+  independent-version-axis rule) plus `libnova-0.16.so.0` and ordinary
+  libc/libgcc/libstdc++.** No leaked `libindi*` SONAME, so
+  `%global __requires_exclude` covers eqmod without needing a new pattern,
+  and no vendor library at all. `Provides:` is package-name-only.
+- **`libgsl` is absent and that is correct** — `--as-needed` dropped a
+  library the driver links but calls no symbol from. `gsl-devel` stays a real
+  `BuildRequires` because `find_package(GSL REQUIRED)` fails configure
+  without it.
+- **The catalogue rewrite reported 63 entries, up from 56** — the same number
+  the Debian build reported, which is the cross-check that both packagings
+  strip the dangling AHP GT entry identically. `grep -c ahpgt` on the shipped
+  `indi_eqmod.xml` is 0 and all seven surviving entries carry absolute paths.
+- `RUNPATH` is `/opt/indi-stable/lib`; nothing lands under `/usr/bin`.
+
+**`scripts/smoke-test-3rdparty.sh` passed with eqmod included**, needing no
+edit — 60 driver binaries checked where there were 56, and
+`indi_azgti_telescope` executed in the per-vendor loop. Coexistence verified
+against Fedora 44's own `libindi-libs`, which ships a `libindidriver.so.2` at
+the identical SONAME: all four eqmod binaries still resolve into
+`/opt/indi-stable/lib`, `rpm -V libindi libindi-libs kstars` clean.
+`fedoraastro` restored to its exact 2153-package baseline afterward, diffed
+rather than counted, `/opt/indi-stable` completely absent and only the
+distribution's own `99-indi_auxiliary.rules` left behind.
+
+**That build predated `fedoraastro` having a clone of this repository**, so
+it was done by copying the spec to `~/eqmod-build/` and checking its
+`sha256sum` matched the working copy on `ubuntuastro`. That workaround is no
+longer needed and should not be repeated; build from the clone. `STATUS.md`
+carries the current state of both machines.
+
+### `beefocus` added — verified 2026-09-09
+
+Thirty subpackages, 86 driver binaries; results in
+`~/mock-result-drivers-slice7`. The last driver of the non-blob batch.
+
+**The only subpackage here with two `%license` lines.** It links two source
+trees under different licences — `driver/` is LGPL-2.0-only and `firmware/`
+LGPL-2.1-only — so it ships both texts, and both come from the tarball:
+
+```bash
+rpm -qlp ~/mock-result-drivers-slice7/indi-stable-3rdparty-drivers-beefocus-2*.rpm \
+  | grep licenses
+```
+
+should list `COPYING.LIB` (481 lines, Version 2 June 1991) and `LICENSE`
+(504 lines, Version 2.1 February 1999). Checking the line counts matters
+here for the same reason it does for the two GPL-2 texts: the version line
+is one line deep and easy to skim past.
+
+### The GPL-2.0-or-later group added — verified 2026-09-09
+
+`bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine
+subpackages, 85 driver binaries; results in `~/mock-result-drivers-slice6`.
+No defects, no new build dependency, and the udev rule count stays at four.
+
+**Which GPL-2 file you point `%license` at matters, and the two in this
+tarball are not interchangeable.** `indi-ocs/LICENSE.txt` is an 86-line
+abridgement; `indi-starbook-ten/COPYING` is the full 339-line licence. Their
+first two lines are identical, so tell them apart by line count or sha256,
+never by reading the top of the file:
+
+```bash
+wc -l indi-ocs/LICENSE.txt indi-starbook-ten/COPYING
+```
+
+All five ship the full text. Confirm it landed by extracting from the built
+RPM and checking the line count, not just the version line.
+
+### The remaining no-dependency drivers added — verified 2026-09-09
+
+`aagcloudwatcher-ng`, `nightscape`, `openogma`, `orion-ssg3`, `atik-efw`.
+Twenty-four subpackages, 79 driver binaries; results in
+`~/mock-result-drivers-slice5`.
+
+**The first build failed at configure, and the cause was a defect in our own
+dependency survey rather than in the packaging:**
+
+```
+CMake Error at cmake_modules/FindFTDI1.cmake:50 (message):
+  FTDI not found.  Please install libftdi1-dev
+Call Stack (most recent call first):
+  indi-nightscape/CMakeLists.txt:15 (FIND_PACKAGE)
+```
+
+`indi-nightscape` writes `FIND_PACKAGE(FTDI1 REQUIRED)` in upper case, and
+the extraction behind `DESIGN.md`'s dependency table matched only lower-case
+`find_package`. Two passes had reported nightscape as needing nothing.
+`BuildRequires: libftdi-devel` added — **note the Fedora name has no `1`**,
+unlike Debian's `libftdi1-dev`.
+
+The udev rule count is now **four**, from three different upstream
+mechanisms, and the `%install` assertion is an exact count rather than "at
+least one" precisely so a fifth fails here with an explanation.
+
+Verified against the built RPMs: 24 subpackages, all catalogues under
+`/opt`, nothing under `/usr/bin`, all four rules present only under their
+re-homed names, and `aagcloudwatcher_test_ng` in no package. Cross-checked
+with the Debian build at **79 driver binaries and 96 catalogue entries**.
+
+### The LGPL-2.0-only group added — verified 2026-09-09
+
+`nexdome`, `talon6`, `ocs` and `starbook-ten`. Nineteen subpackages, 74
+driver binaries; results in `~/mock-result-drivers-slice4`. No defects.
+
+**Check the `License:` tags with `rpmspec`, not by reading the spec.** These
+four are the first here to carry a tag that is neither the top-level
+aggregate nor `eqmod`'s, so this is where a propagation mistake would show:
+
+```bash
+rpmspec -q --qf '%{name}: %{license}\n' core/rpm/indi-stable-3rdparty-drivers.spec
+```
+
+All four read `LGPL-2.0-only`, `starbook-ten` reading
+`LGPL-2.0-only AND MIT`, while the other fifteen still read the aggregate.
+
+**And read the licence text out of the built RPM, not the spec line.** These
+four ship `indi-inovaplx/COPYING.LIB` — a file from a sibling driver's
+directory, because none of their own bundles the LGPL-2.0 (`DESIGN.md`). A
+`%license` line pointing somewhere unexpected is exactly the kind of thing to
+confirm by looking:
+
+```bash
+rpm2cpio ~/mock-result-drivers-slice4/indi-stable-3rdparty-drivers-nexdome-2*.rpm \
+  | cpio -idm --quiet
+head -2 usr/share/licenses/indi-stable-3rdparty-drivers-nexdome/LICENSE
+```
+
+All four should read "Version 2, June 1991". Neither `ocs`'s own
+`LICENSE.txt` (GPL-2, contradicting its headers) nor `starbook-ten`'s own
+`COPYING.LESSER` (the 2.1) is shipped.
+
+### `aok`, `avalon` and `celestronaux` added — verified 2026-09-09
+
+Third slice, fifteen subpackages, 70 driver binaries. Built through `mock`
+with the same sequence as the slice before it; results in
+`~/mock-result-drivers-slice3`. **No defects** — the first slice here to find
+none, which is what the eqmod-first decision meant by "repetition of a proven
+shape". The udev and `INDI_DATA_DIR` fixes from the previous slice carried
+these three with no new work.
+
+Verified against the built RPMs: 15 subpackages, all catalogues under `/opt`,
+nothing under `/usr/bin`, and all three new packages carrying only
+`indi-stable-core-libs`. Cross-checked with the Debian build, both reporting
+**70 driver binaries and 86 catalogue entries**.
+
+Worth knowing before adding any driver here: **the directory, the build
+option, the binary and the catalogue can all have different names.**
+`indi-aok` is built by `WITH_SKYWALKER`, produces `indi_lx200aok`, and ships
+`indi_aok.xml`. Nothing derives from anything else, so `%files` and the
+`-DWITH_<X>=OFF` list have to be written from the tree, not from the package
+name.
+
+### `armadillo-platypus` and `maxdomeii` added — built and verified 2026-09-09
+
+Second non-blob slice, twelve subpackages where there were ten. Built through
+`mock` with the usual `--init` → `--install` → `rpmbuild -bs` → `--no-clean`
+sequence, `CORE=~/mock-result-pcfix` and `LIBS=~/mock-result-symlinkfix`.
+Results in `~/mock-result-drivers-slice2`.
+
+**The first build failed, on this spec's own new assertion, and the finding
+was real.** The udev rule had installed itself to
+`/usr/lib/udev/rules.d/99-armadilloplatypus.rules` — upstream's own
+un-namespaced filename — while the private scratch directory the `-D`
+redirect points at was empty. Cause and fix are in `DESIGN.md`, "Upstream
+build-system facts": five driver directories use `RULES_INSTALL_DIR`, set
+without `CACHE`, which no `-D` can override.
+
+**A second defect surfaced only on the Debian side and is fixed in both
+packagings** — `INDI_DATA_DIR` was resolved from the build host. Fedora never
+showed it, because a `mock` chroot has no distribution `libindi-data` for the
+probe to find. Both now pin it. See `DEBIAN.md` for the full finding; the
+lesson for this file is that a `mock` chroot's cleanliness can *hide* a
+host-dependent path rather than expose it.
+
+Verified against the built RPMs:
+
+- **12 subpackages**, and `rpmspec -q --qf '%{license}'` over all of them
+  shows the two new ones inheriting the LGPL aggregate while `eqmod` alone
+  still carries `GPL-3.0-or-later` — the propagation trap that caught the
+  first eqmod attempt has not reopened.
+- **All 26 catalogues install under `/opt`**, none to `/usr/share/indi`.
+- **67 driver binaries**, up from 60, all seven new ones carrying
+  `RUNPATH=/opt/indi-stable/lib`.
+- Nothing under `/usr/bin` from any of the twelve.
+- The rule ships only as
+  `99-indi-stable-3rdparty-armadilloplatypus.rules`.
+- `Requires` is `indi-stable-core-libs` alone on both new packages, with no
+  leaked vendor or `libindi*` SONAMEs; `Provides` is package-name only.
+- `test-maxdomeii` is in no package. It is an `add_executable()` the default
+  target compiles and nothing installs, so unlike the asi/playerone
+  diagnostic tools it never reaches the buildroot and needs no `rm`.
+
+**Cross-checked against the Debian build:** both packagings independently
+report **67 driver binaries and 70 catalogue `<driver>` entries**, which is
+the same agreement check `eqmod` used at 63.
 
 The upgrade path is scripted too, and — unlike `-libs`'s own upgrade test —
 run TOGETHER with `-libs`'s upgrade, not standalone, because `-drivers`

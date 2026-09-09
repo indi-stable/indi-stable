@@ -9,7 +9,7 @@ Comment:
  project. Problems with these packages should be reported to indi-stable,
  not to INDI upstream.
  .
- Aggregate across 9 driver source trees, confirmed by reading actual SOURCE
+ Aggregate across 10 driver source trees, confirmed by reading actual SOURCE
  FILE licence headers (not the bundled COPYING file alone -- two of them,
  apogee's and sbig's, are stale "Library GPL v2" text left over from before
  upstream's own 2.1 relicense, contradicted by every .cpp header in both
@@ -40,6 +40,292 @@ License: LGPL-2.0-only
  directories above, no source file here carries a licence header of its
  own, so there is no "or later" grant to upgrade the tag with. The
  conservative, defensible reading is the plain v2 text as written.
+
+Files: indi-beefocus/driver/*
+Copyright: 2018 Andrew Brownbill
+ Based on a driver Copyright 2012 Jasem Mutlaq
+License: LGPL-2.0-only
+ Five of the six files here grant "the GNU Library General Public License
+ version 2 as published by the Free Software Foundation" with no "or later"
+ clause. beesimfirmware.cpp carries no header while its own beesimfirmware.h
+ does, and states no contradicting grant.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.
+
+Files: indi-beefocus/firmware/*
+Copyright: 2018 Andrew Brownbill
+License: LGPL-2.1-only
+ No file in this directory carries a licence header. The directory ships
+ its own full LGPL-2.1 text as firmware/LICENSE, which is the only
+ statement of terms for it and therefore governs. Read as -only rather than
+ -or-later: a bundled licence text is not itself a grant of later versions.
+ .
+ This is not a licence on shipped-but-unused source. command_parser.cpp,
+ focuser_state.cpp and hardware_interface.cpp are all named in
+ indi-beefocus/CMakeLists.txt's add_executable and are compiled into
+ indi_beefocus.
+ .
+ indi-beefocus/unit_tests/ is NOT built -- CMakeLists.txt gates it behind
+ INDI_BUILD_UNITTESTS, which this project never sets.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
+Files: indi-bresserexos2/* indi-rtklib/* indi-shelyak/*
+Copyright: The Bresser EXOS-2, RTKLIB and Shelyak driver authors
+ and the INDI Library contributors
+License: GPL-2.0-or-later
+ Read per file (2026-09-09): every source file in all three directories
+ grants the PLAIN GPL, "either version 2 of the License, or (at your
+ option) any later version" -- a different licence family from the LGPL
+ most of this source package carries.
+ .
+ indi-bresserexos2/IndiSerialWrapper.cpp carries no licence header and
+ states no contradicting grant, so the directory governs.
+ .
+ indi-shelyak deserves a note: all four of its files direct the reader to a
+ "COPYING.LIB" and a "LICENSE" that do not exist in the directory, and name
+ the Library GPL in the same breath as granting the plain GPL. The operative
+ grant clause governs; the dangling filenames are vestigial boilerplate.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-2.
+
+Files: indi-gpsnmea/*
+Copyright: The gpsnmea driver authors and the INDI Library contributors
+License: GPL-2.0-or-later
+ Both driver sources grant the plain GPL version 2 or later.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-2.
+
+Files: indi-gpsnmea/minmea.h
+Copyright: 2014 Kosma Moczek <kosma@cloudyourcar.com>
+License: WTFPL
+ minmea, a single-header NMEA 0183 parser, compiled into indi_gpsnmea. Its
+ header refers to a COPYING file that indi-gpsnmea does not contain, so the
+ text is reproduced here.
+ .
+ DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+ Version 2, December 2004
+ .
+ Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>
+ .
+ Everyone is permitted to copy and distribute verbatim or modified copies
+ of this license document, and changing it is allowed as long as the name
+ is changed.
+ .
+ DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+ TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+ .
+ 0. You just DO WHAT THE FUCK YOU WANT TO.
+
+Files: indi-astarbox/*
+Copyright: The AStarBox driver authors and the INDI Library contributors
+License: GPL-2.0-or-later
+ indi-astarbox.cpp and indi-astarbox.h grant the plain GPL, "either version
+ 2 ... or (at your option) any later version". AStarBox.cpp/.h,
+ mcp3421.cpp/.h and StopWatch.h carry no licence header and state no
+ contradicting grant, so the directory governs.
+ .
+ The linked binary is GPL-2.0-or-later as distributed. LGPL-2.1 section 3
+ is what permits combining it with the PCA9685 sources below, the same
+ mechanism indi-eqmod relies on.
+ .
+ Its bundled COPYING.LGPL is NOT shipped: despite the name it holds the
+ GPL-3 text, which matches neither grant in the directory.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-2.
+
+Files: indi-astarbox/PCA9685.cpp indi-astarbox/PCA9685.h
+Copyright: The PCA9685 driver authors
+License: LGPL-2.1-or-later
+ The PWM chip driver bundled into indi_astarbox, granting "version 2.1 ...
+ or (at your option) any later version" where the rest of the directory
+ grants the plain GPL.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
+Files: indi-aagcloudwatcher-ng/*
+Copyright: Lunatico Astronomia and the INDI Library contributors
+License: GPL-3.0-or-later
+ All seven source files grant "either version 3 of the License, or (at your
+ option) any later version" under the plain GPL, and the directory ships the
+ matching GPL-3 text as LICENSE.txt -- one of the few drivers here where the
+ bundled file and the source headers agree.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-3.
+
+Files: indi-nightscape/*
+Copyright: The Celestron Nightscape driver authors and the INDI Library
+ contributors
+License: LGPL-2.0-only
+ No source file in this directory carries a licence header at all. Its
+ bundled COPYING.LIB -- the GNU Library General Public License version 2 --
+ is the only statement of terms, so it governs, and it is shipped as the
+ package's licence text. This is the one driver here whose bundled text is
+ an exact match for its grant.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.
+
+Files: indi-openogma/*
+Copyright: The OpenOGMA driver authors and the INDI Library contributors
+License: AGPL-3.0-only
+ Neither source file carries a licence header, so the bundled LICENSE.txt --
+ the GNU Affero General Public License version 3 -- is the only statement of
+ terms and governs. The Affero clause obliges operators who offer a modified
+ version over a network to provide source to its users; it places no
+ additional condition on redistributing this package.
+ .
+ The full text is shipped with the binary package. Debian's
+ /usr/share/common-licenses does not carry the AGPL.
+
+Files: indi-orion-ssg3/* indi-atik-efw/*
+Copyright: The Orion StarShoot and Atik EFW driver authors
+ and the INDI Library contributors
+License: LGPL-2.1-or-later
+ Read per file: indi-orion-ssg3/orion_ssg3.cpp and indi_orion_ssg3.cpp, and
+ all three files in indi-atik-efw, grant "version 2.1 ... or (at your
+ option) any later version". indi-orion-ssg3/orion_ssg3.h carries no
+ header and states no contradicting grant.
+ .
+ indi-orion-ssg3 bundles a LICENSE which is the GPL-3 text, contradicting
+ every source header in its own directory. It is NOT shipped: a GPL text
+ beside LGPL code overstates the terms in the direction that can mislead a
+ redistributor. The same call indi-ocs's contradictory file gets.
+ .
+ indi-atik-efw has NO relationship to indi-atik or the Atik vendor SDK,
+ which this project excludes on licence grounds -- checked directly rather
+ than inferred from the shared name prefix: its CMakeLists.txt calls
+ find_package for INDI and Threads only.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
+Files: indi-nexdome/* indi-talon6/* indi-ocs/* indi-starbook-ten/*
+Copyright: 2019 Jasem Mutlaq
+ 2017 Rozeware Development Ltd
+ 2014/2023 Jasem Mutlaq, Ed Lee
+ The Vixen Starbook TEN driver authors and the INDI Library contributors
+License: LGPL-2.0-only
+ Read per file across all four directories (2026-09-09), every file
+ accounted for: each grants "the GNU Library General Public License version
+ 2 as published by the Free Software Foundation" with NO "or later" clause.
+ That makes them LGPL-2.0-only, the same conservative reading indi-inovaplx
+ already gets here and for the same reason -- there is no later-version
+ grant to widen the tag with.
+ .
+ Four files in indi-starbook-ten (indi_starbook_ten.cpp/.h,
+ starbook_ten.cpp/.h) carry no licence header at all. They state no
+ contradicting grant, so the rest of the directory governs.
+ .
+ These packages briefly referenced the LGPL-2.1, on a survey claim that
+ indi-3rdparty contained no LGPL-2.0 text anywhere. That claim was wrong:
+ seven directories bundle it as COPYING.LIB (indi-apogee, indi-gphoto,
+ indi-inovaplx, indi-limesdr, indi-nightscape, indi-sbig, indi-sx), all
+ byte-identical, and this source package was already shipping one of them
+ with its inovasdk binary package. Corrected 2026-09-09 to reference the
+ exact licence.
+ .
+ indi-ocs additionally bundles a LICENSE.txt which is the GPL-2 text,
+ contradicting every source header in its directory. That is a real
+ contradiction rather than the staleness indi-apogee and indi-sbig carry, so
+ it is not shipped -- a GPL text beside LGPL code would overstate the terms.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.
+
+Files: indi-starbook-ten/httplib.h
+Copyright: 2020 Yuji Hirose
+License: MIT
+ cpp-httplib, bundled by upstream and genuinely compiled in -- both
+ starbook_ten.h and connectionhttp.h include it -- so it appears in the
+ indi-stable-3rdparty-drivers-starbook-ten binary package's License field
+ as well.
+ .
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the "Software"),
+ to deal in the Software without restriction, including without limitation
+ the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software, and to permit persons to whom the
+ Software is furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ DEALINGS IN THE SOFTWARE.
+
+Files: indi-aok/* indi-avalon/* indi-celestronaux/*
+Copyright: The AOK, Avalon Instruments and Celestron driver authors
+ Jasem Mutlaq and the INDI Library contributors
+License: LGPL-2.1-or-later
+ Read per file, not spot-checked (2026-09-09): every .cpp and .h in all
+ three directories grants "version 2.1 ... or (at your option) any later
+ version", except indi-celestronaux/adaptive_tuner.cpp and its header,
+ which carry no licence header at all. Those two state no contradicting
+ grant, so the rest of the directory governs.
+ .
+ None of the three ships a licence file of its own, so all three rely on
+ indi-3rdparty's top-level LICENSE -- the LGPL-2.1 text, which is correct
+ for them.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
+Files: indi-armadillo-platypus/* indi-maxdomeii/*
+Copyright: 2017 Lunatico Astronomia, Jaime Alemany
+ 2009 Ferran Casarramona
+ Jasem Mutlaq and the INDI Library contributors
+License: LGPL-2.1-or-later
+ Unlike the vendor-driver stanza above, this one is NOT spot-checked: every
+ .cpp and .h file in both directories was read (2026-09-09), and all twelve
+ armadillo-platypus files and all four maxdomeii files carry the identical
+ "version 2.1 of the License, or (at your option) any later version" grant.
+ Neither directory ships a licence file of its own, so both rely on
+ indi-3rdparty's top-level LICENSE, which is the LGPL-2.1 text and therefore
+ the correct one for them.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
+Files: indi-eqmod/*
+Copyright: 2012-2017 Geehalel <geehalel@gmail.com>
+ 2020 Jasem Mutlaq
+License: GPL-3.0-or-later
+ The original EQMod/Skywatcher-protocol driver (eqmod*, skywatcher*, align/,
+ scope-limits/, simulator/) grants "either version 3 of the License, or (at
+ your option) any later version" and ships a full GPLv3 COPYING. Read from
+ every .cpp/.h header in the directory 2026-09-08, not spot-checked -- the
+ only directory in this source package that is not LGPL.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-3.
+
+Files: indi-eqmod/azgtibase.* indi-eqmod/staradventurergtibase.*
+ indi-eqmod/staradventurer2ibase.cpp indi-eqmod/staradventurer2i.h
+Copyright: 2020 Jasem Mutlaq
+License: LGPL-2.0-only
+ The 2020 AZ-GTi and Star Adventurer additions read "GNU Library General
+ Public License version 2 as published by the Free Software Foundation"
+ with no "or later" clause, so the conservative reading is plain v2 -- the
+ same treatment indi-inovaplx gets above, for the same reason. All four
+ built binaries also compile skywatcher.cpp and are therefore
+ GPL-3.0-or-later as distributed; LGPL-2.0 section 3 is what permits that
+ combination.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.
 
 Files: debian/*
 Copyright: 2026 Will Snyder

@@ -80,7 +80,32 @@ DRIVERS_VER=${DRIVERS_VER:-2.2.4.1-1}
 CORE_VER=${CORE_VER:-2.2.4.2-1}
 W=$(mktemp -d /tmp/3rdparty-coexist-deb.XXXXXX)
 
-VENDORS="apogee asi fli playerone inovasdk micam sbig touptek"
+# Derived from the .debs actually present, NOT hardcoded. The list this
+# replaces ("apogee asi fli playerone inovasdk micam sbig touptek") is the
+# same eight-vendor literal LESSONS_LEARNED.md #25 records, and this script
+# is the third copy of it -- the #25 fix on 2026-09-08 corrected the two
+# upgrade harnesses and missed this one. By 2026-09-09 it was installing 8
+# of 30 driver packages and reporting a clean coexistence pass, having never
+# heard of fishcamp or any of the 21 non-blob drivers.
+#
+# Two lists, because they are genuinely different shapes: every -libs vendor
+# has a runtime AND a -dev package, while a non-blob driver like eqmod has no
+# -libs counterpart at all. The old pkg_names() assumed a 1:1 mapping and
+# would have named packages that do not exist.
+list_from() {   # $1 = dir, $2 = package-name prefix, $3 = version
+  ls "$1"/"$2"-*_"$3"_amd64.deb 2>/dev/null \
+    | sed -E "s|.*/$2-(.*)_$3_amd64\.deb|\1|"
+}
+LIBS_VENDORS=$(list_from "$LIBS_DIR" indi-stable-3rdparty-libs "$LIBS_VER" | grep -v -- '-dev$' | LC_ALL=C sort)
+DRIVER_PKGS=$(list_from "$DRIVERS_DIR" indi-stable-3rdparty-drivers "$DRIVERS_VER" | LC_ALL=C sort)
+
+# A list derived from a glob can come back empty, and an empty list makes
+# every loop below a no-op that passes. #1: refuse rather than pass.
+test -n "$LIBS_VENDORS" \
+  || { echo "*** ABORT: no indi-stable-3rdparty-libs-*_${LIBS_VER}_amd64.deb in $LIBS_DIR ***"; exit 1; }
+test -n "$DRIVER_PKGS" \
+  || { echo "*** ABORT: no indi-stable-3rdparty-drivers-*_${DRIVERS_VER}_amd64.deb in $DRIVERS_DIR ***"; exit 1; }
+echo "  ....  derived $(echo "$LIBS_VENDORS" | wc -l) -libs vendors and $(echo "$DRIVER_PKGS" | wc -l) -drivers packages from the .debs present"
 
 OUR_SERVER=/usr/bin/indiserver-stable
 OUR_DRIVER=/opt/indi-stable/bin/indi_apogee_ccd
@@ -99,13 +124,13 @@ snapshot() { dpkg-query -W -f='${Package}\t${Version}\n' | LC_ALL=C sort; }
 
 libs_deb()    { echo "$LIBS_DIR/indi-stable-3rdparty-libs-$1_${LIBS_VER}_amd64.deb"; }
 drivers_deb() { echo "$DRIVERS_DIR/indi-stable-3rdparty-drivers-$1_${DRIVERS_VER}_amd64.deb"; }
-libs_debs()    { for v in $VENDORS; do libs_deb "$v"; libs_deb "$v-dev"; done; }
-drivers_debs() { for v in $VENDORS; do drivers_deb "$v"; done; }
+libs_debs()    { for v in $LIBS_VENDORS; do libs_deb "$v"; libs_deb "$v-dev"; done; }
+drivers_debs() { for v in $DRIVER_PKGS; do drivers_deb "$v"; done; }
 pkg_names() {
-  for v in $VENDORS; do
+  for v in $LIBS_VENDORS; do
     echo "indi-stable-3rdparty-libs-$v"; echo "indi-stable-3rdparty-libs-$v-dev"
-    echo "indi-stable-3rdparty-drivers-$v"
   done
+  for v in $DRIVER_PKGS; do echo "indi-stable-3rdparty-drivers-$v"; done
 }
 
 # Every server started here is recorded so the teardown kills PIDs rather than
@@ -140,7 +165,7 @@ DISTRO_SHA=$(sha256sum "$DISTRO_SERVER" | awk '{print $1}')
 info "baseline: $(wc -l < "$BASELINE") packages; $DISTRO_SERVER sha256 $DISTRO_SHA"
 
 echo
-echo "############ STEP 1: install core + all 8 vendors' libs and drivers ############"
+echo "############ STEP 1: install core, every -libs vendor and every -drivers package ############"
 apt-get install -y \
   "$CORE_DIR/indi-stable-core_${CORE_VER}_amd64.deb" \
   "$CORE_DIR/indi-stable-core-libs_${CORE_VER}_amd64.deb" \
@@ -148,11 +173,18 @@ apt-get install -y \
   $(libs_debs) $(drivers_debs) \
   >"$W/install.log" 2>&1 \
   || { tail -40 "$W/install.log"; die "installing our packages failed"; }
+# Expected count is DERIVED, not written down. It was the literal 24 until
+# 2026-09-09 -- 8 vendors x (runtime + dev) + 8 drivers -- which aborted the
+# run the moment the vendor list stopped being hardcoded, because the real
+# number is now 48. A literal here is the same defect as a literal vendor
+# list, just in numeric form (LESSONS_LEARNED.md #27).
+EXPECTED=$(pkg_names | wc -l)
 INSTALLED=$(dpkg-query -W -f='${Package}\n' $(pkg_names) 2>/dev/null | wc -l)
-test "$INSTALLED" -eq 24 || die "expected 24 3rdparty packages installed, got $INSTALLED"
+test "$INSTALLED" -eq "$EXPECTED" \
+  || die "expected $EXPECTED 3rdparty packages installed, got $INSTALLED"
 test -x "$OUR_DRIVER" || die "$OUR_DRIVER missing after install"
 readlink -e "$OUR_SERVER" >/dev/null || die "$OUR_SERVER does not resolve -- the alternative never registered"
-pass "24 3rdparty packages installed; $OUR_SERVER -> $(readlink -e "$OUR_SERVER")"
+pass "$INSTALLED 3rdparty packages installed; $OUR_SERVER -> $(readlink -e "$OUR_SERVER")"
 
 echo
 echo "############ STEP 2: get a REAL colliding artifact from the archive, without installing it ############"
@@ -188,7 +220,7 @@ for p in $(pkg_names); do
     BAD=1
   fi
 done
-test "$BAD" -eq 0 && pass "none of the 24 3rdparty packages ship anything under /usr/bin or /usr/include"
+test "$BAD" -eq 0 && pass "none of the $EXPECTED 3rdparty packages ship anything under /usr/bin or /usr/include"
 
 echo
 echo "############ STEP 4: distribution core INDI is a clean bystander after 3rdparty installs on top ############"
