@@ -19,7 +19,11 @@ Two rules keep it living rather than growing:
 |---|---|
 | **Fedora `core/`** | **Testing complete.** Built, installed, coexisting (runtime, metadata, `-devel`, and Ekos in *both* the opt-in and bystander cases), upgraded and removed — all verified, and the whole suite re-run green on 2026-08-26. The one item left is release tooling, not a test. |
 | **Debian `core/`** | **Testing complete.** Built, installed, coexisting (runtime, metadata, `-dev`), upgraded and removed — verified in **configuration B**, against a distribution INDI carrying the same SONAME and the same upstream release, and now scripted as four harnesses in `scripts/`. Nothing outstanding is a test. |
-| **`3rdparty/`** | RPM and Debian sides both complete for both source packages, all three verified together (`indi-stable-core`, `-3rdparty-libs`, `-3rdparty-drivers`), on both distros. 9 vendors. **A serious defect was found and fixed 2026-09-04 that all of the earlier verification had missed: 45 of 56 driver binaries could not load on a runtime-only install**, because 17 vendor blobs carry an unversioned SONAME and their bare `.so` symlink was shipped in `-devel`/`-dev` rather than the runtime package (`LESSONS_LEARNED.md` #22). Fixed and re-verified on both distros — see the dated section below. See "3rdparty — remaining" for what is still genuinely open (QSI stays excluded for a confirmed reason; `flipro`/`flialgo` licence coverage; non-blob drivers). |
+| **`3rdparty/`** | RPM and Debian sides both complete for both source packages, all three verified together (`indi-stable-core`, `-3rdparty-libs`, `-3rdparty-drivers`), on both distros. 9 vendors, **plus `eqmod` as of 2026-09-08** — the first
+driver here with no vendor blob behind it, built, installed, coexistence- and
+upgrade-verified on both distros, ten `-drivers` packages now. It ships
+nothing yet: `-drivers` needs a `Release: 2`/`-2` bump first, because its
+contents grew while the upstream tag stayed put. **A serious defect was found and fixed 2026-09-04 that all of the earlier verification had missed: 45 of 56 driver binaries could not load on a runtime-only install**, because 17 vendor blobs carry an unversioned SONAME and their bare `.so` symlink was shipped in `-devel`/`-dev` rather than the runtime package (`LESSONS_LEARNED.md` #22). Fixed and re-verified on both distros — see the dated section below. See "3rdparty — remaining" for what is still genuinely open (QSI stays excluded for a confirmed reason; `flipro`/`flialgo` licence coverage; non-blob drivers). |
 | **`pyindi-client/`** | Both sides built, installed, imported for real, and coexistence/upgrade-tested via scripted harnesses: Debian 2026-08-26/27 (`pyindi-client/deb/`), RPM 2026-08-27 (`pyindi-client/rpm/`). Release automation added 2026-09-04, including a smoke check that every symbol the SWIG wrapper references is actually exported — the `DESIGN.md` 2026-09-03 incident's failure mode, which `import PyIndi` and `BaseClient()` both survive. Nothing outstanding on the packaging itself. |
 | **CI (all three)** | **Verified end to end ON THIS REPO, 2026-09-04**, not just inherited from the seed's own history. Core, 3rdparty and pyindi-client each ran a real (not dry-run) check → build → smoke-test → promote cycle here for the first time, each publishing a real GitHub Release and pushing a real promotion commit: `indi-stable-core-v2.2.4.2` (6 assets), `indi-stable-3rdparty-v2.2.4.1` (54 assets, at a clean `Release: 1` — see below for why that needed a real fix first), `indi-stable-pyindi-client-2.2.0` (2 assets, symbol-check counts 1172/1199 confirmed substantive, not vacuous). All three promote jobs now create the GitHub Release **before** committing the version bump (`53cef94`) — closing a real, if narrow, window where a downstream workflow reading `versions.json` could see a release referenced before it existed; confirmed on this run by the release's `publishedAt` and the promote commit's own timestamp landing in the same second, not by trusting the reorder alone. |
 | **3rdparty's first real run here failed, and the cause was worth finding.** The fresh-history seed carried over the archived repo's already-bumped state (`Release: 2%{?dist}`, changelogs and all 18 control pins at `-2` — leftover from a repackage test run there). This repo's own release history starts fresh, so the first real promotion attempt collided: Debian's `dch` correctly refused to write a lower version than what its changelog already claimed, but the RPM side's plain `sed` had no equivalent check and **silently regressed `Release: 2` back down to `1`**, reporting success. Fixed in two parts, `01b52b9`: the seed's phantom `-2` content reset to a clean `-1` (nothing describing that content ever actually shipped from this repo), and all three bump scripts hardened to refuse moving RPM `Release:` backward for an unchanged upstream version, matching what `dch` already enforced on the Debian side. Re-run afterward: all 8 jobs passed. |
@@ -93,6 +97,41 @@ a `git clone`:
 git config user.email william@williamlsnyder.org   # commit authorship
 git config core.hooksPath .githooks                # or the pre-commit hook is inert
 ```
+
+**Baselines, both boxes, end of 2026-09-08.** Neither carries any
+`indi-stable` package and `/opt/indi-stable` is absent on both.
+
+- **`fedoraastro`: 2153 packages, byte-identical to its documented baseline**
+  after everything below.
+- **`ubuntuastro`: 1839 packages, not the 1832 this file used to say.** The
+  difference is **not** leftover work — it is `unattended-upgrades` running a
+  kernel and security update mid-session (7.0.0-30 → 7.0.0-31, plus
+  openssl/sssd/webkit/bind9), which added seven `linux-*` packages and removed
+  none. Diffed by package *name* to establish that, not by count. Re-baseline
+  from 1839 rather than treating the delta as contamination — and note this is
+  a live desktop that will drift again, so diff names, never counts (#6).
+
+**Build artifacts left on both boxes**, reusable rather than rebuilt:
+
+| Box | Path | What |
+|---|---|---|
+| `fedoraastro` | `~/mock-result-pcfix` | core `2.2.4.2-1` |
+| `fedoraastro` | `~/mock-result-symlinkfix` | `-libs` `2.2.4.1-1`, **post**-#22 fix |
+| `fedoraastro` | `~/mock-result-drivers-eqmod` | `-drivers` `2.2.4.1-1` **with eqmod**, 10 subpackages |
+| `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests |
+| `fedoraastro` | `~/mock-result-drivers-rel2new` | `-drivers` `2.2.4.1-2` scratch, with eqmod |
+| `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
+| `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`, with eqmod |
+| `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`, freshly rebuilt from current packaging |
+
+`~/mock-result-3rdparty` and `~/mock-result-3rdparty-fishcamp` on
+`fedoraastro` both **predate the #22 runtime-symlink fix** and must not be
+used. They hold 18 RPMs each, exactly like `~/mock-result-symlinkfix`, and are
+indistinguishable by name — tell them apart by asking whether the *runtime*
+touptek RPM owns the bare `libtoupcam.so` (`FEDORA.md`).
+
+The `~/build/*-2*.deb` set was rebuilt from the current packaging on
+2026-09-08, replacing an older `-2` set that predated both fishcamp and eqmod.
 
 ---
 
