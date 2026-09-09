@@ -449,19 +449,23 @@ rather than an RPM `Release:` bump. All checks passed on the first run,
 ## Building and testing `indi-stable-3rdparty-drivers`
 
 `core/deb-3rdparty-drivers/` is the packaging source, mirroring
-`core/rpm/indi-stable-3rdparty-drivers.spec` exactly: same 8 vendor
-drivers, same 47-entry `WITH_<X>=OFF` scope list, same `apogee_ccd.cpp`
-`CFLAGS` fix, same `toupcam_test`/`omegonprocam_test` `EXCLUDE_FROM_ALL`
-patch. Read that spec's header and `%build` comments for the full
-rationale; `core/deb-3rdparty-drivers/rules` carries only the
+`core/rpm/indi-stable-3rdparty-drivers.spec` exactly: same 9 vendor
+drivers plus `eqmod`, same 47-entry `WITH_<X>=OFF` scope list, same
+`apogee_ccd.cpp` `CFLAGS` fix, same `toupcam_test`/`omegonprocam_test`
+`EXCLUDE_FROM_ALL` patch. Read that spec's header and `%build` comments for
+the full rationale; `core/deb-3rdparty-drivers/rules` carries only the
 Debian-specific mechanics.
 
 ```bash
 tar xf indi-3rdparty-v2.2.4.1.tar.gz && cd indi-3rdparty-2.2.4.1
 rm -rf debian                                              # ships its own, same trap as -libs's
-cp -r ~/src/packaging/core/deb-3rdparty-drivers debian
-sudo dpkg -i indi-stable-core*.deb indi-stable-3rdparty-libs-*.deb   # Build-Depends
-sudo apt-get build-dep -y .
+cp -r ~/src/indi-stable/core/deb-3rdparty-drivers debian
+# Build-Depends. Install the versions control actually pins -- ~/build holds
+# more than one revision of most of these, so a bare glob picks the wrong set.
+sudo apt-get install -y --no-install-recommends \
+    ./indi-stable-core{,-libs,-dev}_2.2.4.2-1_amd64.deb \
+    ./indi-stable-3rdparty-libs-*_2.2.4.1-1_amd64.deb
+dpkg-checkbuilddeps                                        # confirm before building, not after
 dpkg-buildpackage -us -uc -b 2>&1 | tee /tmp/indi-stable-3rdparty-drivers-deb.log
 lintian --profile debian ../indi-stable-3rdparty-drivers_*.changes
 ```
@@ -538,6 +542,62 @@ completely absent, `ubuntuastro` back at its exact documented Configuration
 B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
+
+### `eqmod` added — built and verified 2026-09-08
+
+**Built clean on the first real `dpkg-buildpackage`, no build-time defects**,
+producing ten binary packages where there were nine. The three defects this
+addition did surface were all found while *writing* the packaging, before a
+compiler ran — see `DESIGN.md`, "Decided: eqmod first, then widen", and
+`LESSONS_LEARNED.md` #24.
+
+Verified against the built `.deb`, not the build log:
+
+- **The catalogue rewrite went from 56 entries to 63**, which is the check
+  that the AHP GT strip did exactly what it claimed: `indi_eqmod.xml`
+  declares eight `<device>` entries, one of them for the
+  `indi_ahpgt_telescope` we never build, and seven survived. All seven carry
+  absolute paths and `grep -c ahpgt` on the shipped file is 0.
+- **`Depends:` is `indi-stable-core-libs, libc6, libgcc-s1, libnova-0.16-0t64,
+  libstdc++6`** — no `indi-stable-3rdparty-libs-<vendor>` at all, which is
+  the point of eqmod being the first blob-free driver here.
+- **`libgsl` is absent from `Depends:` and that is correct.** Confirmed with
+  `readelf -d` rather than assumed: the binary's `DT_NEEDED` list has no
+  `libgsl` entry, so `--as-needed` dropped a library the driver links but
+  never calls a symbol from. `GSL` remains a real `Build-Depends` because
+  `find_package(GSL REQUIRED)` fails configure without it. Same shape as the
+  `libz`/`libcfitsio` absence already documented for `pyindi-client`.
+- **`RUNPATH` is `/opt/indi-stable/lib`** and the package puts nothing under
+  `/usr/bin`.
+- **`lintian --profile debian`: 0 errors**, and eqmod's only tag is the
+  `initial-upload-closes-no-bugs` warning every package here carries. Its two
+  overrides (`dir-or-file-in-opt`, `custom-library-search-path`) are the
+  standard pair, and neither was reported unused.
+
+**Coexistence verified in configuration B, the tightest collision case**:
+all four eqmod binaries resolve `libindidriver.so.2`,
+`libindiAlignmentDriver.so.2` and `libindiclient.so.2` into
+`/opt/indi-stable/lib` while the distro's own `libindi1` ships a
+byte-identical `libindidriver.so.2` SONAME in `/usr/lib` (`dpkg -S` confirms
+the collision is real, not assumed). `dpkg -V` clean on
+`libindi1`/`indi-bin`/`libindi-dev` and `/usr/bin/indiserver` still owned by
+`indi-bin`.
+
+**`scripts/smoke-test-3rdparty-deb.sh` passed with eqmod included**, needing
+no edit — it is driven by package contents rather than a hardcoded vendor
+list, and picked the tenth package up on its own: 60 driver binaries checked
+where there were 56, all resolving inside the private prefix, and
+`indi_azgti_telescope` executed and printed its usage banner in the
+per-vendor loop. **The `-dev` packages installed to satisfy `Build-Depends`
+were removed before that run**, deliberately: this gate answers "does a clean
+*runtime* install work", and leaving `-dev` in place is exactly what would
+have supplied the missing symlink that hid `LESSONS_LEARNED.md` #22.
+
+`ubuntuastro` restored to its exact baseline afterward — package set **diffed
+against a pre-work snapshot rather than counted** (#6), byte-identical, and
+`/opt/indi-stable` completely absent rather than left as empty directories,
+confirming the shared-directory ownership discipline (#20) held with a tenth
+package added.
 
 **The upgrade path is scripted too**,
 `scripts/test-upgrade-path-drivers-deb.sh`, run together with `-libs`'s own

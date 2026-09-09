@@ -408,25 +408,32 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   eqmod's two licence stanzas; the AHP GT catalogue entry stripped and a
   no-bare-names assertion added to both packagings.
 
+  **The Debian side is done, 2026-09-08.** Built clean on the first real
+  `dpkg-buildpackage` (ten binary packages now, not nine), `lintian` 0
+  errors, coexistence verified in configuration B against a distro
+  `libindi1` carrying a byte-identical `libindidriver.so.2` SONAME, and
+  `scripts/smoke-test-3rdparty-deb.sh` passed with eqmod included — 60
+  driver binaries where there were 56, `indi_azgti_telescope` executing in
+  the per-vendor loop. `ubuntuastro` restored to its exact baseline, package
+  set diffed rather than counted. Full detail in `DEBIAN.md`, "`eqmod` added
+  — built and verified".
+
   **Next steps, in order:**
-  1. Real `dpkg-buildpackage` on `ubuntuastro` (this session's own machine).
-     All 14 candidate build-deps for the eventual widening were confirmed
-     available here 2026-09-08 by `apt-cache policy`, `libnova-dev` and
-     `libgsl-dev` among them.
-  2. Real `mock` build on `fedoraastro`. **`libnova-devel`/`gsl-devel` are
+  1. Real `mock` build on `fedoraastro`. **`libnova-devel`/`gsl-devel` are
      still unconfirmed there** — a different machine, nothing checked with
      `dnf` yet, and `WITH_QSI` already failed once on that box for exactly
-     this class of missing `-devel`.
-  3. Then the same install/coexistence/upgrade verification every other
-     package here got. Both `smoke-test-3rdparty*.sh` harnesses are driven by
-     package contents rather than a hardcoded vendor list, so they pick eqmod
-     up with no edit — but confirm that by watching eqmod appear in their
-     per-vendor output, not by trusting the glob.
-  4. Expect real defects on the first attempt — `LESSONS_LEARNED.md` #1's
-     track record has held every time so far, and the two found while merely
-     *writing* this packaging (the `License:` tag propagating to all nine
-     vendor subpackages, the dangling AHP GT catalogue entry) both landed
-     before a compiler ever ran.
+     this class of missing `-devel`. Note the Fedora build is the one with
+     the harder job: the RPM `%files` must account for all five XML files
+     eqmod installs, where Debian's `.install` merely lists them.
+  2. Then the install/coexistence/upgrade verification on Fedora, and the
+     two upgrade-path harnesses (`test-upgrade-path-drivers*.sh`) re-run on
+     both distros — those have not been run against a ten-package `-drivers`
+     yet on either side.
+  3. `-drivers` now needs a `Release: 2` / `-2` revision before it can ship,
+     the upstream tag being unchanged while its contents have grown. Do not
+     hand-edit that in — the bump scripts own `Release:`, and note the
+     repackage path's `-N` suffix has never actually run in a runner (see
+     the correction in the release-automation section below).
 - **Widening past eqmod: the ~40 remaining non-blob drivers.** Still wanted,
   deliberately sequenced after eqmod. `DESIGN.md`'s dependency table was
   re-derived mechanically 2026-09-08 and had four wrong rows before that, so
