@@ -1587,8 +1587,31 @@ packaging without knowing them reintroduces a bug that was already fixed.
   rename the files**, preserving the numeric prefix because udev applies rules
   in lexical order. They land in `/usr/lib/udev/rules.d` rather than `/lib`:
   Debian 12+ and Ubuntu 22.04+ are merged-usr where `/lib` is an alias symlink,
-  and that path also matches Fedora's `%{_udevrulesdir}`. A grep for other
-  absolute `DESTINATION`s found none — this is the only one.
+  and that path also matches Fedora's `%{_udevrulesdir}`.
+
+  **This said "a grep for other absolute `DESTINATION`s found none — this is
+  the only one" until 2026-09-09, and that was wrong.** It held for the `core`
+  tree it was written about and for every `lib*` vendor directory in
+  indi-3rdparty, all of which declare the variable as
+  `set(UDEVRULES_INSTALL_DIR ... CACHE STRING ...)`, which is exactly why a
+  `-D` override has always worked there. But **five indi-3rdparty *driver*
+  directories — `indi-armadillo-platypus`, `indi-dsi`, `indi-orion-ssg3`,
+  `indi-qsi` and `indi-sx` — use a second, differently named variable,
+  `RULES_INSTALL_DIR`, hardcoded to `/usr/lib/udev/rules.d` by a plain
+  `set()` with no `CACHE`.** A plain `set()` overwrites whatever the command
+  line supplied, so neither `-DUDEVRULES_INSTALL_DIR=` (wrong name) nor
+  `-DRULES_INSTALL_DIR=` (overwritten at configure time) can move it. Three
+  other drivers — `indi-ffmv`, `indi-gphoto`, `indi-nightscape` — do use the
+  cache variable and behave as this entry originally described.
+
+  Consequence for the packaging: **a driver's udev rule cannot be redirected
+  by any flag, so it must be re-homed by destination in `%install`/`rules`
+  after the fact.** `indi-stable-3rdparty-drivers` does exactly that, renaming
+  whatever lands in either location and then asserting that nothing is left at
+  an upstream filename. Found by that assertion failing on the first build of
+  the armadillo-platypus slice, not by reading — the rule had installed itself
+  straight to `/usr/lib/udev/rules.d/99-armadilloplatypus.rules`, the exact
+  name a distribution package for the same hardware would use.
 - **`CMAKE_INSTALL_LIBDIR` must be passed RELATIVE (`lib`).** Fedora's `%cmake`
   macro passes it absolute, and INDI derives `PKGCONFIG_INSTALL_PREFIX` straight
   from it (`CMakeLists.txt:83`), so an absolute value drops `libindi.pc` into

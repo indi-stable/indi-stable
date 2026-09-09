@@ -21,13 +21,23 @@
 # added 2026-08-27 once its licence was confirmed clear (DESIGN.md).
 #
 # Scoped to the 9 vendors -libs bundles (apogee, asi, fli, playerone,
-# inovasdk, micam, sbig, touptek, fishcamp) plus eqmod. indi-3rdparty ships
-# roughly 40 more non-blob drivers (gpsd, celestronaux, nexdome, ...) that
-# need no vendor blob and have no dependency on -libs whatsoever; those stay
-# off for now. Scope decided with Will 2026-09-08: eqmod alone first, as a
-# complete build/install/coexistence/upgrade slice on both distros, then
-# widen -- so that the defects a first non-blob driver brings surface against
-# one driver rather than forty. See STATUS.md, "3rdparty -- remaining".
+# inovasdk, micam, sbig, touptek, fishcamp) plus three non-blob drivers:
+# eqmod, armadillo-platypus and maxdomeii. indi-3rdparty ships roughly 40
+# more non-blob drivers (gpsd, celestronaux, nexdome, ...) that need no
+# vendor blob and have no dependency on -libs whatsoever; those stay off for
+# now.
+#
+# Scope decided with Will 2026-09-08: eqmod alone first, as a complete
+# build/install/coexistence/upgrade slice on both distros, then widen -- so
+# that the defects a first non-blob driver brings surface against one driver
+# rather than forty. Widening then resumed 2026-09-09 with a deliberately
+# small second slice, again Will's call, chosen for the MECHANISMS it forces
+# rather than for driver count: armadillo-platypus is the first subpackage in
+# this spec to ship a udev rule, the first with six binaries from one source
+# directory, and the first whose catalogue filename (indi_lunatico.xml)
+# matches neither its directory nor any binary in it; maxdomeii is the first
+# with an upstream test target that the default build compiles but nothing
+# installs. See STATUS.md, "3rdparty -- remaining".
 #
 # See DESIGN.md, "Resolution -- two source packages, not one and not
 # sixty-one", for why this is a second source package rather than a second
@@ -66,7 +76,7 @@
 Name:           indi-stable-3rdparty-drivers
 Version:        2.2.4.1
 Release:        1%{?dist}
-Summary:        INDI drivers for 9 vendor camera/focuser SDKs and EQMod mounts (stable upstream release, private prefix)
+Summary:        INDI drivers for 9 vendor camera/focuser SDKs plus non-blob mount, focuser and dome drivers (stable upstream release, private prefix)
 
 # Aggregate across 9 driver source trees, confirmed by reading actual SOURCE
 # FILE license headers (not the bundled COPYING file alone -- two of them,
@@ -284,6 +294,42 @@ OFF) -- a same-named but independent option from the top-level WITH_AHP_GT,
 and off by default either way. Its catalogue entry is stripped in %%install
 rather than left dangling; see there for why that matters.
 
+# Like eqmod, these two have no vendor blob and so no -libs Requires. Unlike
+# eqmod they need nothing beyond INDI itself -- no libnova, no GSL -- so they
+# add no BuildRequires either. Both are LGPL-2.1-or-later, matching this
+# spec's top-level License:, so neither carries its own License: tag; that
+# was read from every .cpp/.h header in both directories on 2026-09-09, not
+# spot-checked (all 12 armadillo files and all 4 maxdomeii files carry the
+# identical "version 2.1 ... or (at your option) any later version" grant).
+%package armadillo-platypus
+Summary:        Lunatico Armadillo, Platypus, Dragonfly, Seletek and Beaver INDI drivers
+Requires:       indi-stable-core-libs%{?_isa}
+%description armadillo-platypus
+Six binaries from one source directory, for Lunatico Astronomia's controller
+family: indi_armadillo_focus and indi_platypus_focus (focusers),
+indi_seletek_rotator (rotator), indi_dragonfly and indi_dragonfly_dome
+(relay controller and its dome front-end) and indi_beaver_dome.
+
+The first subpackage in this spec to ship a udev rule -- every rule this
+project previously installed came from indi-stable-3rdparty-libs. It is
+re-homed under the same namespaced filename pattern -libs uses, so it takes
+effect without colliding with a distribution rule for the same hardware.
+
+Its catalogue is indi_lunatico.xml, named for the vendor rather than for the
+source directory or any binary in it -- worth knowing before globbing.
+
+%package maxdomeii
+Summary:        MaxDome II observatory dome INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description maxdomeii
+indi_maxdomeii, for the MaxDome II dome controller. Needs no vendor SDK and
+no library beyond INDI itself.
+
+Does NOT include test-maxdomeii, an upstream standalone test harness that
+indi-maxdomeii/CMakeLists.txt builds as part of the default target but never
+install()s -- so unlike the asi and playerone diagnostic tools removed in
+%%install, it never reaches the buildroot and needs no removal.
+
 %package touptek
 Summary:        Touptek and rebranded-Touptek camera INDI drivers (11 brands)
 Requires:       indi-stable-core-libs%{?_isa}
@@ -431,6 +477,7 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DINDI_ROOT=%{indi_prefix} \
     -DCMAKE_PREFIX_PATH=%{indi_prefix} \
     -DBUILD_LIBS=OFF \
+    -DUDEVRULES_INSTALL_DIR=%{indi_prefix}/udev-rules \
     -DWITH_ASTROASIS=OFF \
     -DWITH_ATIK=OFF \
     -DWITH_ATIK_EFW=OFF \
@@ -438,7 +485,6 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_SVBONY=OFF \
     -DWITH_PENTAX=OFF \
     -DWITH_QSI=OFF \
-    -DWITH_ARMADILLO=OFF \
     -DWITH_ASTARBOX=OFF \
     -DWITH_ASTROLINK4=OFF \
     -DWITH_ASTROMECHFOC=OFF \
@@ -457,7 +503,6 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_GPSD=OFF \
     -DWITH_GPSNMEA=OFF \
     -DWITH_LIMESDR=OFF \
-    -DWITH_MAXDOME=OFF \
     -DWITH_MGEN=OFF \
     -DWITH_NEXDOME=OFF \
     -DWITH_NIGHTSCAPE=OFF \
@@ -534,6 +579,69 @@ for _d in indi_eqmod_telescope indi_azgti_telescope \
         || { echo "ERROR: ${_d} lost from indi_eqmod.xml -- the AHP GT device-block delete over-matched"; exit 1; }
 done
 
+# --- udev rules: re-home under a namespaced filename ------------------------
+# NEW as of the armadillo-platypus/maxdomeii slice: until then no subpackage
+# in THIS spec shipped a udev rule at all -- every rule this project put in
+# /usr/lib/udev/rules.d came from -libs. Confirmed before writing this rather
+# than assumed: `rpm -qlp` over all ten 2.2.4.1-1 driver RPMs matched zero
+# paths under rules.d.
+#
+# THIS DOES NOT WORK THE WAY -libs's EQUIVALENT DOES, and the first build
+# proved it. -libs redirects UDEVRULES_INSTALL_DIR with a -D flag and then
+# re-homes out of that private scratch directory. Every lib* vendor
+# directory declares that variable as `set(... CACHE STRING ...)`, so the
+# -D wins. Driver directories are split, and five of them -- armadillo-
+# platypus, dsi, orion-ssg3, qsi and sx -- instead use a DIFFERENT variable,
+# RULES_INSTALL_DIR, declared with a plain `set()` and no CACHE. A plain
+# set() overwrites whatever the command line supplied, so:
+#
+#   -DUDEVRULES_INSTALL_DIR=...  does nothing for these five (wrong name)
+#   -DRULES_INSTALL_DIR=...      does nothing either (overwritten at configure)
+#
+# The rule is therefore installed straight to a hardcoded /usr/lib/udev/
+# rules.d, under upstream's own un-namespaced filename, and no -D flag can
+# move it. That is a coexistence problem, not a tidiness one: 99-armadillo
+# platypus.rules is the exact filename a distribution package for the same
+# hardware would use, so shipping it as-is puts a file this project owns
+# where a distro file belongs. DESIGN.md's "Upstream build-system facts"
+# calls UDEVRULES_INSTALL_DIR "the one non-derived install path"; that is
+# now known to be incomplete.
+#
+# So re-home by DESTINATION rather than by source directory: take whatever
+# landed in either place and rename it, which is robust to both upstream
+# mechanisms and to a driver switching between them. Same namespaced pattern
+# -libs uses, so everything this project installs into rules.d is one
+# greppable set. See core's spec for why four percent signs are needed in
+# ${base%%%%-*} under RPM macro expansion.
+mkdir -p %{buildroot}%{_udevrulesdir}
+for rule in %{buildroot}%{indi_prefix}/udev-rules/*.rules \
+            %{buildroot}%{_udevrulesdir}/*.rules; do
+    [ -e "$rule" ] || continue
+    base=$(basename "$rule")
+    case "$base" in
+        *-indi-stable-3rdparty-*) continue ;;   # already re-homed
+    esac
+    mv "$rule" "%{buildroot}%{_udevrulesdir}/${base%%%%-*}-indi-stable-3rdparty-${base#*-}"
+done
+rm -rf %{buildroot}%{indi_prefix}/udev-rules
+
+# A loop that finds nothing must not pass as though it worked (#1). Exactly
+# one driver in this spec's current scope ships a rule -- armadillo-platypus.
+# maxdomeii deliberately ships none, so this asserts a COUNT, not merely "at
+# least one": a second rule appearing means a driver started shipping one and
+# needs a %%files line, which would otherwise surface much later as an
+# unpackaged-file failure with nothing pointing at the cause.
+_rules=$(ls -1 %{buildroot}%{_udevrulesdir}/*.rules 2>/dev/null | wc -l)
+test "$_rules" -eq 1 \
+    || { echo "ERROR: expected exactly 1 udev rule from this package, found $_rules:"; ls -1 %{buildroot}%{_udevrulesdir}/ 2>/dev/null; exit 1; }
+test -e %{buildroot}%{_udevrulesdir}/99-indi-stable-3rdparty-armadilloplatypus.rules \
+    || { echo "ERROR: the armadillo-platypus rule is not at its re-homed name. Found:"; ls -1 %{buildroot}%{_udevrulesdir}/; exit 1; }
+# And nothing may be left at an upstream, un-namespaced filename -- that is
+# the actual coexistence assertion, and the one the first build failed.
+_bare_rules=$(ls -1 %{buildroot}%{_udevrulesdir}/*.rules 2>/dev/null | grep -v -- '-indi-stable-3rdparty-' || true)
+test -z "$_bare_rules" \
+    || { echo "ERROR: udev rules left at an upstream filename, where a distro package's own rule belongs:"; echo "$_bare_rules"; exit 1; }
+
 # --- driver catalogue: absolute paths, not bare names -----------------------
 # Same defect, same fix, same verification method as core's %%install -- see
 # core's spec for the full reasoning (DESIGN.md, "Driver-manifest
@@ -578,7 +686,10 @@ test -z "$_bare" || { echo "ERROR: catalogue entries left as bare names, which r
 for _bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
             indi_inovaplx_ccd indi_mi_ccd indi_sbig_ccd indi_toupcam_ccd \
             indi_fishcamp_ccd indi_eqmod_telescope indi_azgti_telescope \
-            indi_staradventurergti_telescope indi_staradventurer2i_telescope; do
+            indi_staradventurergti_telescope indi_staradventurer2i_telescope \
+            indi_armadillo_focus indi_platypus_focus indi_seletek_rotator \
+            indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
+            indi_maxdomeii; do
     test -x %{buildroot}%{indi_bindir}/${_bin} \
         || { echo "ERROR: ${_bin} did not install -- an upstream WITH_* default or driver name changed"; exit 1; }
 done
@@ -703,6 +814,35 @@ done
 %{indi_datadir}/indi_eqmod_simulator_sk.xml
 %{indi_datadir}/indi_align_sk.xml
 %{indi_datadir}/indi_eqmod_scope_limits_sk.xml
+
+# Neither directory ships a licence file of its own, so both point at
+# indi-3rdparty's top-level LICENSE -- which is the correct text here,
+# unlike eqmod's case: that file IS the LGPL-2.1 these two grant. Checked,
+# not assumed: LICENSE's first lines read "GNU LESSER GENERAL PUBLIC
+# LICENSE / Version 2.1, February 1999".
+%files armadillo-platypus
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_armadillo_focus
+%{indi_bindir}/indi_platypus_focus
+%{indi_bindir}/indi_seletek_rotator
+%{indi_bindir}/indi_dragonfly
+%{indi_bindir}/indi_dragonfly_dome
+%{indi_bindir}/indi_beaver_dome
+%{indi_datadir}/indi_lunatico.xml
+%{_udevrulesdir}/*-indi-stable-3rdparty-*armadilloplatypus*.rules
+
+%files maxdomeii
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_maxdomeii
+%{indi_datadir}/indi_maxdomeii.xml
 
 %files touptek
 %license indi-toupbase/COPYING.LGPL
