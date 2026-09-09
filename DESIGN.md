@@ -1259,7 +1259,11 @@ above is indexed by directory, the spec by option — map through the
 `QHY` blob this project already excludes for licence reasons (no `COPYING` file — "bundle by
 licence tier" above), and while `indi-atik-efw`'s own `find_package()` list has no vendor
 blob, it ships alongside `indi-atik` (which does) and its exact relationship to that licence
-decision hasn't been checked.
+decision had not been checked when this was written. **Checked and settled
+2026-09-09: there is no relationship.** `indi-atik-efw/CMakeLists.txt` calls
+`find_package` for INDI and Threads only and links `${INDI_LIBRARIES}` and
+`rt`; it talks to the filter wheel directly and shares nothing with
+`indi-atik` but a name prefix. It is packaged. `indi-qhy` still is not.
 
 **`eqmod` specifically is clean**: `find_package(INDI REQUIRED)`, `find_package(Nova REQUIRED)`,
 `find_package(ZLIB REQUIRED)`, `find_package(GSL REQUIRED)` — nothing else, no vendor blob,
@@ -1565,8 +1569,11 @@ neither actually links `INDI_LIBRARIES` — so `indi-stable-3rdparty-libs` needs
 documented `-DINDI_ROOT=<path>` is what lets it find core in the private
 prefix rather than a standard system location. Combined with the
 libs-before-drivers ordering already decided, the real sequence a promotion
-pipeline must respect is **core, then 3rdparty-libs, then 3rdparty-drivers** —
-not yet reflected in any build automation, since none exists yet.
+pipeline must respect is **core, then 3rdparty-libs, then 3rdparty-drivers**.
+This said "not yet reflected in any build automation, since none exists yet"
+until 2026-09-09; three release workflows have existed in
+`.github/workflows/` since 2026-09-04 and have each run end to end on this
+repo (`STATUS.md`).
 
 ## `pyindi-client` — packaging decisions, established 2026-08-26
 

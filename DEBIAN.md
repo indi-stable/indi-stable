@@ -449,8 +449,8 @@ rather than an RPM `Release:` bump. All checks passed on the first run,
 ## Building and testing `indi-stable-3rdparty-drivers`
 
 `core/deb-3rdparty-drivers/` is the packaging source, mirroring
-`core/rpm/indi-stable-3rdparty-drivers.spec` exactly: same 9 vendor
-drivers plus `eqmod`, same 47-entry `WITH_<X>=OFF` scope list, same
+`core/rpm/indi-stable-3rdparty-drivers.spec` exactly: same 9 vendor drivers
+plus the same 21 non-blob drivers, same `WITH_<X>=OFF` scope list, same
 `apogee_ccd.cpp` `CFLAGS` fix, same `toupcam_test`/`omegonprocam_test`
 `EXCLUDE_FROM_ALL` patch. Read that spec's header and `%build` comments for
 the full rationale; `core/deb-3rdparty-drivers/rules` carries only the

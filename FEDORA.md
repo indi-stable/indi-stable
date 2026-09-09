@@ -505,9 +505,11 @@ core's own upgrade test (`STATUS.md`, machine state).
 
 ## Testing `indi-stable-3rdparty-drivers`
 
-Scoped to the same 9 vendors `-libs` bundles, plus `eqmod` — see that spec's
-own file header and `STATUS.md`, "3rdparty — remaining" for why the other ~40
-non-blob drivers upstream ships are still out of scope here.
+Scoped to the 9 vendors `-libs` bundles plus **21 non-blob drivers**, added
+across seven slices between 2026-09-08 and 2026-09-09 — 30 subpackages, 86
+driver binaries. See that spec's own file header and `STATUS.md` for what
+is still out of scope and why (only `dsi` and `rolloffino` remain, both on
+licence grounds rather than packaging ones).
 
 Same `mock --install` pattern as `-libs`, extended: this SRPM's
 `BuildRequires` need core's `-devel` **and** every one of `-libs`'s runtime
