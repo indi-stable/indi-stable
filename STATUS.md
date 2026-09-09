@@ -74,10 +74,20 @@ force-pushes/deletion are disabled. Confirmed by testing, not just reading
 the settings back — a direct push to `main` was rejected with GitHub's own
 `GH006` error before this was trusted.
 
-**Switching machines?** The clone on the box you are moving *to* will be behind
-— `git pull` on `development` first. Both clones were in sync at the end of
-2026-08-26. Two per-clone git settings, both already applied on both clones —
-re-apply them on any new one, because neither travels with a `git clone`:
+**Switching machines?** `ubuntuastro` has a clone of this repo at
+`~/src/indi-stable`. **`fedoraastro` does not** — as of 2026-09-08 it carries
+only `~/src/packaging`, the retired predecessor repo, so there is nothing to
+`git pull` there. This section previously said "both clones were in sync",
+which was true of the old repo and was never re-checked after this one became
+primary on 2026-09-04. The 2026-09-08 Fedora build worked around it by copying
+the one spec across and checking its `sha256sum` against the working copy;
+clone this repo onto `fedoraastro` before the next Fedora session rather than
+repeating that.
+
+Where a clone does exist, the box you are moving *to* will be behind —
+`git pull` on `development` first. Two per-clone git settings, applied on
+`ubuntuastro` — re-apply them on any new clone, because neither travels with
+a `git clone`:
 
 ```bash
 git config user.email william@williamlsnyder.org   # commit authorship
@@ -418,22 +428,27 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   set diffed rather than counted. Full detail in `DEBIAN.md`, "`eqmod` added
   — built and verified".
 
-  **Next steps, in order:**
-  1. Real `mock` build on `fedoraastro`. **`libnova-devel`/`gsl-devel` are
-     still unconfirmed there** — a different machine, nothing checked with
-     `dnf` yet, and `WITH_QSI` already failed once on that box for exactly
-     this class of missing `-devel`. Note the Fedora build is the one with
-     the harder job: the RPM `%files` must account for all five XML files
-     eqmod installs, where Debian's `.install` merely lists them.
-  2. Then the install/coexistence/upgrade verification on Fedora, and the
-     two upgrade-path harnesses (`test-upgrade-path-drivers*.sh`) re-run on
-     both distros — those have not been run against a ten-package `-drivers`
-     yet on either side.
-  3. `-drivers` now needs a `Release: 2` / `-2` revision before it can ship,
-     the upstream tag being unchanged while its contents have grown. Do not
-     hand-edit that in — the bump scripts own `Release:`, and note the
-     repackage path's `-N` suffix has never actually run in a runner (see
-     the correction in the release-automation section below).
+  **The Fedora side is done too, 2026-09-08.** Built clean through `mock` on
+  the first attempt (44s, ten subpackages), `libnova-devel`/`gsl-devel`
+  confirmed present in the base `fedora` repo — the one dependency question
+  that had been open — and `scripts/smoke-test-3rdparty.sh` passed with eqmod
+  included, 60 driver binaries where there were 56. Coexistence verified
+  against Fedora 44's own `libindi-libs` at the identical SONAME;
+  `fedoraastro` restored to its exact 2153-package baseline. Both packagings
+  independently reported the same 63 catalogue entries, which is the
+  cross-check that they strip the dangling AHP GT entry identically. Full
+  detail in `FEDORA.md`, "`eqmod` added — built and verified".
+
+  **What is left for eqmod:**
+  1. The two upgrade-path harnesses (`scripts/test-upgrade-path-drivers.sh`
+     and `-deb`) have **not** been run against a ten-package `-drivers` on
+     either distro. They are the remaining gap; everything else eqmod needed
+     has been exercised.
+  2. `-drivers` needs a `Release: 2` / `-2` revision before it can ship, the
+     upstream tag being unchanged while its contents have grown. Do not
+     hand-edit it — the bump scripts own `Release:`, and the repackage path's
+     `-N` suffix has never actually run in a runner (see the correction in
+     the release-automation section below).
 - **Widening past eqmod: the ~40 remaining non-blob drivers.** Still wanted,
   deliberately sequenced after eqmod. `DESIGN.md`'s dependency table was
   re-derived mechanically 2026-09-08 and had four wrong rows before that, so

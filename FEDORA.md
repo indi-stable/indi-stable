@@ -505,9 +505,9 @@ core's own upgrade test (`STATUS.md`, machine state).
 
 ## Testing `indi-stable-3rdparty-drivers`
 
-Scoped to the same 8 vendors `-libs` bundles — see that spec's own file
-header and `STATUS.md`, "3rdparty — remaining" for why the other ~50
-non-blob drivers upstream ships are deliberately out of scope here.
+Scoped to the same 9 vendors `-libs` bundles, plus `eqmod` — see that spec's
+own file header and `STATUS.md`, "3rdparty — remaining" for why the other ~40
+non-blob drivers upstream ships are still out of scope here.
 
 Same `mock --install` pattern as `-libs`, extended: this SRPM's
 `BuildRequires` need core's `-devel` **and** every one of `-libs`'s runtime
@@ -541,6 +541,61 @@ real build failures found and how each was fixed. Read it before assuming a
 clean `%build` on the next upstream tag bump means nothing changed; at least
 one of those (the 47-entry `WITH_<X>=OFF` list) is a static list that a
 future indi-3rdparty release could silently grow past.
+
+### `eqmod` added — built and verified 2026-09-08
+
+**`libnova-devel` 0.16.0 and `gsl-devel` 2.8 are both in the base `fedora`
+repo**, checked with `dnf info` on `fedoraastro` itself. That closes the one
+dependency question `STATUS.md` had flagged as unconfirmed, and it mattered:
+`WITH_QSI` had already failed on this box for exactly this class of missing
+`-devel`.
+
+**Built clean through `mock` on the first attempt, 44 seconds**, producing
+ten subpackages where there were nine, using the `--init` → `--install` →
+`rpmbuild -bs` → `--no-clean` sequence above with `CORE=~/mock-result-pcfix`
+and **`LIBS=~/mock-result-symlinkfix`** — not `~/mock-result-3rdparty`, which
+predates the `LESSONS_LEARNED.md` #22 runtime-symlink fix. The two are the
+same size (18 RPMs) and indistinguishable by name; tell them apart by asking
+which one's *runtime* touptek RPM owns the bare `libtoupcam.so`
+(`rpm -qlp ... | grep 'libtoupcam\.so$'`), not by date or directory name.
+Results in `~/mock-result-drivers-eqmod`.
+
+Verified against the built RPMs:
+
+- **`License:` on the eqmod subpackage alone reads
+  `GPL-3.0-or-later AND LGPL-2.0-only`** while the other nine still read the
+  LGPL aggregate — the subpackage override behaving as intended on a real
+  build, not just under `rpmspec`.
+- **`Requires:` is `indi-stable-core-libs(x86-64)` (unversioned, the
+  independent-version-axis rule) plus `libnova-0.16.so.0` and ordinary
+  libc/libgcc/libstdc++.** No leaked `libindi*` SONAME, so
+  `%global __requires_exclude` covers eqmod without needing a new pattern,
+  and no vendor library at all. `Provides:` is package-name-only.
+- **`libgsl` is absent and that is correct** — `--as-needed` dropped a
+  library the driver links but calls no symbol from. `gsl-devel` stays a real
+  `BuildRequires` because `find_package(GSL REQUIRED)` fails configure
+  without it.
+- **The catalogue rewrite reported 63 entries, up from 56** — the same number
+  the Debian build reported, which is the cross-check that both packagings
+  strip the dangling AHP GT entry identically. `grep -c ahpgt` on the shipped
+  `indi_eqmod.xml` is 0 and all seven surviving entries carry absolute paths.
+- `RUNPATH` is `/opt/indi-stable/lib`; nothing lands under `/usr/bin`.
+
+**`scripts/smoke-test-3rdparty.sh` passed with eqmod included**, needing no
+edit — 60 driver binaries checked where there were 56, and
+`indi_azgti_telescope` executed in the per-vendor loop. Coexistence verified
+against Fedora 44's own `libindi-libs`, which ships a `libindidriver.so.2` at
+the identical SONAME: all four eqmod binaries still resolve into
+`/opt/indi-stable/lib`, `rpm -V libindi libindi-libs kstars` clean.
+`fedoraastro` restored to its exact 2153-package baseline afterward, diffed
+rather than counted, `/opt/indi-stable` completely absent and only the
+distribution's own `99-indi_auxiliary.rules` left behind.
+
+**`fedoraastro` has no clone of this repository.** It carries only
+`~/src/packaging`, the retired predecessor. This build was done by copying the
+spec to `~/eqmod-build/` and checking its `sha256sum` matched the working
+copy on `ubuntuastro`, which is fine for a one-off but is not a workflow —
+clone this repo there before the next Fedora session.
 
 The upgrade path is scripted too, and — unlike `-libs`'s own upgrade test —
 run TOGETHER with `-libs`'s upgrade, not standalone, because `-drivers`
