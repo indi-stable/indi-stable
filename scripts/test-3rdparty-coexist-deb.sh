@@ -165,7 +165,7 @@ DISTRO_SHA=$(sha256sum "$DISTRO_SERVER" | awk '{print $1}')
 info "baseline: $(wc -l < "$BASELINE") packages; $DISTRO_SERVER sha256 $DISTRO_SHA"
 
 echo
-echo "############ STEP 1: install core + all 8 vendors' libs and drivers ############"
+echo "############ STEP 1: install core, every -libs vendor and every -drivers package ############"
 apt-get install -y \
   "$CORE_DIR/indi-stable-core_${CORE_VER}_amd64.deb" \
   "$CORE_DIR/indi-stable-core-libs_${CORE_VER}_amd64.deb" \
@@ -173,11 +173,18 @@ apt-get install -y \
   $(libs_debs) $(drivers_debs) \
   >"$W/install.log" 2>&1 \
   || { tail -40 "$W/install.log"; die "installing our packages failed"; }
+# Expected count is DERIVED, not written down. It was the literal 24 until
+# 2026-09-09 -- 8 vendors x (runtime + dev) + 8 drivers -- which aborted the
+# run the moment the vendor list stopped being hardcoded, because the real
+# number is now 48. A literal here is the same defect as a literal vendor
+# list, just in numeric form (LESSONS_LEARNED.md #27).
+EXPECTED=$(pkg_names | wc -l)
 INSTALLED=$(dpkg-query -W -f='${Package}\n' $(pkg_names) 2>/dev/null | wc -l)
-test "$INSTALLED" -eq 24 || die "expected 24 3rdparty packages installed, got $INSTALLED"
+test "$INSTALLED" -eq "$EXPECTED" \
+  || die "expected $EXPECTED 3rdparty packages installed, got $INSTALLED"
 test -x "$OUR_DRIVER" || die "$OUR_DRIVER missing after install"
 readlink -e "$OUR_SERVER" >/dev/null || die "$OUR_SERVER does not resolve -- the alternative never registered"
-pass "24 3rdparty packages installed; $OUR_SERVER -> $(readlink -e "$OUR_SERVER")"
+pass "$INSTALLED 3rdparty packages installed; $OUR_SERVER -> $(readlink -e "$OUR_SERVER")"
 
 echo
 echo "############ STEP 2: get a REAL colliding artifact from the archive, without installing it ############"
@@ -213,7 +220,7 @@ for p in $(pkg_names); do
     BAD=1
   fi
 done
-test "$BAD" -eq 0 && pass "none of the 24 3rdparty packages ship anything under /usr/bin or /usr/include"
+test "$BAD" -eq 0 && pass "none of the $EXPECTED 3rdparty packages ship anything under /usr/bin or /usr/include"
 
 echo
 echo "############ STEP 4: distribution core INDI is a clean bystander after 3rdparty installs on top ############"
