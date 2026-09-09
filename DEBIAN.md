@@ -576,11 +576,16 @@ driver binaries, `lintian --profile debian` **0 errors and no new warning** —
 notable because this slice adds the first `MIT` stanza to `debian/copyright`
 and lintian is fussy about copyright formatting.
 
-`debian/copyright` carries the substance here, and it is where the LGPL-2.1
-decision is recorded for a Debian reader: the `License:` field states
-`LGPL-2.0-only`, and the stanza says plainly that the text shipped is the
-2.1. `httplib.h` gets its own `Files:` stanza with the full MIT text, since
-`/usr/share/common-licenses` has no MIT to point at.
+`debian/copyright` carries the substance here. The `License:` field states
+`LGPL-2.0-only` and the stanza references
+`/usr/share/common-licenses/LGPL-2`, which Debian ships — so unlike the RPM
+side, nothing needs bundling. `httplib.h` gets its own `Files:` stanza with
+the full MIT text, since `common-licenses` has no MIT to point at.
+
+**Every binary package ships the whole `debian/copyright`**, so grepping one
+package's copyright for `common-licenses/LGPL-2` also turns up the `LGPL-2.1`
+references belonging to other drivers' stanzas. That is correct, not a
+defect; read the stanza that names the driver, not the file as a whole.
 
 Smoke test passed runtime-only, 74 binaries, one driver from each of the
 nineteen packages executing. Coexistence re-verified in configuration B; all

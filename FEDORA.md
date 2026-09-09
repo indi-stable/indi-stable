@@ -644,9 +644,11 @@ rpmspec -q --qf '%{name}: %{license}\n' core/rpm/indi-stable-3rdparty-drivers.sp
 All four read `LGPL-2.0-only`, `starbook-ten` reading
 `LGPL-2.0-only AND MIT`, while the other fifteen still read the aggregate.
 
-**And read the licence text out of the built RPM, not the spec line.** The
-text shipped is deliberately LGPL-2.1 for LGPL-2.0-only code (`DESIGN.md`),
-so the only way to confirm the right file landed is to look at it:
+**And read the licence text out of the built RPM, not the spec line.** These
+four ship `indi-inovaplx/COPYING.LIB` — a file from a sibling driver's
+directory, because none of their own bundles the LGPL-2.0 (`DESIGN.md`). A
+`%license` line pointing somewhere unexpected is exactly the kind of thing to
+confirm by looking:
 
 ```bash
 rpm2cpio ~/mock-result-drivers-slice4/indi-stable-3rdparty-drivers-nexdome-2*.rpm \
@@ -654,9 +656,9 @@ rpm2cpio ~/mock-result-drivers-slice4/indi-stable-3rdparty-drivers-nexdome-2*.rp
 head -2 usr/share/licenses/indi-stable-3rdparty-drivers-nexdome/LICENSE
 ```
 
-Three of the four ship the top-level `LICENSE`; `starbook-ten` ships its own
-`COPYING.LESSER`, which is the same text. `ocs` ships neither its own
-`LICENSE.txt` (GPL-2, contradicting its headers) nor nothing at all.
+All four should read "Version 2, June 1991". Neither `ocs`'s own
+`LICENSE.txt` (GPL-2, contradicting its headers) nor `starbook-ten`'s own
+`COPYING.LESSER` (the 2.1) is shipped.
 
 ### `aok`, `avalon` and `celestronaux` added — verified 2026-09-09
 

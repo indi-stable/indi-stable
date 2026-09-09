@@ -1274,52 +1274,56 @@ code. A fifth (`indi_ahpgt_telescope`) is gated behind `indi-eqmod/CMakeLists.tx
 top-level `WITH_AHP_GT` above, defaults `Off` either way, not something enabling `eqmod`
 touches.
 
-### Decided: ship the LGPL-2.1 text for LGPL-2.0-only drivers — 2026-09-09
+### Decided: ship the exact LGPL-2.0 text — 2026-09-09, after a correction
 
-**Will's decision.** Four drivers in the non-blob widening — `nexdome`,
-`talon6`, `ocs` and `starbook-ten` — grant "the GNU Library General Public
-License version 2 as published by the Free Software Foundation" with no "or
-later" clause. That is LGPL-2.0-only, the same conservative reading
-`inovasdk` and `eqmod`'s AZ-GTi sources already get here. **CORRECTION, 2026-09-09 — the premise
-below was wrong.** This section originally said indi-3rdparty ships no
-LGPL-2.0 text anywhere, "checked rather than assumed". Two candidate files
+Four drivers in the non-blob widening — `nexdome`, `talon6`, `ocs` and
+`starbook-ten` — grant "the GNU Library General Public License version 2 as
+published by the Free Software Foundation" with no "or later" clause. That is
+LGPL-2.0-only, the same conservative reading `inovaplx` and `eqmod`'s AZ-GTi
+sources already get here. None of the four bundles a matching licence text.
+
+**They ship `indi-inovaplx/COPYING.LIB`, the exact LGPL-2.0.** That is not an
+arbitrary pick from the tree: `indi-inovaplx` is a driver
+`indi-stable-3rdparty-drivers` already builds and already declares
+LGPL-2.0-only, and **this spec was already shipping that very file** with its
+`inovasdk` subpackage. Nor is the choice load-bearing — seven directories
+bundle this file (`indi-apogee`, `indi-gphoto`, `indi-inovaplx`,
+`indi-limesdr`, `indi-nightscape`, `indi-sbig`, `indi-sx`) and all seven are
+byte-identical, sha256 `c340cbee4974bb96…`, checked rather than assumed. On
+the Debian side no file is bundled at all: `debian/copyright` references
+`/usr/share/common-licenses/LGPL-2`, which Debian ships.
+
+**This decision replaces an earlier one taken on a false premise, and the
+false premise was mine.** Will was told that indi-3rdparty contained no
+LGPL-2.0 text anywhere, "checked rather than assumed", and decided on that
+basis to ship the nearest available text, the LGPL-2.1. Two candidate files
 had actually been checked — `indi-starbook-ten/COPYING.LESSER` (2.1) and
 `libinovasdk/LICENSE.lib` (a vendor notice) — and the conclusion was
-generalised from them, which is exactly the move this project's discipline
-exists to prevent. A `grep -rl` for the LGPL-2.0 text finds **seven**
-copies, all bundled as `COPYING.LIB`: `indi-apogee`, `indi-inovaplx`,
-`indi-sbig`, `indi-sx`, `indi-gphoto`, `indi-limesdr` and
-`indi-nightscape`.
+generalised from them. A `grep -rl` finds seven copies, one of which this
+package already ships. Told the correct facts, Will's decision was the exact
+text, and the packages were switched the same day.
 
-The exact text therefore **is** available in the tree, and these four
-drivers could ship it rather than the 2.1. What is shipped today is still
-the 2.1, as decided; but the decision rested on a false constraint and is
-open for re-making on the correct facts. See `STATUS.md`.
+The generalisable point, and the reason this is written down rather than
+quietly fixed: **"checked rather than assumed" is a claim about method, and
+it has to be true of the whole claim, not of the two examples that came to
+hand.** The phrase appears throughout these documents. It earns its place
+only when the check was exhaustive.
 
-The options were: ship no licence text, ship a file fetched from outside the
-source tarball, or ship the nearest text that is in the tree. The decision is
-the third.
+**`indi-ocs` needed a further call.** It bundles a `LICENSE.txt` that is the
+**GPL-2** text, contradicting every source header in its own directory. That
+is a genuine contradiction, not the staleness `indi-apogee` and `indi-sbig`
+carry, where an older LGPL sits beside headers granting a newer one. Its
+bundled file is therefore not shipped: a GPL text beside LGPL code overstates
+the terms in the one direction that can mislead a redistributor.
+`indi-starbook-ten`'s own `COPYING.LESSER` is unused for the same shape of
+reason — it is the 2.1, and its sources grant version 2 only.
 
-**What this does and does not claim.** The `License:` tag and
-`debian/copyright`'s `License:` field — which is what packaging tooling and
-downstream consumers actually read — state `LGPL-2.0-only` accurately for all
-four. Only the accompanying *text* is the nearest available rather than the
-exact one, and the LGPL-2.1 is a later version of the same licence rather
-than a different one. The imprecision is recorded in both packagings at the
-point where it happens, not just here.
-
-**`indi-ocs` is the one that needed a further call.** It bundles a
-`LICENSE.txt` that is the **GPL-2** text, contradicting every source header
-in its own directory. That is a genuine contradiction, not the staleness
-`indi-apogee` and `indi-sbig` carry (theirs is an older LGPL where the
-headers grant a newer one). Its bundled file is therefore **not** shipped:
-a GPL text beside LGPL code overstates the terms in the more restrictive
-direction, which is the one direction that can mislead a redistributor.
-
-**Scope.** This settles the LGPL-2.0-only group only. It does not extend to
-the GPL-2.0-or-later drivers still outstanding — `bresserexos2`, `rtklib`,
-`gpsnmea` and `shelyak` — where the mismatch would be between licence
-*families* rather than versions of one. Those remain open; see `STATUS.md`.
+**Scope.** This settles the LGPL-2.0-only group. It does not extend to the
+GPL-2.0-or-later drivers still outstanding — `bresserexos2`, `rtklib`,
+`gpsnmea` and `shelyak`. GPL-2 text *does* exist in the tree
+(`indi-ocs/LICENSE.txt`, `indi-starbook-ten/COPYING`), so the same
+"point at a sibling directory" answer is available there, but it is a
+separate decision. See `STATUS.md`.
 
 ### Decided: eqmod first, then widen — 2026-09-08
 

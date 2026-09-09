@@ -565,8 +565,8 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
 
   **Slice 4 done, 2026-09-09: `nexdome`, `talon6`, `ocs`, `starbook-ten`.**
   Nineteen `-drivers` packages, 74 driver binaries. Unblocked by Will's
-  decision to ship the LGPL-2.1 text for LGPL-2.0-only drivers — see
-  `DESIGN.md`, "Decided: ship the LGPL-2.1 text". All four carry their own
+  decision on what licence text an LGPL-2.0-only driver should ship — see
+  `DESIGN.md`, "Decided: ship the exact LGPL-2.0 text". All four carry their own
   `License: LGPL-2.0-only`; `starbook-ten` is `LGPL-2.0-only AND MIT`,
   because it compiles in cpp-httplib. `ocs`'s own bundled `LICENSE.txt` is
   deliberately not shipped: it is the GPL-2 text and contradicts every
@@ -598,21 +598,18 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   `libftdi1-dev` added to both packagings; both dependency generators pick up
   the runtime `libftdi1.so.2` on their own.
 
-### Open: re-decide the LGPL-2.0 licence text on correct facts
+### Closed: the LGPL-2.0 licence text, re-decided on correct facts
 
-**The LGPL-2.1-text decision was made on a premise that turned out to be
-false, and that is my error, not Will's.** He was told indi-3rdparty contains
-no LGPL-2.0 text anywhere, "checked rather than assumed". Only two candidate
-files had been checked and the conclusion generalised from them. A `grep -rl`
-finds **seven** copies of the LGPL-2.0 text, all named `COPYING.LIB`:
-`indi-apogee`, `indi-inovaplx`, `indi-sbig`, `indi-sx`, `indi-gphoto`,
-`indi-limesdr` and `indi-nightscape`.
+`nexdome`, `talon6`, `ocs` and `starbook-ten` now ship the **exact LGPL-2.0
+text**, `indi-inovaplx/COPYING.LIB` on the RPM side and a
+`/usr/share/common-licenses/LGPL-2` reference on the Debian side. Verified by
+extracting the licence file from each built RPM and reading its version line,
+not from the `%license` line.
 
-So the exact text is available, and `nexdome`, `talon6`, `ocs` and
-`starbook-ten` could ship it instead of the 2.1. Nothing is broken — the
-`License:` tags state the real grant in every case and always did — but the
-decision deserves re-making now the constraint is gone. Shipped state is
-unchanged pending that.
+They briefly shipped the LGPL-2.1, because Will was told no LGPL-2.0 text
+existed in the tree. Seven directories bundle it, byte-identical, and this
+package was already shipping one of them with its `inovasdk` subpackage. The
+error and its lesson are recorded in `DESIGN.md` where the decision lives.
 
 ### Genuinely open, not just untested — continued
 
