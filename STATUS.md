@@ -71,6 +71,13 @@ negligible. `development` was fast-forwarded to `main` by hand once
 (`39e2676`), confirmed a genuine ancestor first; the fix means the next
 real promotion on any of the three does this itself.
 
+**Only 3rdparty's own promote has actually run under the new permission.**
+core's and pyindi-client's promote jobs carry the identical fetch-depth fix
+but have not had a real promotion since it landed — both upstream polls
+were quiet the whole session (STATUS.md checked this directly, not
+assumed). Treat their self-merge as fixed-by-the-same-patch, not as
+independently verified, until one of them actually promotes for real.
+
 **This repo is public**, with Will as its only collaborator with write
 access (`gh api repos/:owner/:repo/collaborators`, confirmed 2026-09-05).
 Anyone can read, clone, or fork it, but pushing a branch — to `development`
