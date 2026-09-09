@@ -36,12 +36,26 @@ set -u
 BUILD_USER=${SUDO_USER:-$(id -un)}
 R=${1:-$(getent passwd "$BUILD_USER" | cut -d: -f6)/rpmbuild/RPMS/x86_64}
 
-die() { echo; echo "*** ABORT: $* ***"; exit 1; }
+FAIL=0
+die() { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: ${W:-<none>}"; exit 1; }
+
+# Baseline snapshot + restore, shared with the other two RPM harnesses that
+# had no teardown at all. See scripts/lib-baseline.sh for why it is a library
+# rather than a block pasted into three files.
+. "$(cd "$(dirname "$0")" && pwd)/lib-baseline.sh"
+W=$(mktemp -d /tmp/snapshot-a-depsolve.XXXXXX)
 
 echo "############ STEP 0: RPMs present ############"
 echo "  looking in: $R"
 ls $R/indi-stable-core-2*.x86_64.rpm $R/indi-stable-core-libs-2*.x86_64.rpm \
   || die "built RPMs not found under $R -- build them first (see FEDORA.md)"
+
+# Recorded BEFORE STEP 0b, which is the first thing that changes the box.
+# Until 2026-09-09 this script had no baseline and no teardown: it removed
+# kstars and never put it back, left our packages installed, and moved
+# fedoraastro 14 packages off its documented count with nothing to attribute
+# the difference against.
+baseline_record "$W" || die "could not record the baseline"
 
 echo "############ STEP 0b: reset to a Snapshot-A-equivalent INDI state ############"
 # --no-autoremove deliberately KEEPS stellarium-data (613 MiB) installed. dnf5
@@ -88,4 +102,20 @@ readlink -e /usr/bin/indiserver \
 echo -n "  ours:              "
 readlink -e /usr/bin/indiserver-stable || echo "<MISSING -- our alternative is broken>"
 rpm -V libindi-libs; echo "  rpm -V libindi-libs exit=$?  (0 = distro files unmodified)"
-echo "############ DONE ############"
+
+echo
+echo "############ STEP 7: restore, by diffing rather than by naming ############"
+baseline_restore "$W" || FAIL=1
+
+echo
+echo "==================================================================="
+if test "$FAIL" -eq 0; then
+    echo "SNAPSHOT A DEPSOLVE: ALL CHECKS PASSED"
+    echo "  logs: $W"
+    rm -rf "$W"
+else
+    echo "SNAPSHOT A DEPSOLVE: FAILURES ABOVE -- box left as-is for inspection"
+    echo "  logs: $W"
+fi
+echo "==================================================================="
+exit "$FAIL"

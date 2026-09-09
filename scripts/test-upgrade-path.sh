@@ -34,9 +34,14 @@ OLD_DIR=${1:?usage: test-upgrade-path.sh <old-rpm-dir> <new-rpm-dir>}
 NEW_DIR=${2:?usage: test-upgrade-path.sh <old-rpm-dir> <new-rpm-dir>}
 
 FAIL=0
-die()  { echo; echo "*** ABORT: $* ***"; exit 1; }
+die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: ${W:-<none>}"; exit 1; }
 fail() { echo "  *** FAIL: $* ***"; FAIL=1; }
 pass() { echo "  PASS: $*"; }
+
+# Baseline snapshot + restore, shared with the other RPM harnesses that had
+# no teardown. See scripts/lib-baseline.sh for why it is a library.
+. "$(cd "$(dirname "$0")" && pwd)/lib-baseline.sh"
+W=$(mktemp -d /tmp/upgrade-path.XXXXXX)
 
 LINK=/usr/bin/indiserver-stable
 ADMIN=/var/lib/alternatives/indiserver-stable
@@ -46,6 +51,7 @@ ls $OLD_DIR/indi-stable-core-2*.x86_64.rpm >/dev/null 2>&1 || die "no RPMs in $O
 ls $NEW_DIR/indi-stable-core-2*.x86_64.rpm >/dev/null 2>&1 || die "no RPMs in $NEW_DIR"
 OLD_NVR=$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}\n' $OLD_DIR/indi-stable-core-2*.x86_64.rpm 2>/dev/null | head -1)
 NEW_NVR=$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}\n' $NEW_DIR/indi-stable-core-2*.x86_64.rpm 2>/dev/null | head -1)
+baseline_record "$W" || die "could not record the baseline"
 echo "  old: $OLD_NVR"
 echo "  new: $NEW_NVR"
 [ "$OLD_NVR" != "$NEW_NVR" ] \
@@ -152,9 +158,15 @@ test -d /opt/indi-stable \
   || pass "/opt/indi-stable fully removed"
 
 echo
+echo "############ RESTORE: by diffing rather than by naming ############"
+baseline_restore "$W" || FAIL=1
+
+echo
 if [ $FAIL -eq 0 ]; then
   echo "############ UPGRADE PATH: ALL CHECKS PASSED ############"
+  rm -rf "$W"
 else
   echo "############ UPGRADE PATH: ONE OR MORE CHECKS FAILED ############"
+  echo "  logs: $W"
 fi
 exit $FAIL
