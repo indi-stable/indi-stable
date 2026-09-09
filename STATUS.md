@@ -785,23 +785,42 @@ Release tags: release 1 keeps the plain name so existing tags stay valid; a
 repackage gets an explicit `-N` suffix, without which `gh release create`
 fails on the already-existing tag.
 
-**Verified end to end on 3rdparty, 2026-09-04.** All 8 jobs passed:
-`check` resolved `2.2.4.1-1 -> 2.2.4.1-2`, both specs built as `-2` (they
-must move together, and `-drivers` building at all proves they did), the 18
-Debian pins rewrote to `(= 2.2.4.1-2)` in CI, and the release published as
-`indi-stable-3rdparty-v2.2.4.1-2` — the `-N` suffix avoiding the collision
-with the existing `-v2.2.4.1` tag. Confirmed against the published
-artifacts: RPM NVR `2.2.4.1-2.fc44`, deb `2.2.4.1-2`, the runtime-symlink
-fix still present, and the drivers deb depending on
-`indi-stable-3rdparty-libs-touptek (= 2.2.4.1-2)` rather than `-1`.
-`versions.json` correctly did NOT move, a repackage being a rebuild rather
-than a new upstream version.
+**NOT verified end to end — see the correction below.** This paragraph
+previously claimed a 2026-09-04 run in which all 8 jobs passed, both specs
+built as `-2`, the 18 Debian pins rewrote to `(= 2.2.4.1-2)` and a release
+published as `indi-stable-3rdparty-v2.2.4.1-2`. No such release, tag or
+`Release: 2` spec state exists anywhere, and the claim was checked and
+withdrawn on 2026-09-08. What is genuinely verified is the bump-script half:
+the scripts rewrite `Release:` and the Debian revision together, refuse to
+move `Release:` backward, and were exercised locally. What is **not** verified
+is any of that running inside a runner and producing a `-N`-suffixed release.
 
 That run also surfaced one cosmetic defect, fixed in `0e5d28d`: the promote
 commit subject omitted the release, so the repackage commit was
-byte-identical to the original promotion's. **`3rdparty` therefore now sits
-at `Release: 2` with a published `-2` release that is functionally identical
-to `-1`** — the cost of proving the path, agreed in advance.
+byte-identical to the original promotion's.
+
+**Correction, 2026-09-08: the `-2` release described above does not exist,
+and `3rdparty` is at `Release: 1`.** This section previously claimed
+`3rdparty` "now sits at `Release: 2` with a published `-2` release",
+contradicting this same file's own table entry above it, which says the
+release published "at a clean `Release: 1`". Checked directly rather than
+choosing between the two claims: `git ls-remote --tags` has exactly one
+`3rdparty` tag (`indi-stable-3rdparty-v2.2.4.1`, no `-2` suffix),
+`gh release list` has exactly one `3rdparty` release, and `Release:` reads
+`1%{?dist}` in the spec on both `development` and `origin/main`. The table
+entry was right; this section was wrong.
+
+**What actually happened, and it was never recorded:** the scheduled run on
+2026-09-05 (`33969183934`) built all four packages successfully over ten
+minutes and then **failed at `Create GitHub Release`** — consistent with
+`gh release create` refusing the already-existing
+`indi-stable-3rdparty-v2.2.4.1` tag, the same failure mode this file already
+documents for core. Its `Commit to development` step never ran, which is
+exactly why `Release:` stayed at 1 and no `-2` artifact exists anywhere. The
+repackage path's `-N` suffix logic is therefore **not** verified end to end;
+treat the claim above that it was as covering the bump scripts only.
+Subsequent scheduled runs (09-06, 09-07, 09-08) all complete in ~13s with
+`check` correctly finding nothing, so nothing is failing now.
 
 ## Debian / Ubuntu — remaining
 
