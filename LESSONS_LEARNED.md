@@ -579,6 +579,21 @@ against the already-shipped `2.2.4.1-1` packages all 56 existing entries were
 already absolute (so the check passes for a real reason, #1), and run against
 an unstripped `indi_eqmod.xml` it fires on the AHP GT line.
 
+*Enforcement, added 2026-09-09:* `scripts/check-catalogue-sources.sh` asks the
+question one step earlier, against the upstream **source** rather than the
+built artifact — which entries name a binary this build will never install, so
+the entry can be stripped before it ever reaches a package. Run it on a driver
+before adding it to either packaging. Its own two controls exist because both
+of its plausible failure modes were hit while writing it: a plain `grep` for
+the target name reports `eqmod`'s known-bad catalogue as **clean** (the
+`install()` is right there in the file, nested inside two `if` blocks that are
+off), and a destination pattern that excluded backslashes reported all nine
+real `create_symlink` aliases in `indi-mi` and `indi-gphoto` as dangling —
+a false positive that would have had us delete working drivers from two
+catalogues. Over the whole `v2.2.4.1` tree it now reports exactly two entries,
+both understood: `eqmod`'s AHP GT line, and `indi_kepler_ccd` in
+`indi_flipro.xml`, a catalogue neither packaging installs.
+
 ## 25. A hardcoded list stops testing the thing you just added, silently
 
 Running the two Debian upgrade-path harnesses against a newly-added driver
