@@ -249,9 +249,21 @@ jobs:
     needs: [check, smoke-test-fedora, smoke-test-debian]
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 is required here, unlike every other checkout in this
+      # workflow. This job's own "Fast-forward development from main" step
+      # does `git fetch origin main development` then `git merge --ff-only`
+      # across the two branches -- the default depth-1 checkout leaves each
+      # branch's history truncated at a different point with no shared
+      # commit visible locally, so git reports "refusing to merge unrelated
+      # histories" even though development really is a clean ancestor of
+      # main. Found 2026-09-09 on the first run where self-merge itself
+      # actually succeeded (LESSONS_LEARNED.md) -- every earlier promote
+      # attempt failed before ever reaching this step, so the bug had never
+      # been exercised.
       - uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: core-rpm
