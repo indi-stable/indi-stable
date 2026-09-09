@@ -1,3 +1,10 @@
+indi-stable-3rdparty-libs (2.2.4.1-2) unstable; urgency=medium
+
+  * New upstream release v2.2.4.1, built and gated by 3rdparty-
+    release.yml
+
+ -- Will Snyder <william@williamlsnyder.org>  Wed, 09 Sep 2026 22:39:00 +0000
+
 indi-stable-3rdparty-libs (2.2.4.1-1) unstable; urgency=medium
 
   * Initial package. Builds upstream indi-3rdparty tag v2.2.4.1 with
