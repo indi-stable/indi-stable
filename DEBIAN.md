@@ -22,7 +22,7 @@ inside an unpacked upstream tree:
 sudo apt-get install -y devscripts debhelper dpkg-dev
 tar xf indi-v2.2.4.2.tar.gz && cd indi-2.2.4.2
 rm -rf debian                             # SEE BELOW -- not optional
-cp -r ~/src/packaging/core/deb debian     # the repo clone, NOT ~/src/indi-stable
+cp -r ~/src/indi-stable/core/deb debian   # the repo clone, NOT ~/src/packaging (retired)
 sudo apt-get build-dep .
 dpkg-buildpackage -us -uc -b 2>&1 | tee /tmp/indi-stable-deb.log
 lintian --profile debian ../indi-stable-core_*.changes
@@ -324,7 +324,7 @@ Read that spec's header comment for the full rationale; `core/deb-
 sudo apt-get install -y devscripts debhelper dpkg-dev
 tar xf indi-3rdparty-v2.2.4.1.tar.gz && cd indi-3rdparty-2.2.4.1
 rm -rf debian                                       # SEE core/deb's own note -- load-bearing here too
-cp -r ~/src/packaging/core/deb-3rdparty-libs debian
+cp -r ~/src/indi-stable/core/deb-3rdparty-libs debian
 sudo dpkg -i indi-stable-core-libs_*.deb indi-stable-core-dev_*.deb   # Build-Depends
 sudo apt-get build-dep -y .
 dpkg-buildpackage -us -uc -b 2>&1 | tee /tmp/indi-stable-3rdparty-libs-deb.log
@@ -703,7 +703,7 @@ ordinary system Python location rather than `/opt/indi-stable`.
 sudo apt-get install -y devscripts dh-python swig pkg-config
 pip download --no-deps -d /tmp/pyindi pyindi-client   # or fetch the sdist directly
 tar xzf pyindi_client-2.2.0.tar.gz && cd pyindi_client-2.2.0
-cp -r ~/src/packaging/pyindi-client/deb debian
+cp -r ~/src/indi-stable/pyindi-client/deb debian
 sudo dpkg -i indi-stable-core*.deb   # Build-Depends
 dpkg-buildpackage -us -uc -b 2>&1 | tee /tmp/indi-stable-pyindi-client-deb.log
 lintian --profile debian ../indi-stable-pyindi-client_*.changes

@@ -51,7 +51,7 @@ From a bare OS:
 ```bash
 sudo dnf install -y rpm-build rpmdevtools mock
 rpmdev-setuptree
-cd ~/src/packaging          # the repo clone -- NOT ~/src/indi-stable
+cd ~/src/indi-stable        # the repo clone -- NOT ~/src/packaging, which is retired
 
 # Fetch the upstream tarball named in the spec's Source0
 spectool -g -R core/rpm/indi-stable-core.spec
@@ -394,7 +394,7 @@ payload** and needs neither root nor an install:
 ```bash
 mkdir /tmp/x && cd /tmp/x
 rpm2cpio ~/mock-result-pcfix/indi-stable-core-2*.x86_64.rpm | cpio -idm
-cd ~/src/packaging
+cd ~/src/indi-stable
 bash scripts/test-catalogue-rewrite.sh \
      /tmp/x/opt/indi-stable/share/indi/drivers.xml /tmp/x/opt/indi-stable/bin
 ```
