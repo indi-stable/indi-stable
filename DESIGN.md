@@ -1254,6 +1254,42 @@ code. A fifth (`indi_ahpgt_telescope`) is gated behind `indi-eqmod/CMakeLists.tx
 top-level `WITH_AHP_GT` above, defaults `Off` either way, not something enabling `eqmod`
 touches.
 
+### Decided: ship the LGPL-2.1 text for LGPL-2.0-only drivers — 2026-09-09
+
+**Will's decision.** Four drivers in the non-blob widening — `nexdome`,
+`talon6`, `ocs` and `starbook-ten` — grant "the GNU Library General Public
+License version 2 as published by the Free Software Foundation" with no "or
+later" clause. That is LGPL-2.0-only, the same conservative reading
+`inovasdk` and `eqmod`'s AZ-GTi sources already get here. **indi-3rdparty
+ships no LGPL-2.0 text anywhere**, checked rather than assumed:
+`indi-starbook-ten/COPYING.LESSER` is 2.1, `libinovasdk/LICENSE.lib` is a
+vendor notice, and nothing else in the tree carries it.
+
+The options were: ship no licence text, ship a file fetched from outside the
+source tarball, or ship the nearest text that is in the tree. The decision is
+the third.
+
+**What this does and does not claim.** The `License:` tag and
+`debian/copyright`'s `License:` field — which is what packaging tooling and
+downstream consumers actually read — state `LGPL-2.0-only` accurately for all
+four. Only the accompanying *text* is the nearest available rather than the
+exact one, and the LGPL-2.1 is a later version of the same licence rather
+than a different one. The imprecision is recorded in both packagings at the
+point where it happens, not just here.
+
+**`indi-ocs` is the one that needed a further call.** It bundles a
+`LICENSE.txt` that is the **GPL-2** text, contradicting every source header
+in its own directory. That is a genuine contradiction, not the staleness
+`indi-apogee` and `indi-sbig` carry (theirs is an older LGPL where the
+headers grant a newer one). Its bundled file is therefore **not** shipped:
+a GPL text beside LGPL code overstates the terms in the more restrictive
+direction, which is the one direction that can mislead a redistributor.
+
+**Scope.** This settles the LGPL-2.0-only group only. It does not extend to
+the GPL-2.0-or-later drivers still outstanding — `bresserexos2`, `rtklib`,
+`gpsnmea` and `shelyak` — where the mismatch would be between licence
+*families* rather than versions of one. Those remain open; see `STATUS.md`.
+
 ### Decided: eqmod first, then widen — 2026-09-08
 
 **Scope decided with Will: build `eqmod` alone first, as a complete vertical

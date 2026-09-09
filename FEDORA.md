@@ -597,6 +597,36 @@ it was done by copying the spec to `~/eqmod-build/` and checking its
 longer needed and should not be repeated; build from the clone. `STATUS.md`
 carries the current state of both machines.
 
+### The LGPL-2.0-only group added — verified 2026-09-09
+
+`nexdome`, `talon6`, `ocs` and `starbook-ten`. Nineteen subpackages, 74
+driver binaries; results in `~/mock-result-drivers-slice4`. No defects.
+
+**Check the `License:` tags with `rpmspec`, not by reading the spec.** These
+four are the first here to carry a tag that is neither the top-level
+aggregate nor `eqmod`'s, so this is where a propagation mistake would show:
+
+```bash
+rpmspec -q --qf '%{name}: %{license}\n' core/rpm/indi-stable-3rdparty-drivers.spec
+```
+
+All four read `LGPL-2.0-only`, `starbook-ten` reading
+`LGPL-2.0-only AND MIT`, while the other fifteen still read the aggregate.
+
+**And read the licence text out of the built RPM, not the spec line.** The
+text shipped is deliberately LGPL-2.1 for LGPL-2.0-only code (`DESIGN.md`),
+so the only way to confirm the right file landed is to look at it:
+
+```bash
+rpm2cpio ~/mock-result-drivers-slice4/indi-stable-3rdparty-drivers-nexdome-2*.rpm \
+  | cpio -idm --quiet
+head -2 usr/share/licenses/indi-stable-3rdparty-drivers-nexdome/LICENSE
+```
+
+Three of the four ship the top-level `LICENSE`; `starbook-ten` ships its own
+`COPYING.LESSER`, which is the same text. `ocs` ships neither its own
+`LICENSE.txt` (GPL-2, contradicting its headers) nor nothing at all.
+
 ### `aok`, `avalon` and `celestronaux` added — verified 2026-09-09
 
 Third slice, fifteen subpackages, 70 driver binaries. Built through `mock`

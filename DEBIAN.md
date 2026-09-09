@@ -543,6 +543,27 @@ B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
 
+### The LGPL-2.0-only group added — verified 2026-09-09
+
+`nexdome`, `talon6`, `ocs` and `starbook-ten`. Nineteen binary packages, 74
+driver binaries, `lintian --profile debian` **0 errors and no new warning** —
+notable because this slice adds the first `MIT` stanza to `debian/copyright`
+and lintian is fussy about copyright formatting.
+
+`debian/copyright` carries the substance here, and it is where the LGPL-2.1
+decision is recorded for a Debian reader: the `License:` field states
+`LGPL-2.0-only`, and the stanza says plainly that the text shipped is the
+2.1. `httplib.h` gets its own `Files:` stanza with the full MIT text, since
+`/usr/share/common-licenses` has no MIT to point at.
+
+Smoke test passed runtime-only, 74 binaries, one driver from each of the
+nineteen packages executing. Coexistence re-verified in configuration B; all
+four new binaries resolve `libindidriver.so.2` into the private prefix.
+`ubuntuastro` restored to its exact 1839-package baseline.
+
+Both packagings independently report **74 driver binaries and 90 catalogue
+entries**.
+
 ### `aok`, `avalon` and `celestronaux` added — verified 2026-09-09
 
 Third slice, fifteen binary packages. Clean `dpkg-buildpackage`, and
