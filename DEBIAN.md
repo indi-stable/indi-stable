@@ -543,6 +543,30 @@ B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
 
+### `aok`, `avalon` and `celestronaux` added — verified 2026-09-09
+
+Third slice, fifteen binary packages. Clean `dpkg-buildpackage`, and
+`lintian --profile debian` reports **0 errors** with no new warning — the
+only one outstanding is still armadillo-platypus's
+`appstream-metadata-missing-modalias-provide`, since none of these three
+ships a udev rule.
+
+`scripts/smoke-test-3rdparty-deb.sh` passed on a runtime-only install: **70
+driver binaries** where there were 67, and one driver from each of the
+fifteen packages executing. Coexistence re-verified in configuration B —
+`indi_lx200aok`, `indi_lx200stargo` and `indi_celestron_aux` all resolve
+`libindidriver.so.2` to `/opt/indi-stable/lib` against a distribution
+`libindi1` carrying the same SONAME, with `dpkg -V` clean on `libindi1`,
+`indi-bin` and `libindi-data` and `/usr/bin/indiserver` unchanged.
+`ubuntuastro` restored to its exact 1839-package baseline afterward.
+
+**Count catalogues from the `.deb`s, not from the installed system.** A first
+attempt at the cross-distro check read
+`/opt/indi-stable/share/indi/*.xml` on the running box and got 376 entries
+against Fedora's 86. Nothing was wrong: the installed tree also holds core's
+own `drivers.xml`, which the `-drivers` packages do not ship. Comparing the
+same thing on both sides gives 86 and 86.
+
 ### `armadillo-platypus` and `maxdomeii` added — built and verified 2026-09-09
 
 Second non-blob slice, twelve binary packages where there were ten. Clean

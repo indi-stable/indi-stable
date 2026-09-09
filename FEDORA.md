@@ -597,6 +597,27 @@ it was done by copying the spec to `~/eqmod-build/` and checking its
 longer needed and should not be repeated; build from the clone. `STATUS.md`
 carries the current state of both machines.
 
+### `aok`, `avalon` and `celestronaux` added — verified 2026-09-09
+
+Third slice, fifteen subpackages, 70 driver binaries. Built through `mock`
+with the same sequence as the slice before it; results in
+`~/mock-result-drivers-slice3`. **No defects** — the first slice here to find
+none, which is what the eqmod-first decision meant by "repetition of a proven
+shape". The udev and `INDI_DATA_DIR` fixes from the previous slice carried
+these three with no new work.
+
+Verified against the built RPMs: 15 subpackages, all catalogues under `/opt`,
+nothing under `/usr/bin`, and all three new packages carrying only
+`indi-stable-core-libs`. Cross-checked with the Debian build, both reporting
+**70 driver binaries and 86 catalogue entries**.
+
+Worth knowing before adding any driver here: **the directory, the build
+option, the binary and the catalogue can all have different names.**
+`indi-aok` is built by `WITH_SKYWALKER`, produces `indi_lx200aok`, and ships
+`indi_aok.xml`. Nothing derives from anything else, so `%files` and the
+`-DWITH_<X>=OFF` list have to be written from the tree, not from the package
+name.
+
 ### `armadillo-platypus` and `maxdomeii` added — built and verified 2026-09-09
 
 Second non-blob slice, twelve subpackages where there were ten. Built through

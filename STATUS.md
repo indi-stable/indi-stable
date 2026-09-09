@@ -117,9 +117,10 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests |
 | `fedoraastro` | `~/mock-result-drivers-rel2new` | `-drivers` `2.2.4.1-2` scratch, with eqmod |
 | `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
-| `fedoraastro` | `~/mock-result-drivers-slice2` | `-drivers` `2.2.4.1-1`, **12 subpackages**, with armadillo-platypus and maxdomeii |
+| `fedoraastro` | `~/mock-result-drivers-slice3` | `-drivers` `2.2.4.1-1`, **15 subpackages** — the current build |
+| `fedoraastro` | `~/mock-result-drivers-slice2` | the 12-subpackage predecessor, superseded |
 | `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is now the 12-package slice-2 build |
-| `ubuntuastro` | `~/build/slice2-stage/` | the runtime-only 23-deb set the slice-2 smoke test ran against, one version of each |
+| `ubuntuastro` | `~/build/slice3-stage/` | the runtime-only 26-deb set the slice-3 smoke test ran against, one version of each |
 | `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`, freshly rebuilt from current packaging |
 
 `~/mock-result-3rdparty` and `~/mock-result-3rdparty-fishcamp` on
@@ -548,14 +549,49 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
      `dh_install` complaining about touptek, which pointed nowhere near the
      cause.
 
-  **The rest of batch 1 remains: 19 drivers, still no new build dependency.**
+  **Slice 3 done, 2026-09-09: `aok`, `avalon`, `celestronaux`.** Fifteen
+  `-drivers` packages, 70 driver binaries. No new build dependency —
+  `libnova` and `GSL` have been `BuildRequires` here since `eqmod`. Built,
+  smoke-tested runtime-only and coexistence-verified on both distros, both
+  packagings independently reporting 70 binaries and 86 catalogue entries;
+  both boxes back at baseline. **No defects.** First slice in this line of
+  work to find nothing, which is what "repetition of a proven shape" is
+  supposed to look like — the udev and `INDI_DATA_DIR` fixes from slice 2
+  carried these three with no new work.
+
+  These three were chosen because they are the only members of the Nova-only
+  group whose licence is unambiguous. The licence survey that picked them is
+  the real output of this slice, and it blocks most of the rest.
+
+  **The remaining 16 of batch 1 are mostly blocked on ONE licence decision,
+  not on packaging.** Read per file across all eleven Nova-only directories
+  on 2026-09-09:
+
+  | Driver | Grant, read per file | Licence text in its own directory |
+  |---|---|---|
+  | `nexdome`, `talon6` | **LGPL-2.0-only** — "version 2", no "or later" | none |
+  | `ocs` | **LGPL-2.0-only** | `LICENSE.txt`, which is the **GPL-2** text — a real contradiction, not staleness |
+  | `bresserexos2`, `rtklib` | **GPL-2.0-or-later** | none |
+  | `gpsnmea` | **GPL-2.0-or-later**, plus `minmea.h`, third-party, unread | none |
+  | `starbook-ten` | LGPL-2.0-only, plus `httplib.h`, third-party, unread | `COPYING` (GPL-2) and `COPYING.LESSER` (LGPL-2.1) — neither matches the grant |
+  | `rolloffino` | **no licence header in any file** | none |
+
+  **The decision needed: what licence text to ship for a driver whose grant
+  has no matching text anywhere in the source tree.** There is no LGPL-2.0
+  text in indi-3rdparty at all — checked, not assumed: `starbook-ten`'s
+  `COPYING.LESSER` is 2.1 and `libinovasdk`'s `LICENSE.lib` is a vendor
+  notice, not LGPL. Pointing `%license` at the top-level `LICENSE` would ship
+  LGPL-2.1 text for LGPL-2.0-only code, and `indi-shelyak` (GPL-2.0-or-later,
+  no text) has the same problem from the no-dependency group. Answering this
+  once unblocks roughly eight drivers; it is a redistribution question, so it
+  is Will's, not a packaging detail to decide silently.
+
+  **The rest of batch 1 remains: 16 drivers, still no new build dependency.**
   The full list is in `DESIGN.md`'s survey. Known before starting:
   - `indi-shelyak` is **GPL-2.0-or-later, not LGPL** — all four files grant
     "version 2 ... or (at your option) any later version" under the plain GPL,
     while the same headers point at a `COPYING.LIB`/`LICENSE` that does not
-    exist in the directory. It needs its own `License:` tag like `eqmod`, and
-    a decision about which licence text to ship, since `indi-shelyak/` carries
-    none and the top-level `LICENSE` is the wrong one for it.
+    exist in the directory. Same blocked decision as the table above.
   - `indi-dsi` installs a firmware blob, `meade-deepskyimager.hex`, whose
     licence has not been read. Settle that before including it.
   - Four more drivers ship udev rules (`dsi`, `nightscape`, `openogma`,
