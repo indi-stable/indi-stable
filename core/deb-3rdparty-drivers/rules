@@ -91,9 +91,7 @@ override_dh_auto_configure:
 		-DWITH_GPSNMEA=OFF \
 		-DWITH_LIMESDR=OFF \
 		-DWITH_MGEN=OFF \
-		-DWITH_NEXDOME=OFF \
 		-DWITH_NIGHTSCAPE=OFF \
-		-DWITH_OCS=OFF \
 		-DWITH_OPENOGMA=OFF \
 		-DWITH_ORION_SSG3=OFF \
 		-DWITH_RADIOSIM=OFF \
@@ -102,9 +100,7 @@ override_dh_auto_configure:
 		-DWITH_SHELYAK=OFF \
 		-DWITH_SPECTRACYBER=OFF \
 		-DWITH_STARBOOK=OFF \
-		-DWITH_STARBOOK_TEN=OFF \
 		-DWITH_SX=OFF \
-		-DWITH_TALON6=OFF \
 		"-DWITH_TICFOCUSER-NG=OFF" \
 		-DWITH_WEEWX_JSON=OFF \
 		-DWITH_WEBCAM=OFF \
@@ -233,7 +229,8 @@ override_dh_auto_install:
 	                   indi_armadillo_focus indi_platypus_focus indi_seletek_rotator \
 	                   indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
 	                   indi_maxdomeii indi_lx200aok indi_lx200stargo \
-	                   indi_celestron_aux; do \
+	                   indi_celestron_aux indi_nexdome indi_talon6 indi_ocs \
+	                   indi_starbook_ten; do \
 		test -x debian/tmp$(INDI_BINDIR)/$$bin \
 			|| { echo "ERROR: $$bin did not install -- an upstream WITH_* default or driver name changed"; exit 1; }; \
 	done

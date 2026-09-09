@@ -41,6 +41,66 @@ License: LGPL-2.0-only
  own, so there is no "or later" grant to upgrade the tag with. The
  conservative, defensible reading is the plain v2 text as written.
 
+Files: indi-nexdome/* indi-talon6/* indi-ocs/* indi-starbook-ten/*
+Copyright: 2019 Jasem Mutlaq
+ 2017 Rozeware Development Ltd
+ 2014/2023 Jasem Mutlaq, Ed Lee
+ The Vixen Starbook TEN driver authors and the INDI Library contributors
+License: LGPL-2.0-only
+ Read per file across all four directories (2026-09-09), every file
+ accounted for: each grants "the GNU Library General Public License version
+ 2 as published by the Free Software Foundation" with NO "or later" clause.
+ That makes them LGPL-2.0-only, the same conservative reading indi-inovaplx
+ already gets here and for the same reason -- there is no later-version
+ grant to widen the tag with.
+ .
+ Four files in indi-starbook-ten (indi_starbook_ten.cpp/.h,
+ starbook_ten.cpp/.h) carry no licence header at all. They state no
+ contradicting grant, so the rest of the directory governs.
+ .
+ THE TEXT SHIPPED WITH THESE PACKAGES IS LGPL-2.1, NOT LGPL-2.0. That is a
+ deliberate decision (Will, 2026-09-09): indi-3rdparty contains no LGPL-2.0
+ text anywhere, checked rather than assumed -- indi-starbook-ten/COPYING.LESSER
+ is 2.1 and libinovasdk/LICENSE.lib is a vendor notice. The alternatives were
+ shipping no licence text or shipping a file from outside the source tarball.
+ The License field above, which is what tooling and downstream consumers
+ read, states the actual grant; only the accompanying text is the nearest
+ available rather than the exact one.
+ .
+ indi-ocs additionally bundles a LICENSE.txt which is the GPL-2 text,
+ contradicting every source header in its directory. That is a real
+ contradiction rather than the staleness indi-apogee and indi-sbig carry, so
+ it is not shipped -- a GPL text beside LGPL code would overstate the terms.
+ .
+ On Debian systems the full text of the LGPL-2.1 can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
+Files: indi-starbook-ten/httplib.h
+Copyright: 2020 Yuji Hirose
+License: MIT
+ cpp-httplib, bundled by upstream and genuinely compiled in -- both
+ starbook_ten.h and connectionhttp.h include it -- so it appears in the
+ indi-stable-3rdparty-drivers-starbook-ten binary package's License field
+ as well.
+ .
+ Permission is hereby granted, free of charge, to any person obtaining a
+ copy of this software and associated documentation files (the "Software"),
+ to deal in the Software without restriction, including without limitation
+ the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software, and to permit persons to whom the
+ Software is furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in
+ all copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ DEALINGS IN THE SOFTWARE.
+
 Files: indi-aok/* indi-avalon/* indi-celestronaux/*
 Copyright: The AOK, Avalon Instruments and Celestron driver authors
  Jasem Mutlaq and the INDI Library contributors

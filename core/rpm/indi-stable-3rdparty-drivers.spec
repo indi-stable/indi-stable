@@ -370,6 +370,65 @@ indi_celestron_aux, speaking Celestron's AUX protocol directly rather than
 the NexStar serial protocol the core INDI driver uses. The only driver in
 this package that needs GSL as well as libnova.
 
+# --- The LGPL-2.0-only group -------------------------------------------------
+# Four drivers whose every source file grants "the GNU Library General Public
+# License version 2 as published by the Free Software Foundation" with NO "or
+# later" clause -- read per file, not spot-checked. That is LGPL-2.0-only, the
+# same conservative reading inovasdk and eqmod's azgti sources already get
+# here, so each carries its own License: tag rather than inheriting the
+# LGPL-2.1-or-later half of this spec's aggregate.
+#
+# %%license for these ships the LGPL-2.1 TEXT, which is not the text of the
+# licence they grant. That is a deliberate decision by Will, 2026-09-09, taken
+# because indi-3rdparty contains no LGPL-2.0 text anywhere -- checked, not
+# assumed: indi-starbook-ten/COPYING.LESSER is 2.1 and libinovasdk/LICENSE.lib
+# is a vendor notice. The alternatives were shipping no licence text at all or
+# shipping something from outside the source tarball. The License: tag, which
+# is what tooling and downstream consumers actually read, states the grant
+# accurately in every case; it is only the accompanying text that is the
+# nearest available rather than the exact one. See DESIGN.md.
+%package nexdome
+Summary:        NexDome observatory dome INDI driver (firmware v3+)
+License:        LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description nexdome
+indi_nexdome, for NexDome domes running firmware v3 or later. Upstream
+rewrote this driver completely for v3; firmware v1 is not supported.
+
+%package talon6
+Summary:        Talon6 roll-off roof controller INDI driver
+License:        LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description talon6
+indi_talon6, for the Talon6 observatory roof controller.
+
+%package ocs
+Summary:        OnCue OCS observatory control system INDI driver
+License:        LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description ocs
+indi_ocs, for the OnCue Observatory Control System.
+
+Ships the top-level LGPL-2.1 text rather than its own bundled LICENSE.txt,
+which is the GPL-2 text and contradicts every source header in the
+directory. That is a genuine contradiction rather than the staleness apogee
+and sbig carry, and shipping a GPL text alongside LGPL code would overstate
+the terms in the more restrictive direction.
+
+%package starbook-ten
+Summary:        Vixen Starbook TEN mount INDI driver
+License:        LGPL-2.0-only AND MIT
+Requires:       indi-stable-core-libs%{?_isa}
+%description starbook-ten
+indi_starbook_ten, for Vixen Starbook TEN mount controllers, which it drives
+over HTTP rather than a serial protocol.
+
+The only subpackage here carrying MIT code: it bundles cpp-httplib
+(httplib.h, Copyright (c) 2020 Yuji Hirose), which is genuinely compiled in
+-- both starbook_ten.h and connectionhttp.h include it -- and so appears in
+this subpackage's License: tag. Unlike its three siblings in this group it
+ships its OWN COPYING.LESSER, which is the same LGPL-2.1 text.
+
 %package touptek
 Summary:        Touptek and rebranded-Touptek camera INDI drivers (11 brands)
 Requires:       indi-stable-core-libs%{?_isa}
@@ -543,9 +602,7 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_GPSNMEA=OFF \
     -DWITH_LIMESDR=OFF \
     -DWITH_MGEN=OFF \
-    -DWITH_NEXDOME=OFF \
     -DWITH_NIGHTSCAPE=OFF \
-    -DWITH_OCS=OFF \
     -DWITH_OPENOGMA=OFF \
     -DWITH_ORION_SSG3=OFF \
     -DWITH_RADIOSIM=OFF \
@@ -554,9 +611,7 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_SHELYAK=OFF \
     -DWITH_SPECTRACYBER=OFF \
     -DWITH_STARBOOK=OFF \
-    -DWITH_STARBOOK_TEN=OFF \
     -DWITH_SX=OFF \
-    -DWITH_TALON6=OFF \
     "-DWITH_TICFOCUSER-NG=OFF" \
     -DWITH_WEEWX_JSON=OFF \
     -DWITH_WEBCAM=OFF \
@@ -728,7 +783,8 @@ for _bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
             indi_armadillo_focus indi_platypus_focus indi_seletek_rotator \
             indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
             indi_maxdomeii indi_lx200aok indi_lx200stargo \
-            indi_celestron_aux; do
+            indi_celestron_aux indi_nexdome indi_talon6 indi_ocs \
+            indi_starbook_ten; do
     test -x %{buildroot}%{indi_bindir}/${_bin} \
         || { echo "ERROR: ${_bin} did not install -- an upstream WITH_* default or driver name changed"; exit 1; }
 done
@@ -912,6 +968,46 @@ done
 %dir %{indi_datadir}
 %{indi_bindir}/indi_celestron_aux
 %{indi_datadir}/indi_celestronaux.xml
+
+# These four grant LGPL-2.0-only and ship the LGPL-2.1 text -- see the
+# %%package block above for why, and DESIGN.md for the decision itself.
+# starbook-ten uses its own COPYING.LESSER rather than the top-level LICENSE
+# only because it has one; the two are the same licence text.
+%files nexdome
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_nexdome
+%{indi_datadir}/indi_nexdome.xml
+
+%files talon6
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_talon6
+%{indi_datadir}/indi_talon6.xml
+
+%files ocs
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_ocs
+%{indi_datadir}/indi_ocs.xml
+
+%files starbook-ten
+%license indi-starbook-ten/COPYING.LESSER
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_starbook_ten
+%{indi_datadir}/indi_starbook_ten.xml
 
 %files touptek
 %license indi-toupbase/COPYING.LGPL

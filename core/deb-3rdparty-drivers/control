@@ -244,6 +244,54 @@ Description: Celestron AUX-protocol mount INDI driver
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.
 
+# The LGPL-2.0-only group: every source file grants the Library GPL "version
+# 2" with no "or later" clause. See debian/copyright, which also records why
+# these ship the LGPL-2.1 text.
+Package: indi-stable-3rdparty-drivers-nexdome
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: NexDome observatory dome INDI driver (firmware v3+)
+ indi_nexdome, for NexDome domes running firmware v3 or later. Upstream
+ rewrote this driver completely for v3; firmware v1 is not supported.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-talon6
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Talon6 roll-off roof controller INDI driver
+ indi_talon6, for the Talon6 observatory roof controller.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-ocs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: OnCue OCS observatory control system INDI driver
+ indi_ocs, for the OnCue Observatory Control System.
+ .
+ Upstream bundles a LICENSE.txt in this driver's directory which is the
+ GPL-2 text and contradicts every source header in it. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-starbook-ten
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Vixen Starbook TEN mount INDI driver
+ indi_starbook_ten, for Vixen Starbook TEN mount controllers, which it
+ drives over HTTP rather than a serial protocol.
+ .
+ The only package here containing MIT code: it bundles cpp-httplib, which
+ is genuinely compiled in rather than merely present.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
 Package: indi-stable-3rdparty-drivers-touptek
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,
