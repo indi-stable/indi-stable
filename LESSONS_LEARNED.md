@@ -594,6 +594,42 @@ catalogues. Over the whole `v2.2.4.1` tree it now reports exactly two entries,
 both understood: `eqmod`'s AHP GT line, and `indi_kepler_ccd` in
 `indi_flipro.xml`, a catalogue neither packaging installs.
 
+## 26. Look for the file where it would be, not only where you looked last time
+
+`indi-beefocus` was held back from packaging for most of a session on the
+grounds that 24 of its 29 source files carried no licence header, three of
+them compiled straight into the driver binary. The survey behind that had
+listed its licence files as "NONE".
+
+It ships one. `indi-beefocus/firmware/LICENSE` is the full LGPL-2.1 text,
+sitting in the same subdirectory as the headerless files it governs. The
+survey missed it because it globbed `<driver>/COPYING*` and
+`<driver>/LICENSE*` — the driver's **top level** — and every other driver in
+the tree happens to put its licence there. One subdirectory down was outside
+the pattern, and the pattern had been right forty times running.
+
+Once found, the reading is not a judgement call at all: the headerless files
+are governed by their own directory's licence text, and the package ships
+both that and the different one its `driver/` tree grants.
+
+This is the same shape as the LGPL-2.0 error two entries of work earlier in
+the same session, where "indi-3rdparty ships no LGPL-2.0 text anywhere" was
+concluded from checking two candidate files, and seven copies existed. Both
+came from a search narrower than the claim it was used to support.
+
+**Rule:** when a search comes back empty and the conclusion is
+consequential, widen the search before widening the conclusion. `find`
+before `ls`, `grep -r` before spot-checks — and say which you ran, because
+"no licence file" and "no licence file at the top level" are different
+claims and only one of them was true.
+
+*Evidence:* found 2026-09-09 while finally packaging `beefocus`. The
+practical cost was a driver wrongly presented to Will as needing a licence
+judgement he should not have had to make. The 2026-09-08 dependency table
+has a third instance of the same family, where a case-sensitive regex made
+`FIND_PACKAGE(FTDI1 REQUIRED)` invisible and `indi-nightscape` was twice
+reported as needing no dependencies.
+
 ## 25. A hardcoded list stops testing the thing you just added, silently
 
 Running the two Debian upgrade-path harnesses against a newly-added driver

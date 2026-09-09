@@ -543,6 +543,22 @@ B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
 
+### `beefocus` added — verified 2026-09-09
+
+Thirty binary packages, 86 driver binaries, `lintian` **0 errors**. The last
+driver of the non-blob batch.
+
+`debian/copyright` gains **two** stanzas for this one driver, which is the
+point of it: `indi-beefocus/driver/*` is LGPL-2.0-only and
+`indi-beefocus/firmware/*` is LGPL-2.1-only, and three files from the second
+are compiled into the binary rather than merely shipped as source.
+
+The firmware stanza is worth reading before assuming a headerless file is
+ungoverned. No file in `firmware/` carries a licence header, but the
+directory ships its own full LGPL-2.1 as `firmware/LICENSE` — which a
+licence survey that globs only `<driver>/LICENSE*` will not find. See
+`LESSONS_LEARNED.md` #26.
+
 ### The GPL-2.0-or-later group added — verified 2026-09-09
 
 `bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine

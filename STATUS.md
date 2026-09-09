@@ -117,10 +117,10 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests |
 | `fedoraastro` | `~/mock-result-drivers-rel2new` | `-drivers` `2.2.4.1-2` scratch, with eqmod |
 | `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
-| `fedoraastro` | `~/mock-result-drivers-slice6` | `-drivers` `2.2.4.1-1`, **29 subpackages** — the current build |
-| `fedoraastro` | `~/mock-result-drivers-slice2`..`-slice5`, `-lic` | 12- to 24-subpackage predecessors, superseded |
+| `fedoraastro` | `~/mock-result-drivers-slice7` | `-drivers` `2.2.4.1-1`, **30 subpackages** — the current build |
+| `fedoraastro` | `~/mock-result-drivers-slice2`..`-slice6`, `-lic` | 12- to 29-subpackage predecessors, superseded |
 | `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is now the 12-package slice-2 build |
-| `ubuntuastro` | `~/build/slice6-stage/` | the runtime-only 40-deb set the slice-6 smoke test ran against, one version of each |
+| `ubuntuastro` | `~/build/slice7-stage/` | the runtime-only 41-deb set the slice-7 smoke test ran against, one version of each |
 | `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`, freshly rebuilt from current packaging |
 
 `~/mock-result-3rdparty` and `~/mock-result-3rdparty-fishcamp` on
@@ -611,6 +611,21 @@ existed in the tree. Seven directories bundle it, byte-identical, and this
 package was already shipping one of them with its `inovasdk` subpackage. The
 error and its lesson are recorded in `DESIGN.md` where the decision lives.
 
+  **Slice 7 done, 2026-09-09: `beefocus`, and its licence was not what the
+  file count suggested.** Thirty `-drivers` packages, 86 driver binaries.
+  The concern that deferred it — 24 of 29 files carrying no licence header,
+  three of them compiled in — dissolved on a proper read: `firmware/` ships
+  **its own full LGPL-2.1 text as `firmware/LICENSE`**, missed earlier
+  because the licence-file check only looked at each driver's top level. So
+  the headerless firmware sources are governed by their own directory's
+  licence, not inherited by inference.
+
+  `beefocus` is genuinely two licences and is the only subpackage here
+  shipping **two** licence texts: `driver/` is LGPL-2.0-only (five of six
+  files grant "version 2" with no "or later") and `firmware/` is
+  LGPL-2.1-only. Both texts come from the tarball, neither is guessed at.
+  `unit_tests/` is gated behind `INDI_BUILD_UNITTESTS` and never built.
+
   **Slice 6 done, 2026-09-09: the GPL-2.0-or-later group** —
   `bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine
   `-drivers` packages, 85 driver binaries. No new build dependency, no udev
@@ -633,9 +648,9 @@ error and its lesson are recorded in `DESIGN.md` where the decision lives.
 
 ### Genuinely open, not just untested — continued
 
-**Batch 1 is finished except for three drivers.** 29 of the 32 non-blob
-drivers originally scoped are built and verified on both distros. What
-remains is not packaging work:
+**Batch 1 is finished except for two drivers, and neither is packaging
+work.** 30 of the 32 non-blob drivers originally scoped are built and
+verified on both distros — 86 driver binaries, 30 `-drivers` packages.
 
 - **`dsi` — decided 2026-09-09, not shipping.** Will researched the Meade
   firmware situation independently and found it a hard no on Linux. The
@@ -652,15 +667,6 @@ remains is not packaging work:
   grant, and it ships no licence file. Unlike the headerless files elsewhere
   here, there is no grant anywhere in the directory for them to inherit.
   Needs upstream contact, not analysis.
-- **`beefocus` — deferred by Will, 2026-09-09, pending a decision he wanted
-  to make himself.** 5 of its 29 files grant LGPL-2.0-only; 24 carry
-  nothing, including the three `firmware/` sources compiled into the driver
-  binary. Treating the directory's grant as governing would be consistent
-  with the same call already made for `celestronaux`, `starbook-ten` and
-  `orion-ssg3`, and LGPL-2.0-only is the most conservative reading
-  available — but 24 of 29 is a far thinner basis than 2 of 6, which is why
-  it was not stretched silently.
-
 - **The License: tag's precision is a defensible aggregate, not a full
   per-file audit** — read in `indi-stable-3rdparty-libs.spec`'s own header
   comment for exactly which licences were read in full text versus inferred,

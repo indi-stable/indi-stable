@@ -597,6 +597,25 @@ it was done by copying the spec to `~/eqmod-build/` and checking its
 longer needed and should not be repeated; build from the clone. `STATUS.md`
 carries the current state of both machines.
 
+### `beefocus` added — verified 2026-09-09
+
+Thirty subpackages, 86 driver binaries; results in
+`~/mock-result-drivers-slice7`. The last driver of the non-blob batch.
+
+**The only subpackage here with two `%license` lines.** It links two source
+trees under different licences — `driver/` is LGPL-2.0-only and `firmware/`
+LGPL-2.1-only — so it ships both texts, and both come from the tarball:
+
+```bash
+rpm -qlp ~/mock-result-drivers-slice7/indi-stable-3rdparty-drivers-beefocus-2*.rpm \
+  | grep licenses
+```
+
+should list `COPYING.LIB` (481 lines, Version 2 June 1991) and `LICENSE`
+(504 lines, Version 2.1 February 1999). Checking the line counts matters
+here for the same reason it does for the two GPL-2 texts: the version line
+is one line deep and easy to skim past.
+
 ### The GPL-2.0-or-later group added — verified 2026-09-09
 
 `bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine
