@@ -205,6 +205,45 @@ Description: MaxDome II observatory dome INDI driver
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.
 
+# Three more non-blob drivers. They link libnova, and celestronaux also
+# libgsl, both already build dependencies here since eqmod -- so this slice
+# added none. All three are LGPL-2.1-or-later; see debian/copyright.
+Package: indi-stable-3rdparty-drivers-aok
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Astro-Electronic AOK Skywalker mount INDI driver
+ indi_lx200aok, an LX200-protocol driver for AOK Skywalker mount
+ controllers.
+ .
+ The source directory is indi-aok, the upstream build option is
+ WITH_SKYWALKER, the binary is indi_lx200aok and the catalogue is
+ indi_aok.xml. None of those can be derived from the others.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-avalon
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Avalon StarGo mount INDI driver
+ indi_lx200stargo, an LX200-protocol driver for Avalon Instruments StarGo
+ mount controllers. Its catalogue is indi_avalon.xml, named for the vendor
+ rather than the binary.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-celestronaux
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Celestron AUX-protocol mount INDI driver
+ indi_celestron_aux, speaking Celestron's AUX protocol directly rather than
+ the NexStar serial protocol the core INDI driver uses. The only driver
+ here that needs libgsl as well as libnova.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
 Package: indi-stable-3rdparty-drivers-touptek
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,

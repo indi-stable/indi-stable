@@ -77,11 +77,9 @@ override_dh_auto_configure:
 		-DWITH_ASTARBOX=OFF \
 		-DWITH_ASTROLINK4=OFF \
 		-DWITH_ASTROMECHFOC=OFF \
-		-DWITH_AVALON=OFF \
 		-DWITH_AVALONUD=OFF \
 		-DWITH_BEEFOCUS=OFF \
 		-DWITH_BRESSEREXOS2=OFF \
-		-DWITH_CAUX=OFF \
 		-DWITH_CLOUDWATCHER=OFF \
 		-DWITH_DREAMFOCUSER=OFF \
 		-DWITH_DSI=OFF \
@@ -102,7 +100,6 @@ override_dh_auto_configure:
 		-DWITH_ROLLOFFINO=OFF \
 		-DWITH_RTKLIB=OFF \
 		-DWITH_SHELYAK=OFF \
-		-DWITH_SKYWALKER=OFF \
 		-DWITH_SPECTRACYBER=OFF \
 		-DWITH_STARBOOK=OFF \
 		-DWITH_STARBOOK_TEN=OFF \
@@ -235,7 +232,8 @@ override_dh_auto_install:
 	                   indi_staradventurergti_telescope indi_staradventurer2i_telescope \
 	                   indi_armadillo_focus indi_platypus_focus indi_seletek_rotator \
 	                   indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
-	                   indi_maxdomeii; do \
+	                   indi_maxdomeii indi_lx200aok indi_lx200stargo \
+	                   indi_celestron_aux; do \
 		test -x debian/tmp$(INDI_BINDIR)/$$bin \
 			|| { echo "ERROR: $$bin did not install -- an upstream WITH_* default or driver name changed"; exit 1; }; \
 	done

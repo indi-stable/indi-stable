@@ -41,6 +41,23 @@ License: LGPL-2.0-only
  own, so there is no "or later" grant to upgrade the tag with. The
  conservative, defensible reading is the plain v2 text as written.
 
+Files: indi-aok/* indi-avalon/* indi-celestronaux/*
+Copyright: The AOK, Avalon Instruments and Celestron driver authors
+ Jasem Mutlaq and the INDI Library contributors
+License: LGPL-2.1-or-later
+ Read per file, not spot-checked (2026-09-09): every .cpp and .h in all
+ three directories grants "version 2.1 ... or (at your option) any later
+ version", except indi-celestronaux/adaptive_tuner.cpp and its header,
+ which carry no licence header at all. Those two state no contradicting
+ grant, so the rest of the directory governs.
+ .
+ None of the three ships a licence file of its own, so all three rely on
+ indi-3rdparty's top-level LICENSE -- the LGPL-2.1 text, which is correct
+ for them.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
 Files: indi-armadillo-platypus/* indi-maxdomeii/*
 Copyright: 2017 Lunatico Astronomia, Jaime Alemany
  2009 Ferran Casarramona

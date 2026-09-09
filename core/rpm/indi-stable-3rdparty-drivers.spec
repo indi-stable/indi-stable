@@ -330,6 +330,46 @@ indi-maxdomeii/CMakeLists.txt builds as part of the default target but never
 install()s -- so unlike the asi and playerone diagnostic tools removed in
 %%install, it never reaches the buildroot and needs no removal.
 
+# Three more non-blob drivers, added 2026-09-09 as the third slice. Like
+# armadillo-platypus and maxdomeii they need no vendor blob and so carry no
+# -libs Requires; unlike those two they do link libnova, and celestronaux
+# also GSL -- both already BuildRequires here since eqmod, so this slice
+# added no new build dependency at all.
+#
+# All three are LGPL-2.1-or-later and therefore carry no License: tag of
+# their own, read from every .cpp/.h in each directory rather than
+# spot-checked. celestronaux has two files with no licence header at all
+# (adaptive_tuner.cpp/.h, a PID helper); they carry no contradicting grant,
+# so the directory's own reading stands. See STATUS.md for the several
+# NEIGHBOURING drivers in this same dependency group that are NOT here,
+# each held back on a real licence question rather than on packaging.
+%package aok
+Summary:        Astro-Electronic AOK Skywalker mount INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description aok
+indi_lx200aok, an LX200-protocol driver for AOK Skywalker mount controllers.
+
+Note the three-way name mismatch this package documents rather than hides:
+the source directory is indi-aok, the upstream option is WITH_SKYWALKER, the
+binary is indi_lx200aok and the catalogue is indi_aok.xml. None of them can
+be derived from the others.
+
+%package avalon
+Summary:        Avalon StarGo mount INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description avalon
+indi_lx200stargo, an LX200-protocol driver for Avalon Instruments StarGo
+mount controllers. Catalogue is indi_avalon.xml, named for the vendor
+rather than the binary.
+
+%package celestronaux
+Summary:        Celestron AUX-protocol mount INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description celestronaux
+indi_celestron_aux, speaking Celestron's AUX protocol directly rather than
+the NexStar serial protocol the core INDI driver uses. The only driver in
+this package that needs GSL as well as libnova.
+
 %package touptek
 Summary:        Touptek and rebranded-Touptek camera INDI drivers (11 brands)
 Requires:       indi-stable-core-libs%{?_isa}
@@ -489,11 +529,9 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_ASTARBOX=OFF \
     -DWITH_ASTROLINK4=OFF \
     -DWITH_ASTROMECHFOC=OFF \
-    -DWITH_AVALON=OFF \
     -DWITH_AVALONUD=OFF \
     -DWITH_BEEFOCUS=OFF \
     -DWITH_BRESSEREXOS2=OFF \
-    -DWITH_CAUX=OFF \
     -DWITH_CLOUDWATCHER=OFF \
     -DWITH_DREAMFOCUSER=OFF \
     -DWITH_DSI=OFF \
@@ -514,7 +552,6 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_ROLLOFFINO=OFF \
     -DWITH_RTKLIB=OFF \
     -DWITH_SHELYAK=OFF \
-    -DWITH_SKYWALKER=OFF \
     -DWITH_SPECTRACYBER=OFF \
     -DWITH_STARBOOK=OFF \
     -DWITH_STARBOOK_TEN=OFF \
@@ -690,7 +727,8 @@ for _bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
             indi_staradventurergti_telescope indi_staradventurer2i_telescope \
             indi_armadillo_focus indi_platypus_focus indi_seletek_rotator \
             indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
-            indi_maxdomeii; do
+            indi_maxdomeii indi_lx200aok indi_lx200stargo \
+            indi_celestron_aux; do
     test -x %{buildroot}%{indi_bindir}/${_bin} \
         || { echo "ERROR: ${_bin} did not install -- an upstream WITH_* default or driver name changed"; exit 1; }
 done
@@ -844,6 +882,36 @@ done
 %dir %{indi_datadir}
 %{indi_bindir}/indi_maxdomeii
 %{indi_datadir}/indi_maxdomeii.xml
+
+# None of these three ships a licence file of its own, so all three point at
+# indi-3rdparty's top-level LICENSE -- which is the right text for them: it
+# is the LGPL-2.1 these directories grant.
+%files aok
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_lx200aok
+%{indi_datadir}/indi_aok.xml
+
+%files avalon
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_lx200stargo
+%{indi_datadir}/indi_avalon.xml
+
+%files celestronaux
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_celestron_aux
+%{indi_datadir}/indi_celestronaux.xml
 
 %files touptek
 %license indi-toupbase/COPYING.LGPL
