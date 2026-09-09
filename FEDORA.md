@@ -597,6 +597,37 @@ it was done by copying the spec to `~/eqmod-build/` and checking its
 longer needed and should not be repeated; build from the clone. `STATUS.md`
 carries the current state of both machines.
 
+### The remaining no-dependency drivers added — verified 2026-09-09
+
+`aagcloudwatcher-ng`, `nightscape`, `openogma`, `orion-ssg3`, `atik-efw`.
+Twenty-four subpackages, 79 driver binaries; results in
+`~/mock-result-drivers-slice5`.
+
+**The first build failed at configure, and the cause was a defect in our own
+dependency survey rather than in the packaging:**
+
+```
+CMake Error at cmake_modules/FindFTDI1.cmake:50 (message):
+  FTDI not found.  Please install libftdi1-dev
+Call Stack (most recent call first):
+  indi-nightscape/CMakeLists.txt:15 (FIND_PACKAGE)
+```
+
+`indi-nightscape` writes `FIND_PACKAGE(FTDI1 REQUIRED)` in upper case, and
+the extraction behind `DESIGN.md`'s dependency table matched only lower-case
+`find_package`. Two passes had reported nightscape as needing nothing.
+`BuildRequires: libftdi-devel` added — **note the Fedora name has no `1`**,
+unlike Debian's `libftdi1-dev`.
+
+The udev rule count is now **four**, from three different upstream
+mechanisms, and the `%install` assertion is an exact count rather than "at
+least one" precisely so a fifth fails here with an explanation.
+
+Verified against the built RPMs: 24 subpackages, all catalogues under
+`/opt`, nothing under `/usr/bin`, all four rules present only under their
+re-homed names, and `aagcloudwatcher_test_ng` in no package. Cross-checked
+with the Debian build at **79 driver binaries and 96 catalogue entries**.
+
 ### The LGPL-2.0-only group added — verified 2026-09-09
 
 `nexdome`, `talon6`, `ocs` and `starbook-ten`. Nineteen subpackages, 74

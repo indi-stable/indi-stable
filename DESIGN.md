@@ -1172,6 +1172,26 @@ on a licence finding read in full from `libqsi/COPYING` — see "QSI and
 Fishcamp resolved" below — not on a missing build dependency. The dependency
 was only ever the reason its *configure* failed first.
 
+**Re-derived a THIRD time, 2026-09-09, after a build failure — the
+extraction itself was case-sensitive.** `indi-nightscape` requires `FTDI1`,
+and both earlier passes reported it as needing nothing: its `CMakeLists.txt`
+writes `FIND_PACKAGE(FTDI1 REQUIRED)` in **upper case**, and the regex both
+passes used matched only lower-case `find_package`. The build caught it at
+configure — `FTDI not found. Please install libftdi1-dev` — which is the
+only reason it was found. A survey defect, not a packaging one, and the
+third time this table has been wrong.
+
+Re-run case-insensitively over the whole tree, `indi-nightscape` is the
+**only** non-obsolete driver affected; the two other upper-case users are a
+test subdirectory and an obsolete driver. The damage was contained to one
+row, but the lesson is the ordinary one: the extraction that produces a
+table needs a control as much as any other check does.
+
+`FTDI1` resolves to `libftdi-devel` on Fedora and `libftdi1-dev` on Debian,
+both already confirmed present. `indi-nightscape` also calls
+`FIND_PACKAGE(D2XX)`, FTDI's proprietary driver; it is not `REQUIRED`,
+neither distro packages it, and the build falls back to libftdi.
+
 **Re-derived a second time, mechanically, 2026-09-09 — three of the table's
 entries are directories the build can never reach.** The 2026-09-08 pass read
 every `indi-*/CMakeLists.txt`, which is why its dependency columns hold up
@@ -1260,10 +1280,21 @@ touches.
 `talon6`, `ocs` and `starbook-ten` — grant "the GNU Library General Public
 License version 2 as published by the Free Software Foundation" with no "or
 later" clause. That is LGPL-2.0-only, the same conservative reading
-`inovasdk` and `eqmod`'s AZ-GTi sources already get here. **indi-3rdparty
-ships no LGPL-2.0 text anywhere**, checked rather than assumed:
-`indi-starbook-ten/COPYING.LESSER` is 2.1, `libinovasdk/LICENSE.lib` is a
-vendor notice, and nothing else in the tree carries it.
+`inovasdk` and `eqmod`'s AZ-GTi sources already get here. **CORRECTION, 2026-09-09 — the premise
+below was wrong.** This section originally said indi-3rdparty ships no
+LGPL-2.0 text anywhere, "checked rather than assumed". Two candidate files
+had actually been checked — `indi-starbook-ten/COPYING.LESSER` (2.1) and
+`libinovasdk/LICENSE.lib` (a vendor notice) — and the conclusion was
+generalised from them, which is exactly the move this project's discipline
+exists to prevent. A `grep -rl` for the LGPL-2.0 text finds **seven**
+copies, all bundled as `COPYING.LIB`: `indi-apogee`, `indi-inovaplx`,
+`indi-sbig`, `indi-sx`, `indi-gphoto`, `indi-limesdr` and
+`indi-nightscape`.
+
+The exact text therefore **is** available in the tree, and these four
+drivers could ship it rather than the 2.1. What is shipped today is still
+the 2.1, as decided; but the decision rested on a false constraint and is
+open for re-making on the correct facts. See `STATUS.md`.
 
 The options were: ship no licence text, ship a file fetched from outside the
 source tarball, or ship the nearest text that is in the tree. The decision is

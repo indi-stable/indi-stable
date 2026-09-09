@@ -543,6 +543,32 @@ B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
 
+### The remaining no-dependency drivers added — verified 2026-09-09
+
+`aagcloudwatcher-ng`, `nightscape`, `openogma`, `orion-ssg3`, `atik-efw`.
+Twenty-four binary packages, 79 driver binaries, `lintian` **0 errors**.
+
+**`libftdi1-dev` is a new build dependency**, for `indi-nightscape` alone —
+found by the Fedora build failing at configure, not by the survey. Fedora
+spells the same library `libftdi-devel`, with no `1`. Both dependency
+generators pick up the runtime library on their own: the `.deb` gains
+`libftdi1-2 (>= 1.2)` through `${shlibs:Depends}` and the RPM gains
+`libftdi1.so.2()(64bit)`, neither hand-written.
+
+`debian/copyright` gains four stanzas, including the project's first
+**AGPL-3** one for `openogma`. Its full text is shipped with the binary
+package, since `/usr/share/common-licenses` does not carry the AGPL.
+
+The `appstream-metadata-missing-modalias-provide` warning now fires for all
+four rule-shipping packages rather than one. Still no override, for the
+reason given when it first appeared: the tag is accurate and AppStream
+metadata is out of scope.
+
+**`ubuntuastro` was restored by package NAME, not count.** Building this
+slice installed `libftdi1-dev` and pulled `libftdi1-doc` with it; both were
+purged afterward and the package set diffed against the pre-build list,
+coming back identical rather than merely back to 1839 (#6).
+
 ### The LGPL-2.0-only group added — verified 2026-09-09
 
 `nexdome`, `talon6`, `ocs` and `starbook-ten`. Nineteen binary packages, 74

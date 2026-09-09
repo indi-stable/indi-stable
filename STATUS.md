@@ -117,10 +117,10 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests |
 | `fedoraastro` | `~/mock-result-drivers-rel2new` | `-drivers` `2.2.4.1-2` scratch, with eqmod |
 | `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
-| `fedoraastro` | `~/mock-result-drivers-slice4` | `-drivers` `2.2.4.1-1`, **19 subpackages** — the current build |
-| `fedoraastro` | `~/mock-result-drivers-slice2`, `-slice3` | 12- and 15-subpackage predecessors, superseded |
+| `fedoraastro` | `~/mock-result-drivers-slice5` | `-drivers` `2.2.4.1-1`, **24 subpackages** — the current build |
+| `fedoraastro` | `~/mock-result-drivers-slice2`..`-slice4` | 12-, 15- and 19-subpackage predecessors, superseded |
 | `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is now the 12-package slice-2 build |
-| `ubuntuastro` | `~/build/slice4-stage/` | the runtime-only 30-deb set the slice-4 smoke test ran against, one version of each |
+| `ubuntuastro` | `~/build/slice5-stage/` | the runtime-only 35-deb set the slice-5 smoke test ran against, one version of each |
 | `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`, freshly rebuilt from current packaging |
 
 `~/mock-result-3rdparty` and `~/mock-result-3rdparty-fishcamp` on
@@ -573,45 +573,73 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   source header in its directory. No defects. Both packagings independently
   report 74 binaries and 90 catalogue entries; both boxes back at baseline.
 
-  **The remaining 12 of batch 1.** Four are blocked on a licence question
-  that the LGPL-2.1 decision does NOT cover, because the mismatch there is
-  between licence *families* rather than versions of one:
+  **Slice 5 done, 2026-09-09: `aagcloudwatcher-ng`, `nightscape`,
+  `openogma`, `orion-ssg3`, `atik-efw`.** Twenty-four `-drivers` packages, 79
+  driver binaries. The udev rule count went 1 → 4 and the exact-count
+  assertion in both packagings moved with it. Both packagings independently
+  report 79 binaries and 96 catalogue entries; both boxes at exact baseline,
+  `ubuntuastro` diffed by package NAME and identical, not merely 1839 again.
 
-  | Driver | Grant, read per file | Licence text in its own directory |
-  |---|---|---|
-  | `bresserexos2`, `rtklib` | **GPL-2.0-or-later** | none |
-  | `gpsnmea` | **GPL-2.0-or-later**, plus `minmea.h`, third-party, unread | none |
-  | `shelyak` | **GPL-2.0-or-later** | none; its headers name a `COPYING.LIB` and `LICENSE` that do not exist |
-  | `rolloffino` | **no licence header in any file** | none |
+  Licence outcomes, all read per file: `aagcloudwatcher-ng` is
+  GPL-3.0-or-later with a matching bundled GPL-3 text. `nightscape` has no
+  source header anywhere and its bundled `COPYING.LIB` is the LGPL-2.0 text,
+  so it is the one driver here whose shipped text exactly matches its tag.
+  `openogma` is **AGPL-3.0-only**, the only AGPL package in this project.
+  `orion-ssg3` bundles a GPL-3 `LICENSE` contradicting its own
+  LGPL-2.1-or-later headers, so that file is not shipped. `atik-efw` has **no
+  relationship to the Atik vendor SDK** — checked directly, its CMakeLists
+  asks only for INDI and Threads.
 
-  There *is* GPL-2 text in the tree — `indi-ocs/LICENSE.txt` and
-  `indi-starbook-ten/COPYING` both carry it — so unlike the LGPL-2.0 case the
-  nearest-text option here means pointing at another driver's file. That is a
-  different question from the one already settled, and `rolloffino` is
-  different again: nothing states a grant at all, so there is no reading to be
-  conservative about.
+  **`nightscape` needed a new build dependency nobody had found, and it took
+  a build failure.** `FIND_PACKAGE(FTDI1 REQUIRED)` is upper case, and the
+  survey regex that produced `DESIGN.md`'s dependency table was
+  case-sensitive, so two passes both reported nightscape as needing nothing.
+  It is the only non-obsolete driver affected. `libftdi-devel` /
+  `libftdi1-dev` added to both packagings; both dependency generators pick up
+  the runtime `libftdi1.so.2` on their own.
 
-  **The eight not blocked on licences** are the no-dependency group:
-  `aagcloudwatcher-ng`, `beefocus`, `dsi`, `nightscape`, `openogma`,
-  `orion-ssg3`, `astarbox`, and `atik-efw` (itself held on the vendor-blob
-  question). Four of them ship udev rules, which the re-homing already
-  handles, but the rule-count assertion in both packagings is deliberately an
-  exact count and will need updating with them. `dsi` additionally installs a
-  firmware blob, `meade-deepskyimager.hex`, whose licence has not been read.
-  `aagcloudwatcher-ng` installs a second binary that is a test tool
-  (`aagcloudwatcher_test_ng`) yet is a real `install(TARGETS)` target, unlike
-  maxdomeii's.
+### Open: re-decide the LGPL-2.0 licence text on correct facts
 
-  The full list is in `DESIGN.md`'s survey. Known before starting:
-  - `indi-shelyak` is **GPL-2.0-or-later, not LGPL** — all four files grant
-    "version 2 ... or (at your option) any later version" under the plain GPL,
-    while the same headers point at a `COPYING.LIB`/`LICENSE` that does not
-    exist in the directory. Same blocked decision as the table above.
-  - `indi-dsi` installs a firmware blob, `meade-deepskyimager.hex`, whose
-    licence has not been read. Settle that before including it.
-  - Four more drivers ship udev rules (`dsi`, `nightscape`, `openogma`,
-    `orion-ssg3`); the re-homing now in place handles them, but each needs its
-    own `%files`/`.install` line and the rule-count assertion updated.
+**The LGPL-2.1-text decision was made on a premise that turned out to be
+false, and that is my error, not Will's.** He was told indi-3rdparty contains
+no LGPL-2.0 text anywhere, "checked rather than assumed". Only two candidate
+files had been checked and the conclusion generalised from them. A `grep -rl`
+finds **seven** copies of the LGPL-2.0 text, all named `COPYING.LIB`:
+`indi-apogee`, `indi-inovaplx`, `indi-sbig`, `indi-sx`, `indi-gphoto`,
+`indi-limesdr` and `indi-nightscape`.
+
+So the exact text is available, and `nexdome`, `talon6`, `ocs` and
+`starbook-ten` could ship it instead of the 2.1. Nothing is broken — the
+`License:` tags state the real grant in every case and always did — but the
+decision deserves re-making now the constraint is gone. Shipped state is
+unchanged pending that.
+
+### Genuinely open, not just untested — continued
+
+- **The three drivers left in batch 1, each blocked for its own reason.**
+  - **`dsi`**: bundles `meade-deepskyimager.hex`, Meade's proprietary
+    EZUSB FX2 device firmware, with **no licence statement anywhere** in the
+    directory or the README — the same "no COPYING" situation that excluded
+    QSI and QHY. Upstream offers `INDI_INSTALL_FIRMWARE=OFF`, so the driver
+    could ship without the blob, at the cost of being unusable on a fresh
+    device until the firmware is obtained elsewhere. Also note its
+    `FIRMWARE_INSTALL_DIR` is a plain `set()` to `/usr/lib/firmware`, outside
+    the private prefix and unredirectable — the same class as
+    `RULES_INSTALL_DIR`.
+  - **`beefocus`**: compiles ESP8266 firmware sources into the driver binary
+    (`firmware/command_parser.cpp` and two more are in its `add_executable`).
+    5 of its 29 files carry LGPL-2.0-only, 24 carry nothing; which of the
+    *compiled* ones grant what has not been established.
+  - **`astarbox`**: genuinely mixed — `indi-astarbox.cpp/.h` are
+    GPL-2.0-or-later, `PCA9685.cpp/.h` are LGPL-2.1-or-later, five files
+    carry nothing, and its `COPYING.LGPL` is misnamed: it holds the GPL-3
+    text.
+- **The four GPL-2.0-or-later drivers** — `bresserexos2`, `rtklib`,
+  `gpsnmea`, `shelyak` — still need the same licence-text decision, and
+  unlike the LGPL-2.0 case GPL-2 text does exist in the tree
+  (`indi-ocs/LICENSE.txt`, `indi-starbook-ten/COPYING`). `gpsnmea` also
+  bundles `minmea.h` and `shelyak` needs its own tag. `rolloffino` states no
+  grant at all in any file.
 - **The License: tag's precision is a defensible aggregate, not a full
   per-file audit** — read in `indi-stable-3rdparty-libs.spec`'s own header
   comment for exactly which licences were read in full text versus inferred,
