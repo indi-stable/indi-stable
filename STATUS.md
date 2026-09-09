@@ -716,32 +716,40 @@ error and its lesson are recorded in `DESIGN.md` where the decision lives.
   `astarbox`'s `COPYING.LGPL` is misnamed and holds GPL-3, so it is not
   shipped.
 
-### Open: three Fedora core harnesses do not restore the box
+### Closed: the RPM harnesses now restore, and all four ran green
 
-`scripts/test-snapshot-a-depsolve.sh`, `scripts/test-snapshot-b-coexist.sh`
-and `scripts/test-upgrade-path.sh` have **no teardown step and no baseline
-check**, and none of them says so. Every Debian harness in this project
-restores by diffing and every one of them documents it; on the Fedora side
-only `scripts/test-devel-coexist.sh` does.
+`scripts/test-snapshot-a-depsolve.sh`, `scripts/test-snapshot-b-coexist.sh`,
+`scripts/test-upgrade-path.sh` and
+`scripts/test-pyindi-client-coexist-upgrade.sh` had **no teardown and no
+baseline check**, and none said so. All four now snapshot at the start and
+restore by diffing, via `scripts/lib-baseline.sh`.
 
-Found 2026-09-09 by running the first of them, which:
+**It is a library, not four pasted copies**, deliberately: four call sites at
+once is precisely how `LESSONS_LEARNED.md` #25 and #27 happen, and the Debian
+harnesses each carrying their own inline version is why the coexistence one
+still had an eight-vendor literal a day after its two siblings were fixed.
 
-- removed `kstars` — the package the whole coexistence guarantee is about —
-  and did not put it back;
-- left our own packages installed and `/opt/indi-stable` in place;
-- upgraded 11 `qt6` packages in place as a side effect of installing
-  `stellarium` from the live repositories, which is not reversible by
-  removing anything.
+It does one thing the Debian pattern never needed: **it puts back what the run
+removed.** `test-snapshot-a-depsolve.sh` removes `kstars` and `libindi` as
+part of the test, and a restore that only removes what was added is not a
+restore. On the re-run it reinstalled both, which is the exact failure that
+exposed all of this.
 
-The remaining two were **deliberately not run** pending a decision on this.
-Nothing about them is known to be wrong — they have simply never been safe
-to run on a box whose baseline matters, and that was not visible until a
-baseline was being kept.
+**The library was tested before being trusted**, by planting both failure
+shapes at once — install a package the baseline lacks, remove a leaf package
+it has — and requiring the restore to undo both. The first attempt planted
+`tree`, which was already installed, so it proved nothing; the second used
+`sl` and `tree` and exercised both paths for real.
 
-The fix is the Debian pattern: snapshot the package set at STEP 0, and at
-the end remove what is actually installed and diff names against the
-snapshot, with a planted-difference control proving the diff can see one.
-`scripts/test-config-b-coexist.sh` is the model.
+That test also found a bug in the drift detector: `join` on the package name
+cross-products the six names a Fedora box installs twice (`kernel`,
+`kernel-core`, `kernel-modules`, `kernel-modules-core`,
+`kernel-modules-extra`, `gpg-pubkey`) and invented twelve
+`6.19.10 -> 7.1.9` and `7.1.9 -> 6.19.10` upgrades on a run that changed
+nothing. Now compared only for names installed exactly once on both sides.
+
+All four re-ran green with `fedoraastro` **identical to its captured name
+baseline**, not merely back to the same count.
 
 ### Genuinely open, not just untested — continued
 
