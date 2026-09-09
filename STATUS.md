@@ -1087,8 +1087,19 @@ of the tests that mattered", are scripted, were run on `ubuntuastro` on
 watched firing.
 
 For `3rdparty/`: nothing. Coexistence is scripted,
-`scripts/test-3rdparty-coexist-deb.sh` — verified 2026-08-26, see the
-`indi-stable-3rdparty-drivers` — Debian side section above. The upgrade path
+`scripts/test-3rdparty-coexist-deb.sh` — **re-run green 2026-09-09 across
+all 30 driver packages**, 48 3rdparty packages in one transaction, with all
+three of its controls firing: the SONAME collision shown real (same soname,
+different sha256), `LD_LIBRARY_PATH` shown able to override `DT_RUNPATH` so
+the clean result in the step before it is a real outcome and not a blind
+check, and the restore diff shown able to report a planted difference.
+`ubuntuastro` back to baseline, diffed by package name.
+
+Its first run that day aborted, and correctly: the vendor list had just been
+made derived, and a **literal `24` further down** — 8 vendors × 2 plus 8
+drivers — no longer matched the 48 actually installed. Both the list and the
+count are derived now. Originally verified 2026-08-26, when it covered 8 of
+what were then 8 driver packages. The upgrade path
 is also scripted, `scripts/test-upgrade-path-3rdparty-deb.sh` and
 `scripts/test-upgrade-path-drivers-deb.sh` — both verified 2026-08-26.
 
