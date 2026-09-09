@@ -93,8 +93,20 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 **Baselines, both boxes, end of 2026-09-08.** Neither carries any
 `indi-stable` package and `/opt/indi-stable` is absent on both.
 
-- **`fedoraastro`: 2153 packages, byte-identical to its documented baseline**
-  after everything below.
+- **`fedoraastro`: 2167 packages as of 2026-09-09, and there is now a NAME
+  list**, `~/fedoraastro-baseline-2026-09-09.txt`. It had only ever had a
+  count, which is what `LESSONS_LEARNED.md` #6 says not to rely on, and the
+  gap showed: `scripts/test-snapshot-a-depsolve.sh` moved it from 2153 to
+  2167 and there was no name list to attribute the difference against.
+  Attributed from `dnf history` instead — 12 packages from that harness's
+  `dnf install -y stellarium`, plus 2 from reinstalling `kstars`, which the
+  same harness had removed and not put back.
+  **The box is not restorable to 2153**: that transaction also upgraded 11
+  `qt6` packages in place from 6.11.1 to 6.11.2, because it installs from
+  the live repositories. Re-baseline from 2167 and from the name list.
+  `dnf autoremove` is NOT the way to close the gap — it offers to remove 11
+  packages dated April and August, all of them baseline packages merely
+  orphaned by the churn.
 - **`ubuntuastro`: 1839 packages, not the 1832 this file used to say.** The
   difference is **not** leftover work — it is `unattended-upgrades` running a
   kernel and security update mid-session (7.0.0-30 → 7.0.0-31, plus
@@ -703,6 +715,33 @@ error and its lesson are recorded in `DESIGN.md` where the decision lives.
   GPL-2.0-or-later, its bundled PCA9685 PWM driver LGPL-2.1-or-later.
   `astarbox`'s `COPYING.LGPL` is misnamed and holds GPL-3, so it is not
   shipped.
+
+### Open: three Fedora core harnesses do not restore the box
+
+`scripts/test-snapshot-a-depsolve.sh`, `scripts/test-snapshot-b-coexist.sh`
+and `scripts/test-upgrade-path.sh` have **no teardown step and no baseline
+check**, and none of them says so. Every Debian harness in this project
+restores by diffing and every one of them documents it; on the Fedora side
+only `scripts/test-devel-coexist.sh` does.
+
+Found 2026-09-09 by running the first of them, which:
+
+- removed `kstars` — the package the whole coexistence guarantee is about —
+  and did not put it back;
+- left our own packages installed and `/opt/indi-stable` in place;
+- upgraded 11 `qt6` packages in place as a side effect of installing
+  `stellarium` from the live repositories, which is not reversible by
+  removing anything.
+
+The remaining two were **deliberately not run** pending a decision on this.
+Nothing about them is known to be wrong — they have simply never been safe
+to run on a box whose baseline matters, and that was not visible until a
+baseline was being kept.
+
+The fix is the Debian pattern: snapshot the package set at STEP 0, and at
+the end remove what is actually installed and diff names against the
+snapshot, with a planted-difference control proving the diff can see one.
+`scripts/test-config-b-coexist.sh` is the model.
 
 ### Genuinely open, not just untested — continued
 
