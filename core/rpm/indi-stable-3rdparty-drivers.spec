@@ -389,15 +389,13 @@ this package that needs GSL as well as libnova.
 # here, so each carries its own License: tag rather than inheriting the
 # LGPL-2.1-or-later half of this spec's aggregate.
 #
-# %%license for these ships the LGPL-2.1 TEXT, which is not the text of the
-# licence they grant. That is a deliberate decision by Will, 2026-09-09, taken
-# because indi-3rdparty contains no LGPL-2.0 text anywhere -- checked, not
-# assumed: indi-starbook-ten/COPYING.LESSER is 2.1 and libinovasdk/LICENSE.lib
-# is a vendor notice. The alternatives were shipping no licence text at all or
-# shipping something from outside the source tarball. The License: tag, which
-# is what tooling and downstream consumers actually read, states the grant
-# accurately in every case; it is only the accompanying text that is the
-# nearest available rather than the exact one. See DESIGN.md.
+# %%license for these ships the exact LGPL-2.0 text, taken from
+# indi-inovaplx/COPYING.LIB because none of the four directories bundles it.
+#
+# They shipped the LGPL-2.1 text briefly, on a survey claim that no LGPL-2.0
+# text existed anywhere in indi-3rdparty. Seven directories bundle it, all
+# byte-identical. Switched 2026-09-09 once that was found; see DESIGN.md for
+# the correction and the re-made decision.
 %package nexdome
 Summary:        NexDome observatory dome INDI driver (firmware v3+)
 License:        LGPL-2.0-only
@@ -420,11 +418,11 @@ Requires:       indi-stable-core-libs%{?_isa}
 %description ocs
 indi_ocs, for the OnCue Observatory Control System.
 
-Ships the top-level LGPL-2.1 text rather than its own bundled LICENSE.txt,
-which is the GPL-2 text and contradicts every source header in the
-directory. That is a genuine contradiction rather than the staleness apogee
-and sbig carry, and shipping a GPL text alongside LGPL code would overstate
-the terms in the more restrictive direction.
+Does not ship its own bundled LICENSE.txt, which is the GPL-2 text and
+contradicts every source header in the directory. That is a genuine
+contradiction rather than the staleness apogee and sbig carry, and a GPL
+text alongside LGPL code would overstate the terms in the more restrictive
+direction.
 
 %package starbook-ten
 Summary:        Vixen Starbook TEN mount INDI driver
@@ -437,8 +435,8 @@ over HTTP rather than a serial protocol.
 The only subpackage here carrying MIT code: it bundles cpp-httplib
 (httplib.h, Copyright (c) 2020 Yuji Hirose), which is genuinely compiled in
 -- both starbook_ten.h and connectionhttp.h include it -- and so appears in
-this subpackage's License: tag. Unlike its three siblings in this group it
-ships its OWN COPYING.LESSER, which is the same LGPL-2.1 text.
+this subpackage's License: tag. Its own bundled COPYING.LESSER is the LGPL-2.1
+and is therefore not shipped, its sources granting version 2 only.
 
 # --- The remaining no-vendor-dependency drivers ------------------------------
 # Five drivers needing nothing beyond INDI itself. Their licences are the
@@ -1070,12 +1068,23 @@ done
 %{indi_bindir}/indi_celestron_aux
 %{indi_datadir}/indi_celestronaux.xml
 
-# These four grant LGPL-2.0-only and ship the LGPL-2.1 text -- see the
-# %%package block above for why, and DESIGN.md for the decision itself.
-# starbook-ten uses its own COPYING.LESSER rather than the top-level LICENSE
-# only because it has one; the two are the same licence text.
+# These four grant LGPL-2.0-only and now ship the EXACT LGPL-2.0 text.
+#
+# None of the four directories bundles it, so all four point at
+# indi-inovaplx/COPYING.LIB. That is not an arbitrary pick: indi-inovaplx is
+# a driver this same spec builds and already declares LGPL-2.0-only, so the
+# reference stays inside this package's own build scope. Nor is the choice
+# load-bearing -- seven directories in this tarball bundle this file
+# (indi-apogee, indi-gphoto, indi-inovaplx, indi-limesdr, indi-nightscape,
+# indi-sbig, indi-sx) and all seven are byte-identical, sha256
+# c340cbee4974bb96... , checked rather than assumed.
+#
+# They shipped the LGPL-2.1 text until 2026-09-09, on a survey claim that no
+# LGPL-2.0 text existed in the tree. That claim was wrong, and conspicuously
+# so: THIS SPEC WAS ALREADY SHIPPING THE FILE, from %%files inovasdk above.
+# See DESIGN.md.
 %files nexdome
-%license LICENSE
+%license indi-inovaplx/COPYING.LIB
 %dir %{indi_prefix}
 %dir %{indi_bindir}
 %dir %{indi_prefix}/share
@@ -1084,7 +1093,7 @@ done
 %{indi_datadir}/indi_nexdome.xml
 
 %files talon6
-%license LICENSE
+%license indi-inovaplx/COPYING.LIB
 %dir %{indi_prefix}
 %dir %{indi_bindir}
 %dir %{indi_prefix}/share
@@ -1093,7 +1102,7 @@ done
 %{indi_datadir}/indi_talon6.xml
 
 %files ocs
-%license LICENSE
+%license indi-inovaplx/COPYING.LIB
 %dir %{indi_prefix}
 %dir %{indi_bindir}
 %dir %{indi_prefix}/share
@@ -1101,8 +1110,13 @@ done
 %{indi_bindir}/indi_ocs
 %{indi_datadir}/indi_ocs.xml
 
+# starbook-ten's own COPYING.LESSER is the 2.1 and so is NOT used, despite
+# being in its own directory. Its MIT half (httplib.h) has no separate text
+# file anywhere in the tarball -- the notice lives in the header's own
+# comment block -- so the License: tag carries it and debian/copyright holds
+# the full text; nothing is shipped for it here.
 %files starbook-ten
-%license indi-starbook-ten/COPYING.LESSER
+%license indi-inovaplx/COPYING.LIB
 %dir %{indi_prefix}
 %dir %{indi_bindir}
 %dir %{indi_prefix}/share

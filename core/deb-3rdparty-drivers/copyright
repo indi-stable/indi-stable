@@ -116,22 +116,21 @@ License: LGPL-2.0-only
  starbook_ten.cpp/.h) carry no licence header at all. They state no
  contradicting grant, so the rest of the directory governs.
  .
- THE TEXT SHIPPED WITH THESE PACKAGES IS LGPL-2.1, NOT LGPL-2.0. That is a
- deliberate decision (Will, 2026-09-09): indi-3rdparty contains no LGPL-2.0
- text anywhere, checked rather than assumed -- indi-starbook-ten/COPYING.LESSER
- is 2.1 and libinovasdk/LICENSE.lib is a vendor notice. The alternatives were
- shipping no licence text or shipping a file from outside the source tarball.
- The License field above, which is what tooling and downstream consumers
- read, states the actual grant; only the accompanying text is the nearest
- available rather than the exact one.
+ These packages briefly referenced the LGPL-2.1, on a survey claim that
+ indi-3rdparty contained no LGPL-2.0 text anywhere. That claim was wrong:
+ seven directories bundle it as COPYING.LIB (indi-apogee, indi-gphoto,
+ indi-inovaplx, indi-limesdr, indi-nightscape, indi-sbig, indi-sx), all
+ byte-identical, and this source package was already shipping one of them
+ with its inovasdk binary package. Corrected 2026-09-09 to reference the
+ exact licence.
  .
  indi-ocs additionally bundles a LICENSE.txt which is the GPL-2 text,
  contradicting every source header in its directory. That is a real
  contradiction rather than the staleness indi-apogee and indi-sbig carry, so
  it is not shipped -- a GPL text beside LGPL code would overstate the terms.
  .
- On Debian systems the full text of the LGPL-2.1 can be found in
- /usr/share/common-licenses/LGPL-2.1.
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.
 
 Files: indi-starbook-ten/httplib.h
 Copyright: 2020 Yuji Hirose

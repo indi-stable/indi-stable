@@ -250,7 +250,7 @@ Description: Celestron AUX-protocol mount INDI driver
 
 # The LGPL-2.0-only group: every source file grants the Library GPL "version
 # 2" with no "or later" clause. See debian/copyright, which also records why
-# these ship the LGPL-2.1 text.
+# these ship the exact LGPL-2.0 text.
 Package: indi-stable-3rdparty-drivers-nexdome
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
