@@ -1115,9 +1115,9 @@ those for every driver here):
 | Needs only `Nova` (`libnova-devel` / `libnova-dev`) | `indi-aok`, `indi-avalon`, `indi-bresserexos2`, `indi-celestronaux` (+`GSL`), `indi-eqmod` (+`GSL`), `indi-gpsnmea`, `indi-nexdome`, `indi-ocs`, `indi-rolloffino`, `indi-rtklib`, `indi-starbook-ten`, `indi-talon6` |
 |---|---|
 | No extra dependency beyond INDI itself | `indi-armadillo-platypus`, `indi-nightscape`, `indi-openogma`, `indi-shelyak`, `indi-aagcloudwatcher-ng`, `indi-dsi`, `indi-orion-ssg3`, `indi-maxdomeii`, `indi-beefocus`, `indi-atik-efw`\* |
-| `find_package(RT)` and nothing else | `indi-astarbox`, `indi-asi-power`, `indi-rpi-gpio` — the latter two are Raspberry Pi GPIO drivers |
+| `find_package(RT)` and nothing else | `indi-astarbox`. (`indi-asi-power` and `indi-rpi-gpio` were listed here and are **orphan directories the build never adds** — see the 2026-09-09 re-derivation below) |
 | `GTest`/`GMock` in `find_package()` but their result unused, so **not a real `BuildRequires`** | `indi-atik-efw`\*, `indi-beefocus`, `indi-maxdomeii`, `indi-starbook`, `indi-eqmod`. Two different mechanisms, both checked: `indi-atik-efw` and `indi-maxdomeii` wrap the call in `IF (INDI_BUILD_UNITTESTS)`, which this project never sets; `indi-eqmod` instead hardcodes `set(INDI_BUILD_UNITTESTS FALSE)` immediately *before* an unguarded `find_package(GTest)`, so the call runs but nothing consumes it. Neither form is REQUIRED, so neither fails configure when GTest is absent |
-| One extra library, ordinary Fedora/Debian package | `indi-duino`/`indi-starbook` (`CURL`→`libcurl-devel`), `indi-weewx-json` (`CURL`+`nlohmann_json`), `indi-avalonud` (`nlohmann_json`+`ZMQ`→`json-devel`+`cppzmq-devel`), `indi-sx` (`hidapi`→`hidapi-devel`), `indi-mgen` (`FTDI1`→`libftdi-devel` on Fedora / `libftdi1-dev` on Debian — note the Fedora name has no `1`; both confirmed present 2026-09-09), `indi-ffmv` (`DC1394`→`libdc1394-devel`, an EOL FireWire camera), `indi-limesdr` (`LIMESUITE` — **Debian-only**, no Fedora package; see the availability note below), `indi-gpsd` (`GPSD`→`gpsd-devel`/`libgps-dev`), `indi-weather-mqtt` (`Mosquitto`) |
+| One extra library, ordinary Fedora/Debian package | `indi-duino` (`CURL`→`libcurl-devel`), `indi-starbook` (`CURL`+`Nova`), `indi-weewx-json` (`CURL`+`nlohmann_json`), `indi-avalonud` (`nlohmann_json`+`ZMQ`→`json-devel`+`cppzmq-devel`), `indi-sx` (`hidapi`→`hidapi-devel`), `indi-mgen` (`FTDI1`→`libftdi-devel` on Fedora / `libftdi1-dev` on Debian — note the Fedora name has no `1`; both confirmed present 2026-09-09), `indi-ffmv` (`DC1394`→`libdc1394-devel`, an EOL FireWire camera), `indi-limesdr` (`LIMESUITE` — **Debian-only**, no Fedora package; see the availability note below), `indi-gpsd` (`GPSD`→`gpsd-devel`/`libgps-dev`), ~~`indi-weather-mqtt` (`Mosquitto`)~~ — **orphan directory, never added by the build** |
 | `find_package(GPIOD)` wrapped in its own success check, so the driver silently doesn't build if the package is absent rather than failing configure | `indi-gpio` (Raspberry Pi GPIO; `libgpiod-devel` exists on both distros if wanted) |
 | Heaviest new surface | `indi-gphoto` (`GPHOTO2`+`JPEG`+`LibRaw`→`gphoto2-devel`+`libjpeg-turbo-devel`+`libraw-devel` — DSLR control, plausibly wanted for an astrophotography audience despite the dependency count) |
 
@@ -1171,6 +1171,53 @@ Everything else resolves on Fedora: `libnova-devel`, `gsl-devel`,
 on a licence finding read in full from `libqsi/COPYING` — see "QSI and
 Fishcamp resolved" below — not on a missing build dependency. The dependency
 was only ever the reason its *configure* failed first.
+
+**Re-derived a second time, mechanically, 2026-09-09 — three of the table's
+entries are directories the build can never reach.** The 2026-09-08 pass read
+every `indi-*/CMakeLists.txt`, which is why its dependency columns hold up
+(all twelve Nova-only rows and all ten no-dependency rows re-confirmed
+unchanged). What it did not do is check that the top-level `CMakeLists.txt`
+ever *adds* those directories. Three of them it does not:
+
+- **`indi-asi-power`, `indi-rpi-gpio` and `indi-weather-mqtt` are orphans.**
+  Each ships its own `CMakeLists.txt`, and no `add_subdirectory()` anywhere
+  in the tree names any of them, nor does any `WITH_<X>` option mention them.
+  They are unbuildable at `v2.2.4.1` and cannot be enabled by a spec flag.
+  Two were the entire "`find_package(RT)` and nothing else" row apart from
+  `indi-astarbox`; the third is the only consumer of `Mosquitto`, so
+  `mosquitto-devel`/`libmosquitto-dev` — confirmed available on both boxes
+  above — is a dependency of nothing reachable.
+- **`indi-starbook` needs `Nova` as well as `CURL`.** The table's "one extra
+  library" row pairs it with `indi-duino` as if their dependencies matched.
+  `indi-duino` is `CURL` alone; `indi-starbook` is `find_package(CURL)` and
+  `find_package(Nova)` both.
+
+Two things that look like defects in this same pass and are not, both checked
+against the packaging rather than assumed:
+
+- **`WITH_TICFOCUSER-NG` is spelled with a hyphen**, not the underscore every
+  other option uses, so a `-DWITH_TICFOCUSER=OFF` override would silently miss
+  it. Both packagings already write `-DWITH_TICFOCUSER-NG=OFF` correctly.
+- **`indi-toupbase` is gated by no single option at all.** It is added only if
+  a `foreach` over `TOUPTEK_REBRANDS` sets `ADD_TOUPBASE`, which is the
+  eleven-brand mechanism already documented elsewhere in this file, not an
+  omission from the table.
+
+**`find_package(RT)` costs nothing.** `cmake_modules/FindRT.cmake` looks for
+`time.h` and `librt`, both of which come with glibc. `indi-astarbox` therefore
+needs no new `BuildRequires` and belongs with the no-dependency group, not in
+a row of its own.
+
+**The first widening batch is therefore 21 drivers with zero new build
+dependencies** beyond the `libnova`/`GSL` pair `eqmod` already added:
+`indi-aok`, `indi-avalon`, `indi-bresserexos2`, `indi-celestronaux`,
+`indi-gpsnmea`, `indi-nexdome`, `indi-ocs`, `indi-rolloffino`, `indi-rtklib`,
+`indi-starbook-ten`, `indi-talon6` (Nova, plus `GSL` for `celestronaux`);
+`indi-aagcloudwatcher-ng`, `indi-armadillo-platypus`, `indi-beefocus`,
+`indi-dsi`, `indi-maxdomeii`, `indi-nightscape`, `indi-openogma`,
+`indi-orion-ssg3`, `indi-shelyak` (nothing); and `indi-astarbox` (`RT`).
+`indi-atik-efw` is deliberately held back — it has no dependency either, but
+its licence relationship to `indi-atik`'s blob is the open question below.
 
 **Five of the spec's `WITH_<X>=OFF` overrides are dead options upstream.**
 `WITH_ASTROLINK4`, `WITH_ASTROMECHFOC`, `WITH_DREAMFOCUSER`, `WITH_RADIOSIM`
