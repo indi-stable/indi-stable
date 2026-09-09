@@ -594,6 +594,41 @@ catalogues. Over the whole `v2.2.4.1` tree it now reports exactly two entries,
 both understood: `eqmod`'s AHP GT line, and `indi_kepler_ccd` in
 `indi_flipro.xml`, a catalogue neither packaging installs.
 
+## 25. A hardcoded list stops testing the thing you just added, silently
+
+Running the two Debian upgrade-path harnesses against a newly-added driver
+showed they had been covering eight packages out of nine since 2026-08-27.
+Both opened with a literal `VENDORS="apogee asi fli playerone inovasdk micam
+sbig touptek"`. `fishcamp` was added to the packaging that day and to the
+smoke tests, and nothing pointed at these two, so they kept passing on the
+eight vendors they knew about and said nothing whatever about the ninth.
+
+The RPM twins of the same two tests were never affected. They enumerate by
+globbing the result directory (`ls "$1"/indi-stable-3rdparty-libs-*.rpm`), so
+a new subpackage joins the test the moment it exists.
+
+The failure is quiet in the worst way: a hardcoded list produces a **shorter
+green run**, not a red one. Nothing in the output says "I did not check
+fishcamp" — the reader sees PASS lines and stops. The same shape already cost
+this project once: `LESSONS_LEARNED.md` #22's 45 broken binaries survived
+because every harness used `indi_apogee_ccd` as "the representative driver",
+and the fix applied then went into the smoke tests only. The upgrade tests
+kept their single representative for two more weeks.
+
+**Rule:** derive the set under test from what is actually present — the built
+artifacts, the installed packages — rather than restating it. Where derivation
+is genuinely impossible, assert the expected count so that a list falling
+behind fails loudly. And when a coverage bug is fixed in one harness, grep for
+the same shape in its siblings; the twin that shares its purpose is the most
+likely place for the identical defect to be sitting.
+
+*Evidence:* found 2026-09-08 while adding `eqmod`, which made the gap visible
+because it is a driver with no `-libs` counterpart at all and so could not be
+bolted onto a single vendor list. Both Debian harnesses now derive their lists
+and abort if the derivation yields nothing (#1); both drivers harnesses, RPM
+and Debian, now exercise one binary from *every* driver package after the
+upgrade rather than `indi_apogee_ccd` alone.
+
 ## 26. Look for the file where it would be, not only where you looked last time
 
 `indi-beefocus` was held back from packaging for most of a session on the
@@ -630,37 +665,48 @@ has a third instance of the same family, where a case-sensitive regex made
 `FIND_PACKAGE(FTDI1 REQUIRED)` invisible and `indi-nightscape` was twice
 reported as needing no dependencies.
 
-## 25. A hardcoded list stops testing the thing you just added, silently
+## 27. A count written into prose is a claim with an expiry date
 
-Running the two Debian upgrade-path harnesses against a newly-added driver
-showed they had been covering eight packages out of nine since 2026-08-27.
-Both opened with a literal `VENDORS="apogee asi fli playerone inovasdk micam
-sbig touptek"`. `fishcamp` was added to the packaging that day and to the
-smoke tests, and nothing pointed at these two, so they kept passing on the
-eight vendors they knew about and said nothing whatever about the ninth.
+An audit on 2026-09-09, asked for because too many "clean" things had turned
+out not to be, found nine stale factual claims across the documentation and
+the packaging. Every one of them was a number, and every one had been true
+when written:
 
-The RPM twins of the same two tests were never affected. They enumerate by
-globbing the result directory (`ls "$1"/indi-stable-3rdparty-libs-*.rpm`), so
-a new subpackage joins the test the moment it exists.
+- `STATUS.md`'s headline table said "ten `-drivers` packages now". Thirty.
+- The drivers spec said "47 `WITH_<X>=OFF` overrides". Twenty-seven — each
+  driver enabled since has removed its own entry.
+- Both the spec and `debian/rules` said "the 9 vendors plus eqmod", three
+  slices after that stopped being the scope.
+- `DESIGN.md` said a promotion sequence was "not yet reflected in any build
+  automation, since none exists yet". Three workflows had existed for five
+  days and had each run end to end.
+- `DESIGN.md` said `indi-atik-efw`'s licence relationship "hasn't been
+  checked". It had been, and the driver was packaged.
 
-The failure is quiet in the worst way: a hardcoded list produces a **shorter
-green run**, not a red one. Nothing in the output says "I did not check
-fishcamp" — the reader sees PASS lines and stops. The same shape already cost
-this project once: `LESSONS_LEARNED.md` #22's 45 broken binaries survived
-because every harness used `indi_apogee_ccd` as "the representative driver",
-and the fix applied then went into the smoke tests only. The upgrade tests
-kept their single representative for two more weeks.
+None of this is caught by `scripts/check-docs.sh`, which verifies paths,
+hashes and cross-references — mechanical things — and says so in its own
+header. A number in a sentence is prose.
 
-**Rule:** derive the set under test from what is actually present — the built
-artifacts, the installed packages — rather than restating it. Where derivation
-is genuinely impossible, assert the expected count so that a list falling
-behind fails loudly. And when a coverage bug is fixed in one harness, grep for
-the same shape in its siblings; the twin that shares its purpose is the most
-likely place for the identical defect to be sitting.
+The tempting fix is to update the numbers, and that is what most of this
+audit did, because a wrong number is worse than none. But updating is what
+produced the stale numbers in the first place: each was correct at its last
+update too. **Where a count carries no information the reader cannot get
+from the artifact, delete it rather than maintain it.** The drivers spec's
+licence comment now says which *rule* decides where `%license` points and
+gives the `rpmspec` one-liner that prints the current answer, instead of
+enumerating subpackages that were nine last week and fourteen this week.
 
-*Evidence:* found 2026-09-08 while adding `eqmod`, which made the gap visible
-because it is a driver with no `-libs` counterpart at all and so could not be
-bolted onto a single vendor list. Both Debian harnesses now derive their lists
-and abort if the derivation yields nothing (#1); both drivers harnesses, RPM
-and Debian, now exercise one binary from *every* driver package after the
-upgrade rather than `indi_apogee_ccd` alone.
+Dated, historical statements are the exception and must NOT be scrubbed:
+"60 driver binaries where there were 56, verified 2026-09-08" is a record of
+what a build did on a day, and stays true. The distinction is tense. A
+present-tense count describes a moving target; a past-tense one describes an
+event.
+
+*Evidence:* found 2026-09-09 by grepping every number in the documents
+against the built artifacts. The same pass found a hardcoded eight-vendor
+list in `scripts/test-3rdparty-coexist-deb.sh` — the third copy of the #25
+defect, missed when the other two were fixed the day before, by then
+installing 8 of 30 driver packages and reporting a clean coexistence pass.
+While writing this entry I also stated "eleven subpackages override the
+default `License:`" from memory; it was fourteen, checked with `rpmspec`
+before the sentence was committed. The habit is the hard part, not the rule.
