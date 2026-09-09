@@ -41,6 +41,83 @@ License: LGPL-2.0-only
  own, so there is no "or later" grant to upgrade the tag with. The
  conservative, defensible reading is the plain v2 text as written.
 
+Files: indi-bresserexos2/* indi-rtklib/* indi-shelyak/*
+Copyright: The Bresser EXOS-2, RTKLIB and Shelyak driver authors
+ and the INDI Library contributors
+License: GPL-2.0-or-later
+ Read per file (2026-09-09): every source file in all three directories
+ grants the PLAIN GPL, "either version 2 of the License, or (at your
+ option) any later version" -- a different licence family from the LGPL
+ most of this source package carries.
+ .
+ indi-bresserexos2/IndiSerialWrapper.cpp carries no licence header and
+ states no contradicting grant, so the directory governs.
+ .
+ indi-shelyak deserves a note: all four of its files direct the reader to a
+ "COPYING.LIB" and a "LICENSE" that do not exist in the directory, and name
+ the Library GPL in the same breath as granting the plain GPL. The operative
+ grant clause governs; the dangling filenames are vestigial boilerplate.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-2.
+
+Files: indi-gpsnmea/*
+Copyright: The gpsnmea driver authors and the INDI Library contributors
+License: GPL-2.0-or-later
+ Both driver sources grant the plain GPL version 2 or later.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-2.
+
+Files: indi-gpsnmea/minmea.h
+Copyright: 2014 Kosma Moczek <kosma@cloudyourcar.com>
+License: WTFPL
+ minmea, a single-header NMEA 0183 parser, compiled into indi_gpsnmea. Its
+ header refers to a COPYING file that indi-gpsnmea does not contain, so the
+ text is reproduced here.
+ .
+ DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+ Version 2, December 2004
+ .
+ Copyright (C) 2004 Sam Hocevar <sam@hocevar.net>
+ .
+ Everyone is permitted to copy and distribute verbatim or modified copies
+ of this license document, and changing it is allowed as long as the name
+ is changed.
+ .
+ DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE
+ TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION
+ .
+ 0. You just DO WHAT THE FUCK YOU WANT TO.
+
+Files: indi-astarbox/*
+Copyright: The AStarBox driver authors and the INDI Library contributors
+License: GPL-2.0-or-later
+ indi-astarbox.cpp and indi-astarbox.h grant the plain GPL, "either version
+ 2 ... or (at your option) any later version". AStarBox.cpp/.h,
+ mcp3421.cpp/.h and StopWatch.h carry no licence header and state no
+ contradicting grant, so the directory governs.
+ .
+ The linked binary is GPL-2.0-or-later as distributed. LGPL-2.1 section 3
+ is what permits combining it with the PCA9685 sources below, the same
+ mechanism indi-eqmod relies on.
+ .
+ Its bundled COPYING.LGPL is NOT shipped: despite the name it holds the
+ GPL-3 text, which matches neither grant in the directory.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-2.
+
+Files: indi-astarbox/PCA9685.cpp indi-astarbox/PCA9685.h
+Copyright: The PCA9685 driver authors
+License: LGPL-2.1-or-later
+ The PWM chip driver bundled into indi_astarbox, granting "version 2.1 ...
+ or (at your option) any later version" where the rest of the directory
+ grants the plain GPL.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
 Files: indi-aagcloudwatcher-ng/*
 Copyright: Lunatico Astronomia and the INDI Library contributors
 License: GPL-3.0-or-later

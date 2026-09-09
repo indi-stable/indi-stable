@@ -362,6 +362,66 @@ Description: Atik EFW filter wheel INDI driver
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.
 
+# The GPL-2.0-or-later group: the plain GPL, a different licence family from
+# the LGPL most of this package carries. See debian/copyright.
+Package: indi-stable-3rdparty-drivers-bresserexos2
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Bresser Messier EXOS-2 GoTo mount INDI driver
+ indi_bresserexos2, for the Bresser Messier EXOS-2 mount with the EXOS-2
+ GoTo controller.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-rtklib
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: RTKLIB GNSS receiver INDI driver
+ indi_rtklib, reading position from an RTKLIB rtkrcv GNSS receiver.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-shelyak
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Shelyak eShel and SPOX spectrograph INDI drivers
+ indi_shelyakeshel_spectrograph and indi_shelyakspox_spectrograph, for
+ Shelyak Instruments spectrographs.
+ .
+ Its source headers grant the plain GPL while directing the reader to a
+ COPYING.LIB and a LICENSE that do not exist in the directory. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-gpsnmea
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: NMEA 0183 GPS receiver INDI driver
+ indi_gpsnmea, for GPS receivers speaking NMEA 0183 over serial.
+ .
+ Bundles minmea, a single-header NMEA parser under the WTFPL. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-astarbox
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: AStarBox observatory controller INDI driver
+ indi_astarbox, for the AStarBox Raspberry Pi observatory controller.
+ .
+ Genuinely two licences: the driver itself is GPL-2.0-or-later and its
+ bundled PCA9685 PWM chip driver is LGPL-2.1-or-later. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
 Package: indi-stable-3rdparty-drivers-touptek
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,

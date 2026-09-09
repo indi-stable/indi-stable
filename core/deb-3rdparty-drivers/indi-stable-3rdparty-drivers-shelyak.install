@@ -1,0 +1,3 @@
+opt/indi-stable/bin/indi_shelyakeshel_spectrograph
+opt/indi-stable/bin/indi_shelyakspox_spectrograph
+opt/indi-stable/share/indi/indi_shelyak.xml

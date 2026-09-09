@@ -73,12 +73,10 @@ override_dh_auto_configure:
 		-DWITH_SVBONY=OFF \
 		-DWITH_PENTAX=OFF \
 		-DWITH_QSI=OFF \
-		-DWITH_ASTARBOX=OFF \
 		-DWITH_ASTROLINK4=OFF \
 		-DWITH_ASTROMECHFOC=OFF \
 		-DWITH_AVALONUD=OFF \
 		-DWITH_BEEFOCUS=OFF \
-		-DWITH_BRESSEREXOS2=OFF \
 		-DWITH_DREAMFOCUSER=OFF \
 		-DWITH_DSI=OFF \
 		-DWITH_DUINO=OFF \
@@ -86,13 +84,10 @@ override_dh_auto_configure:
 		-DWITH_GPHOTO=OFF \
 		-DWITH_GPIO=OFF \
 		-DWITH_GPSD=OFF \
-		-DWITH_GPSNMEA=OFF \
 		-DWITH_LIMESDR=OFF \
 		-DWITH_MGEN=OFF \
 		-DWITH_RADIOSIM=OFF \
 		-DWITH_ROLLOFFINO=OFF \
-		-DWITH_RTKLIB=OFF \
-		-DWITH_SHELYAK=OFF \
 		-DWITH_SPECTRACYBER=OFF \
 		-DWITH_STARBOOK=OFF \
 		-DWITH_SX=OFF \
@@ -238,7 +233,10 @@ override_dh_auto_install:
 	                   indi_celestron_aux indi_nexdome indi_talon6 indi_ocs \
 	                   indi_starbook_ten indi_aagcloudwatcher_ng \
 	                   indi_nightscape_ccd indi_openogma \
-	                   indi_orion_ssg3_ccd indi_atik_efw; do \
+	                   indi_orion_ssg3_ccd indi_atik_efw indi_bresserexos2 \
+	                   indi_rtklib indi_gpsnmea indi_astarbox \
+	                   indi_shelyakeshel_spectrograph \
+	                   indi_shelyakspox_spectrograph; do \
 		test -x debian/tmp$(INDI_BINDIR)/$$bin \
 			|| { echo "ERROR: $$bin did not install -- an upstream WITH_* default or driver name changed"; exit 1; }; \
 	done

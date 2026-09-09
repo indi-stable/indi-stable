@@ -511,6 +511,84 @@ find_package for INDI and Threads only, and links ${INDI_LIBRARIES} and rt.
 It talks to the filter wheel over USB HID directly, and all three of its
 source files are plainly LGPL-2.1-or-later.
 
+# --- The GPL-2.0-or-later group ----------------------------------------------
+# Five drivers whose sources grant the PLAIN GPL "either version 2 ... or (at
+# your option) any later version" -- a different licence family from the
+# LGPL most of this package carries, so each takes its own License: tag.
+#
+# None bundles a matching text, so %%license points at
+# indi-starbook-ten/COPYING, the full 339-line GPL-2. Two GPL-2 texts exist
+# in this tarball and they are NOT interchangeable: indi-ocs/LICENSE.txt is
+# an 86-line abridgement, not the licence. Checked by line count and sha256,
+# not by the first two lines, which are identical.
+#
+# Both files belong to drivers this spec deliberately does NOT ship them
+# for -- ocs and starbook-ten are LGPL-2.0-only and their bundled GPL text
+# contradicts their own headers. That is not a contradiction here: what is
+# wrong for ocs is the pairing, not the text.
+%package bresserexos2
+Summary:        Bresser Messier EXOS-2 GoTo mount INDI driver
+License:        GPL-2.0-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description bresserexos2
+indi_bresserexos2, for the Bresser Messier EXOS-2 mount with the EXOS-2
+GoTo controller. IndiSerialWrapper.cpp carries no licence header and states
+no contradicting grant, so the directory governs.
+
+%package rtklib
+Summary:        RTKLIB GNSS receiver INDI driver
+License:        GPL-2.0-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description rtklib
+indi_rtklib, reading position from an RTKLIB rtkrcv GNSS receiver. All
+three source files agree on the grant.
+
+%package shelyak
+Summary:        Shelyak eShel and SPOX spectrograph INDI drivers
+License:        GPL-2.0-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description shelyak
+indi_shelyakeshel_spectrograph and indi_shelyakspox_spectrograph, for
+Shelyak Instruments spectrographs.
+
+All four source files grant the plain GPL "either version 2 ... or any
+later version", while the SAME headers direct the reader to a COPYING.LIB
+and a LICENSE that do not exist in the directory -- vestigial LGPL
+boilerplate under an operative GPL grant. The grant governs; the dangling
+filenames are ignored.
+
+%package gpsnmea
+Summary:        NMEA 0183 GPS receiver INDI driver
+License:        GPL-2.0-or-later AND WTFPL
+Requires:       indi-stable-core-libs%{?_isa}
+%description gpsnmea
+indi_gpsnmea, for GPS receivers speaking NMEA 0183 over serial.
+
+Bundles minmea (minmea.h, Copyright 2014 Kosma Moczek), a single-header
+NMEA parser under the Do What The Fuck You Want To Public License v2 --
+a free licence accepted by both Fedora and Debian, SPDX WTFPL. Its header
+refers to a COPYING file that indi-gpsnmea does not contain, so no WTFPL
+text ships here; the tag declares it and debian/copyright carries the full
+text, the same treatment starbook-ten's MIT half gets.
+
+%package astarbox
+Summary:        AStarBox observatory controller INDI driver
+License:        GPL-2.0-or-later AND LGPL-2.1-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description astarbox
+indi_astarbox, for the AStarBox Raspberry Pi observatory controller.
+
+Genuinely two licences rather than an aggregate for tidiness:
+indi-astarbox.cpp and its header are GPL-2.0-or-later, while PCA9685.cpp
+and its header (the PWM chip driver) are LGPL-2.1-or-later. Five further
+files carry no header and state no contradicting grant. The linked binary
+is GPL-2.0-or-later as distributed, which is what its shipped licence text
+is; LGPL-2.1 section 3 is what permits the combination, the same mechanism
+eqmod relies on.
+
+Its bundled COPYING.LGPL is not shipped: despite the name it holds the
+GPL-3 text, matching neither grant in the directory.
+
 %package touptek
 Summary:        Touptek and rebranded-Touptek camera INDI drivers (11 brands)
 Requires:       indi-stable-core-libs%{?_isa}
@@ -666,12 +744,10 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_SVBONY=OFF \
     -DWITH_PENTAX=OFF \
     -DWITH_QSI=OFF \
-    -DWITH_ASTARBOX=OFF \
     -DWITH_ASTROLINK4=OFF \
     -DWITH_ASTROMECHFOC=OFF \
     -DWITH_AVALONUD=OFF \
     -DWITH_BEEFOCUS=OFF \
-    -DWITH_BRESSEREXOS2=OFF \
     -DWITH_DREAMFOCUSER=OFF \
     -DWITH_DSI=OFF \
     -DWITH_DUINO=OFF \
@@ -679,13 +755,10 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_GPHOTO=OFF \
     -DWITH_GPIO=OFF \
     -DWITH_GPSD=OFF \
-    -DWITH_GPSNMEA=OFF \
     -DWITH_LIMESDR=OFF \
     -DWITH_MGEN=OFF \
     -DWITH_RADIOSIM=OFF \
     -DWITH_ROLLOFFINO=OFF \
-    -DWITH_RTKLIB=OFF \
-    -DWITH_SHELYAK=OFF \
     -DWITH_SPECTRACYBER=OFF \
     -DWITH_STARBOOK=OFF \
     -DWITH_SX=OFF \
@@ -883,7 +956,9 @@ for _bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
             indi_maxdomeii indi_lx200aok indi_lx200stargo \
             indi_celestron_aux indi_nexdome indi_talon6 indi_ocs \
             indi_starbook_ten indi_aagcloudwatcher_ng indi_nightscape_ccd \
-            indi_openogma indi_orion_ssg3_ccd indi_atik_efw; do
+            indi_openogma indi_orion_ssg3_ccd indi_atik_efw \
+            indi_bresserexos2 indi_rtklib indi_gpsnmea indi_astarbox \
+            indi_shelyakeshel_spectrograph indi_shelyakspox_spectrograph; do
     test -x %{buildroot}%{indi_bindir}/${_bin} \
         || { echo "ERROR: ${_bin} did not install -- an upstream WITH_* default or driver name changed"; exit 1; }
 done
@@ -1174,6 +1249,54 @@ done
 %dir %{indi_datadir}
 %{indi_bindir}/indi_atik_efw
 %{indi_datadir}/indi_atik_efw.xml
+
+# All five ship indi-starbook-ten/COPYING, the full GPL-2 -- see the
+# %%package block for why that file and not indi-ocs/LICENSE.txt.
+%files bresserexos2
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_bresserexos2
+%{indi_datadir}/indi_bresserexos2.xml
+
+%files rtklib
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_rtklib
+%{indi_datadir}/indi_rtklib.xml
+
+%files shelyak
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_shelyakeshel_spectrograph
+%{indi_bindir}/indi_shelyakspox_spectrograph
+%{indi_datadir}/indi_shelyak.xml
+
+%files gpsnmea
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_gpsnmea
+%{indi_datadir}/indi_gpsnmea.xml
+
+%files astarbox
+%license indi-starbook-ten/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_astarbox
+%{indi_datadir}/indi_astarbox.xml
 
 %files touptek
 %license indi-toupbase/COPYING.LGPL
