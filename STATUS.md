@@ -117,10 +117,10 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests |
 | `fedoraastro` | `~/mock-result-drivers-rel2new` | `-drivers` `2.2.4.1-2` scratch, with eqmod |
 | `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
-| `fedoraastro` | `~/mock-result-drivers-slice5` | `-drivers` `2.2.4.1-1`, **24 subpackages** — the current build |
-| `fedoraastro` | `~/mock-result-drivers-slice2`..`-slice4` | 12-, 15- and 19-subpackage predecessors, superseded |
+| `fedoraastro` | `~/mock-result-drivers-slice6` | `-drivers` `2.2.4.1-1`, **29 subpackages** — the current build |
+| `fedoraastro` | `~/mock-result-drivers-slice2`..`-slice5`, `-lic` | 12- to 24-subpackage predecessors, superseded |
 | `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is now the 12-package slice-2 build |
-| `ubuntuastro` | `~/build/slice5-stage/` | the runtime-only 35-deb set the slice-5 smoke test ran against, one version of each |
+| `ubuntuastro` | `~/build/slice6-stage/` | the runtime-only 40-deb set the slice-6 smoke test ran against, one version of each |
 | `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`, freshly rebuilt from current packaging |
 
 `~/mock-result-3rdparty` and `~/mock-result-3rdparty-fishcamp` on
@@ -611,32 +611,56 @@ existed in the tree. Seven directories bundle it, byte-identical, and this
 package was already shipping one of them with its `inovasdk` subpackage. The
 error and its lesson are recorded in `DESIGN.md` where the decision lives.
 
+  **Slice 6 done, 2026-09-09: the GPL-2.0-or-later group** —
+  `bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine
+  `-drivers` packages, 85 driver binaries. No new build dependency, no udev
+  rules, no defects. Both packagings independently report 85 binaries and
+  102 catalogue entries; both boxes identical to baseline by package name.
+
+  Unblocked by the same sibling-directory answer the LGPL-2.0 group got.
+  All five ship `indi-starbook-ten/COPYING`, and **which GPL-2 file matters**:
+  the tarball has two, and `indi-ocs/LICENSE.txt` is an 86-line abridgement,
+  not the licence. `indi-starbook-ten/COPYING` is the full 339 lines. They
+  are indistinguishable from their first two lines; tell them apart by line
+  count or sha256.
+
+  Two carry a second licence: `gpsnmea` bundles minmea under the **WTFPL**
+  (SPDX `WTFPL`, accepted by both distros, text in `debian/copyright` since
+  the tarball has none), and `astarbox` is genuinely mixed — its own sources
+  GPL-2.0-or-later, its bundled PCA9685 PWM driver LGPL-2.1-or-later.
+  `astarbox`'s `COPYING.LGPL` is misnamed and holds GPL-3, so it is not
+  shipped.
+
 ### Genuinely open, not just untested — continued
 
-- **The three drivers left in batch 1, each blocked for its own reason.**
-  - **`dsi`**: bundles `meade-deepskyimager.hex`, Meade's proprietary
-    EZUSB FX2 device firmware, with **no licence statement anywhere** in the
-    directory or the README — the same "no COPYING" situation that excluded
-    QSI and QHY. Upstream offers `INDI_INSTALL_FIRMWARE=OFF`, so the driver
-    could ship without the blob, at the cost of being unusable on a fresh
-    device until the firmware is obtained elsewhere. Also note its
-    `FIRMWARE_INSTALL_DIR` is a plain `set()` to `/usr/lib/firmware`, outside
-    the private prefix and unredirectable — the same class as
-    `RULES_INSTALL_DIR`.
-  - **`beefocus`**: compiles ESP8266 firmware sources into the driver binary
-    (`firmware/command_parser.cpp` and two more are in its `add_executable`).
-    5 of its 29 files carry LGPL-2.0-only, 24 carry nothing; which of the
-    *compiled* ones grant what has not been established.
-  - **`astarbox`**: genuinely mixed — `indi-astarbox.cpp/.h` are
-    GPL-2.0-or-later, `PCA9685.cpp/.h` are LGPL-2.1-or-later, five files
-    carry nothing, and its `COPYING.LGPL` is misnamed: it holds the GPL-3
-    text.
-- **The four GPL-2.0-or-later drivers** — `bresserexos2`, `rtklib`,
-  `gpsnmea`, `shelyak` — still need the same licence-text decision, and
-  unlike the LGPL-2.0 case GPL-2 text does exist in the tree
-  (`indi-ocs/LICENSE.txt`, `indi-starbook-ten/COPYING`). `gpsnmea` also
-  bundles `minmea.h` and `shelyak` needs its own tag. `rolloffino` states no
-  grant at all in any file.
+**Batch 1 is finished except for three drivers.** 29 of the 32 non-blob
+drivers originally scoped are built and verified on both distros. What
+remains is not packaging work:
+
+- **`dsi` — decided 2026-09-09, not shipping.** Will researched the Meade
+  firmware situation independently and found it a hard no on Linux. The
+  driver bundles `meade-deepskyimager.hex`, Meade's proprietary EZUSB FX2
+  device firmware, with no licence statement anywhere in the directory or
+  the README — the same "no COPYING" situation that excluded QSI and QHY.
+  Upstream's `INDI_INSTALL_FIRMWARE=OFF` would let the driver ship without
+  the blob, but the camera cannot enumerate as a DSI until firmware is
+  loaded, so that ships something unusable. Reopen only if the firmware's
+  terms are established with Meade. (Its `FIRMWARE_INSTALL_DIR` is also a
+  plain `set()` to `/usr/lib/firmware`, unredirectable, the same class as
+  `RULES_INSTALL_DIR` — relevant only if it is ever revisited.)
+- **`rolloffino` — nothing to reason from.** Not one of its files states any
+  grant, and it ships no licence file. Unlike the headerless files elsewhere
+  here, there is no grant anywhere in the directory for them to inherit.
+  Needs upstream contact, not analysis.
+- **`beefocus` — deferred by Will, 2026-09-09, pending a decision he wanted
+  to make himself.** 5 of its 29 files grant LGPL-2.0-only; 24 carry
+  nothing, including the three `firmware/` sources compiled into the driver
+  binary. Treating the directory's grant as governing would be consistent
+  with the same call already made for `celestronaux`, `starbook-ten` and
+  `orion-ssg3`, and LGPL-2.0-only is the most conservative reading
+  available — but 24 of 29 is a far thinner basis than 2 of 6, which is why
+  it was not stretched silently.
+
 - **The License: tag's precision is a defensible aggregate, not a full
   per-file audit** — read in `indi-stable-3rdparty-libs.spec`'s own header
   comment for exactly which licences were read in full text versus inferred,

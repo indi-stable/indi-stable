@@ -597,6 +597,25 @@ it was done by copying the spec to `~/eqmod-build/` and checking its
 longer needed and should not be repeated; build from the clone. `STATUS.md`
 carries the current state of both machines.
 
+### The GPL-2.0-or-later group added — verified 2026-09-09
+
+`bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine
+subpackages, 85 driver binaries; results in `~/mock-result-drivers-slice6`.
+No defects, no new build dependency, and the udev rule count stays at four.
+
+**Which GPL-2 file you point `%license` at matters, and the two in this
+tarball are not interchangeable.** `indi-ocs/LICENSE.txt` is an 86-line
+abridgement; `indi-starbook-ten/COPYING` is the full 339-line licence. Their
+first two lines are identical, so tell them apart by line count or sha256,
+never by reading the top of the file:
+
+```bash
+wc -l indi-ocs/LICENSE.txt indi-starbook-ten/COPYING
+```
+
+All five ship the full text. Confirm it landed by extracting from the built
+RPM and checking the line count, not just the version line.
+
 ### The remaining no-dependency drivers added — verified 2026-09-09
 
 `aagcloudwatcher-ng`, `nightscape`, `openogma`, `orion-ssg3`, `atik-efw`.

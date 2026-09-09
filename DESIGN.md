@@ -1274,6 +1274,31 @@ code. A fifth (`indi_ahpgt_telescope`) is gated behind `indi-eqmod/CMakeLists.tx
 top-level `WITH_AHP_GT` above, defaults `Off` either way, not something enabling `eqmod`
 touches.
 
+### Decided: dsi is not shipped — 2026-09-09
+
+`indi-dsi` bundles `meade-deepskyimager.hex`, Meade's proprietary Cypress
+EZUSB FX2 device firmware, and **no file in the directory or the README
+states any terms for it**. That is the same "no licence at all" situation
+that already excluded `qsi` and `qhy` under "bundle by licence tier".
+
+Will researched the Meade firmware situation independently and concluded it
+is a hard no on Linux. Upstream's `INDI_INSTALL_FIRMWARE=OFF` would allow
+shipping the driver without the blob, and that was considered; it was
+rejected because the camera cannot enumerate as a DSI until firmware is
+loaded, so the result would be a package that installs cleanly and cannot
+work. Reopen only if the firmware's terms are established with Meade.
+
+One detail worth keeping if it is ever revisited: `indi-dsi` sets
+`FIRMWARE_INSTALL_DIR` with a plain `set()` to `/usr/lib/firmware`, so it is
+unredirectable by any `-D` flag — the same class of problem as
+`RULES_INSTALL_DIR`, and it would need the same re-home-by-destination
+treatment.
+
+**`rolloffino` is excluded for a different and simpler reason:** not one of
+its files states any grant and it ships no licence file, so unlike the
+headerless files elsewhere in this tree there is nothing in the directory
+for them to inherit. That needs upstream contact, not analysis.
+
 ### Decided: ship the exact LGPL-2.0 text — 2026-09-09, after a correction
 
 Four drivers in the non-blob widening — `nexdome`, `talon6`, `ocs` and

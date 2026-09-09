@@ -543,6 +543,29 @@ B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
 
+### The GPL-2.0-or-later group added — verified 2026-09-09
+
+`bresserexos2`, `rtklib`, `shelyak`, `gpsnmea`, `astarbox`. Twenty-nine
+binary packages, 85 driver binaries, `lintian` **0 errors** and no new
+warning class.
+
+Nothing is bundled on this side: all five stanzas reference
+`/usr/share/common-licenses/GPL-2`. Two packages carry a second licence and
+both needed their text written out, because neither exists in the tarball or
+in `common-licenses`:
+
+- **`gpsnmea`** bundles minmea under the **WTFPL**. Its own header points at
+  a `COPYING` file `indi-gpsnmea` does not contain. SPDX `WTFPL`; lintian
+  accepted the stanza without complaint.
+- **`astarbox`** is genuinely two licences — its own sources
+  GPL-2.0-or-later, its bundled PCA9685 PWM driver LGPL-2.1-or-later — so it
+  gets two `Files:` stanzas rather than a combined tag.
+
+`shelyak` is worth knowing about when reading headers elsewhere: all four of
+its files grant the plain GPL while naming the *Library* GPL in the next
+sentence and pointing at a `COPYING.LIB` that does not exist. The operative
+grant clause governs; the rest is vestigial boilerplate.
+
 ### The remaining no-dependency drivers added — verified 2026-09-09
 
 `aagcloudwatcher-ng`, `nightscape`, `openogma`, `orion-ssg3`, `atik-efw`.
