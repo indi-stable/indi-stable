@@ -26,9 +26,9 @@ Homepage: https://github.com/indilib/indi-3rdparty
 Rules-Requires-Root: no
 
 # Mirrors core/rpm/indi-stable-3rdparty-drivers.spec -- same private prefix,
-# same 9 vendor drivers plus eqmod, armadillo-platypus and maxdomeii, same
-# scope decision (the ~40 other non-blob indi-3rdparty drivers stay out of
-# scope for now, STATUS.md).
+# same 9 vendor drivers plus the same 21 non-blob drivers, same scope
+# decision (only dsi and rolloffino are left out, both on licence grounds --
+# STATUS.md and DESIGN.md).
 # Read that spec's header comment for the full rationale; core/deb-
 # 3rdparty-drivers/rules carries only the Debian-specific mechanics.
 #

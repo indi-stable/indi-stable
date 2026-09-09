@@ -2,7 +2,8 @@
 #
 # Debian build for indi-stable-3rdparty-drivers. Mirrors
 # core/rpm/indi-stable-3rdparty-drivers.spec -- same private prefix, same 9
-# vendor drivers plus eqmod, same 47-entry WITH_<X>=OFF scope list, same
+# vendor drivers plus the same 21 non-blob drivers, same WITH_<X>=OFF scope
+# list, same
 # CFLAGS fix and toupcam_test/omegonprocam_test patch. Read that spec's
 # header and %%build comments for the full rationale; this file carries only
 # the Debian-specific mechanics. core/deb-3rdparty-libs/rules is the sibling
