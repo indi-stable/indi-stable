@@ -1117,7 +1117,7 @@ those for every driver here):
 | No extra dependency beyond INDI itself | `indi-armadillo-platypus`, `indi-nightscape`, `indi-openogma`, `indi-shelyak`, `indi-aagcloudwatcher-ng`, `indi-dsi`, `indi-orion-ssg3`, `indi-maxdomeii`, `indi-beefocus`, `indi-atik-efw`\* |
 | `find_package(RT)` and nothing else | `indi-astarbox`, `indi-asi-power`, `indi-rpi-gpio` — the latter two are Raspberry Pi GPIO drivers |
 | `GTest`/`GMock` in `find_package()` but their result unused, so **not a real `BuildRequires`** | `indi-atik-efw`\*, `indi-beefocus`, `indi-maxdomeii`, `indi-starbook`, `indi-eqmod`. Two different mechanisms, both checked: `indi-atik-efw` and `indi-maxdomeii` wrap the call in `IF (INDI_BUILD_UNITTESTS)`, which this project never sets; `indi-eqmod` instead hardcodes `set(INDI_BUILD_UNITTESTS FALSE)` immediately *before* an unguarded `find_package(GTest)`, so the call runs but nothing consumes it. Neither form is REQUIRED, so neither fails configure when GTest is absent |
-| One extra library, ordinary Fedora/Debian package | `indi-duino`/`indi-starbook` (`CURL`→`libcurl-devel`), `indi-weewx-json` (`CURL`+`nlohmann_json`), `indi-avalonud` (`nlohmann_json`+`ZMQ`→`json-devel`+`cppzmq-devel`), `indi-sx` (`hidapi`→`hidapi-devel`), `indi-mgen` (`FTDI1`→`libftdi1-devel` — the same package `WITH_QSI` needed and didn't have on `fedoraastro`'s `mock` chroot, so confirm it resolves before counting on it), `indi-ffmv` (`DC1394`→`libdc1394-devel`, an EOL FireWire camera), `indi-limesdr` (`LIMESUITE`), `indi-gpsd` (`GPSD`→`gpsd-devel`/`libgps-dev`), `indi-weather-mqtt` (`Mosquitto`) |
+| One extra library, ordinary Fedora/Debian package | `indi-duino`/`indi-starbook` (`CURL`→`libcurl-devel`), `indi-weewx-json` (`CURL`+`nlohmann_json`), `indi-avalonud` (`nlohmann_json`+`ZMQ`→`json-devel`+`cppzmq-devel`), `indi-sx` (`hidapi`→`hidapi-devel`), `indi-mgen` (`FTDI1`→`libftdi-devel` on Fedora / `libftdi1-dev` on Debian — note the Fedora name has no `1`; both confirmed present 2026-09-09), `indi-ffmv` (`DC1394`→`libdc1394-devel`, an EOL FireWire camera), `indi-limesdr` (`LIMESUITE` — **Debian-only**, no Fedora package; see the availability note below), `indi-gpsd` (`GPSD`→`gpsd-devel`/`libgps-dev`), `indi-weather-mqtt` (`Mosquitto`) |
 | `find_package(GPIOD)` wrapped in its own success check, so the driver silently doesn't build if the package is absent rather than failing configure | `indi-gpio` (Raspberry Pi GPIO; `libgpiod-devel` exists on both distros if wanted) |
 | Heaviest new surface | `indi-gphoto` (`GPHOTO2`+`JPEG`+`LibRaw`→`gphoto2-devel`+`libjpeg-turbo-devel`+`libraw-devel` — DSLR control, plausibly wanted for an astrophotography audience despite the dependency count) |
 
@@ -1136,14 +1136,41 @@ all of the same kind — a dependency present in the file and missed by the read
 - **`indi-astarbox` calls `find_package(RT)`**, and was listed as needing
   nothing beyond INDI.
 
-**Availability confirmed on `ubuntuastro` (Ubuntu 26.04) 2026-09-08**, by
-`apt-cache policy` against every candidate at once: `libnova-dev`, `libgsl-dev`,
-`libcurl4-openssl-dev`, `nlohmann-json3-dev`, `libzmq3-dev`, `libhidapi-dev`,
-`libftdi1-dev`, `libdc1394-dev`, `libgpiod-dev`, `libgphoto2-dev`, `libjpeg-dev`,
-`libraw-dev`, `liblimesuite-dev` and `libgps-dev` all resolve. That settles
-`LIMESUITE`, which this section previously flagged as possibly absent. **The
-Fedora half is still unconfirmed** — `fedoraastro` is a different machine and
-nothing here has been checked with `dnf`.
+**Availability confirmed on BOTH boxes, 2026-09-09.** `apt-cache policy` on
+`ubuntuastro` (Ubuntu 26.04) and `dnf repoquery` on `fedoraastro` (Fedora 44),
+run against every candidate at once. **Debian resolves all fifteen**:
+`libnova-dev`, `libgsl-dev`, `libcurl4-openssl-dev`, `nlohmann-json3-dev`,
+`libzmq3-dev`, `libhidapi-dev`, `libftdi1-dev`, `libdc1394-dev`,
+`libgpiod-dev`, `libgphoto2-dev`, `libjpeg-dev`, `libraw-dev`,
+`liblimesuite-dev`, `libgps-dev` and `libmosquitto-dev`.
+
+**Fedora does not, and three of the names this table gave for it were wrong.**
+The Fedora column cannot be derived from the Debian one by pattern:
+
+| This table said | Fedora reality |
+|---|---|
+| `libftdi1-devel` | **No such package.** It is `libftdi-devel`, which *is* libftdi1 (version 1.5) — the `1` is in the version, not the name |
+| `gphoto2-devel` | `libgphoto2-devel`. `gphoto2-devel` does not exist |
+| `libraw-devel` | `LibRaw-devel`. The lowercase spelling happens to resolve through `Provides`, so this one would not have failed |
+| `LimeSuite-devel` | **Absent from Fedora entirely**, base and updates both |
+
+**`indi-limesdr` is therefore Debian-only** unless this project takes a
+dependency on RPM Fusion or a COPR, which it never has. That is a scope
+decision, not a packaging problem, and it has to be made before `LIMESUITE`
+goes into any batch — a driver that builds on one distro and not the other
+breaks the "same package set on every distro" shape the rest of this
+document assumes. This section previously said the Ubuntu resolve "settles
+`LIMESUITE`". It settled only half of it.
+
+Everything else resolves on Fedora: `libnova-devel`, `gsl-devel`,
+`libcurl-devel`, `json-devel`, `cppzmq-devel`, `hidapi-devel`,
+`libdc1394-devel`, `libgpiod-devel`, `libjpeg-turbo-devel`, `gpsd-devel` and
+`mosquitto-devel`.
+
+**`libftdi-devel` being present does not reopen `WITH_QSI`.** QSI is excluded
+on a licence finding read in full from `libqsi/COPYING` — see "QSI and
+Fishcamp resolved" below — not on a missing build dependency. The dependency
+was only ever the reason its *configure* failed first.
 
 **Five of the spec's `WITH_<X>=OFF` overrides are dead options upstream.**
 `WITH_ASTROLINK4`, `WITH_ASTROMECHFOC`, `WITH_DREAMFOCUSER`, `WITH_RADIOSIM`
