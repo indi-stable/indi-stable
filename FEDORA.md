@@ -597,6 +597,50 @@ it was done by copying the spec to `~/eqmod-build/` and checking its
 longer needed and should not be repeated; build from the clone. `STATUS.md`
 carries the current state of both machines.
 
+### `armadillo-platypus` and `maxdomeii` added — built and verified 2026-09-09
+
+Second non-blob slice, twelve subpackages where there were ten. Built through
+`mock` with the usual `--init` → `--install` → `rpmbuild -bs` → `--no-clean`
+sequence, `CORE=~/mock-result-pcfix` and `LIBS=~/mock-result-symlinkfix`.
+Results in `~/mock-result-drivers-slice2`.
+
+**The first build failed, on this spec's own new assertion, and the finding
+was real.** The udev rule had installed itself to
+`/usr/lib/udev/rules.d/99-armadilloplatypus.rules` — upstream's own
+un-namespaced filename — while the private scratch directory the `-D`
+redirect points at was empty. Cause and fix are in `DESIGN.md`, "Upstream
+build-system facts": five driver directories use `RULES_INSTALL_DIR`, set
+without `CACHE`, which no `-D` can override.
+
+**A second defect surfaced only on the Debian side and is fixed in both
+packagings** — `INDI_DATA_DIR` was resolved from the build host. Fedora never
+showed it, because a `mock` chroot has no distribution `libindi-data` for the
+probe to find. Both now pin it. See `DEBIAN.md` for the full finding; the
+lesson for this file is that a `mock` chroot's cleanliness can *hide* a
+host-dependent path rather than expose it.
+
+Verified against the built RPMs:
+
+- **12 subpackages**, and `rpmspec -q --qf '%{license}'` over all of them
+  shows the two new ones inheriting the LGPL aggregate while `eqmod` alone
+  still carries `GPL-3.0-or-later` — the propagation trap that caught the
+  first eqmod attempt has not reopened.
+- **All 26 catalogues install under `/opt`**, none to `/usr/share/indi`.
+- **67 driver binaries**, up from 60, all seven new ones carrying
+  `RUNPATH=/opt/indi-stable/lib`.
+- Nothing under `/usr/bin` from any of the twelve.
+- The rule ships only as
+  `99-indi-stable-3rdparty-armadilloplatypus.rules`.
+- `Requires` is `indi-stable-core-libs` alone on both new packages, with no
+  leaked vendor or `libindi*` SONAMEs; `Provides` is package-name only.
+- `test-maxdomeii` is in no package. It is an `add_executable()` the default
+  target compiles and nothing installs, so unlike the asi/playerone
+  diagnostic tools it never reaches the buildroot and needs no `rm`.
+
+**Cross-checked against the Debian build:** both packagings independently
+report **67 driver binaries and 70 catalogue `<driver>` entries**, which is
+the same agreement check `eqmod` used at 63.
+
 The upgrade path is scripted too, and — unlike `-libs`'s own upgrade test —
 run TOGETHER with `-libs`'s upgrade, not standalone, because `-drivers`
 pins its `BuildRequires` to `-libs`'s exact `%{version}-%{release}` and the

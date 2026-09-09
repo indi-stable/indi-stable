@@ -543,6 +543,72 @@ B package count (`dpkg-query -W`: 1829 — `dpkg -l`'s own `grep '^ii'` count
 undercounts by a few packages with non-standard status flags and should not
 be used for this comparison; use `dpkg-query -W` instead).
 
+### `armadillo-platypus` and `maxdomeii` added — built and verified 2026-09-09
+
+Second non-blob slice, twelve binary packages where there were ten. Clean
+`dpkg-buildpackage` and `lintian --profile debian` with **0 errors**.
+
+**The real finding here was `INDI_DATA_DIR`, and it is the more dangerous of
+the slice's two defects because nothing in the build complains.**
+
+Nothing in indi-3rdparty ever assigns that variable — `FindINDI.cmake` only
+documents the name — yet it appears in `CMakeCache.txt` as a `PATH` resolved
+from the build host. On `ubuntuastro`, where the distribution's `libindi-data`
+owns `/usr/share/indi`, it resolved there, and **every catalogue except
+`eqmod`'s installed outside the private prefix**. `eqmod` was unaffected only
+because `indi-eqmod/CMakeLists.txt` sets its own from `CMAKE_INSTALL_PREFIX`;
+the drivers that simply use `${INDI_DATA_DIR}` — which is most of them — went
+to `/usr/share/indi`.
+
+The build did not fail on this. `dh_install` failed later, complaining about
+missing touptek catalogues, which points nowhere near the cause. What it means
+in the general case: **a driver catalogue installed into `/usr/share/indi` is
+a file this project owns landing in the directory `libindi-data` owns.**
+
+Fedora never showed it, because a `mock` chroot has no distribution
+`libindi-data` for the probe to find — a case where the clean-room build
+*hides* a host-dependent path instead of exposing it. Both packagings now pin
+`-DINDI_DATA_DIR` explicitly. Same class as `WITH_WEBCAM`/`WITH_NUT` in
+`DESIGN.md`: a build decision taken from whatever happens to be installed on
+the build machine.
+
+**The udev finding is `DESIGN.md`'s**, under "Upstream build-system facts" —
+five driver directories use `RULES_INSTALL_DIR`, set without `CACHE`, so no
+`-D` can redirect them. Caught by the RPM side's assertion first; the Debian
+rules file carries the same re-home-by-destination fix and the same three
+assertions.
+
+Verified against the built `.deb`s and on the running system:
+
+- **12 binary packages**; nothing under `/usr/bin` from any of them, and no
+  catalogue outside `/opt` anywhere.
+- `scripts/smoke-test-3rdparty-deb.sh` passed on a **runtime-only** install
+  (no `-dev` packages, which is the point of #22): **67 driver binaries**
+  where there were 60, all libraries resolving inside the private prefix, and
+  one driver from every one of the twelve packages executing —
+  `indi_armadillo_focus` and `indi_maxdomeii` among them.
+- **Coexistence in configuration B**, against a distribution `libindi1`
+  carrying a byte-identical `libindidriver.so.2` SONAME: `ldd` on the new
+  binaries resolves to `/opt/indi-stable/lib`, `dpkg -V` clean on `libindi1`,
+  `indi-bin` and `libindi-data`, `/usr/bin/indiserver` hash unchanged, and our
+  own binary offered separately as `indiserver-stable`.
+- The udev rule installs only as
+  `99-indi-stable-3rdparty-armadilloplatypus.rules`, alongside the
+  distribution's own untouched `99-indi_auxiliary.rules`.
+- **One new lintian warning, not an error**:
+  `appstream-metadata-missing-modalias-provide`. It fires because this is the
+  first rule this project ships that carries a full `idVendor`+`idProduct`
+  pair, from which lintian can construct a modalias; the vendor rules in
+  `-libs` match on vendor alone. No override added — AppStream metadata is out
+  of scope, and silencing a tag that is telling the truth would be worse.
+
+`ubuntuastro` restored to its exact baseline afterward: **1839 packages**, no
+`indi-stable` package, `/opt/indi-stable` absent, none of our udev rules left
+behind, distribution rule intact.
+
+**Cross-checked against the Fedora build:** both packagings independently
+report **67 driver binaries and 70 catalogue `<driver>` entries**.
+
 ### `eqmod` added — built and verified 2026-09-08
 
 **Built clean on the first real `dpkg-buildpackage`, no build-time defects**,

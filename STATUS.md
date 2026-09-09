@@ -117,7 +117,9 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests |
 | `fedoraastro` | `~/mock-result-drivers-rel2new` | `-drivers` `2.2.4.1-2` scratch, with eqmod |
 | `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
-| `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`, with eqmod |
+| `fedoraastro` | `~/mock-result-drivers-slice2` | `-drivers` `2.2.4.1-1`, **12 subpackages**, with armadillo-platypus and maxdomeii |
+| `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is now the 12-package slice-2 build |
+| `ubuntuastro` | `~/build/slice2-stage/` | the runtime-only 23-deb set the slice-2 smoke test ran against, one version of each |
 | `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`, freshly rebuilt from current packaging |
 
 `~/mock-result-3rdparty` and `~/mock-result-3rdparty-fishcamp` on
@@ -521,39 +523,44 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   the existing "bundle by licence tier" decision checked before either is
   included, not assumed clear by omission from the blob-driver list.
 
-  **Batch 1 is scoped and pre-checked, no packaging written yet.** 21 drivers
-  needing nothing beyond the `libnova`/`GSL` pair `eqmod` already added —
-  named in full in `DESIGN.md`'s survey section. What has been established:
+  **Slice 2 is built and verified on both distros, 2026-09-09:
+  `armadillo-platypus` and `maxdomeii`.** Twelve `-drivers` packages now, 67
+  driver binaries where there were 60. Chosen small, and for the mechanisms
+  rather than the count: first six-binary subpackage, first udev rule in this
+  source package, first catalogue whose filename matches neither its directory
+  nor any binary in it (`indi_lunatico.xml`), first uninstalled upstream test
+  target. Both LGPL-2.1-or-later, read per file. Build, install,
+  runtime-only smoke test and coexistence all pass on both distros; both boxes
+  restored to exact baseline. Detail in `FEDORA.md` and `DEBIAN.md`.
 
-  - Both distros resolve every build dependency the wider survey needs, with
-    three Fedora package names corrected in the process. `LimeSuite` is the
-    exception and is Debian-only, which makes `indi-limesdr` a scope decision
-    rather than a packaging task.
-  - All 21 catalogues are clean under `scripts/check-catalogue-sources.sh`,
-    so none needs the `<device>`-stripping `eqmod` required.
-  - The 21 install **33 binaries, not 21** — `indi-armadillo-platypus` alone
-    ships six, `indi-shelyak` and `indi-aagcloudwatcher-ng` two each. Any
-    `%files` written per driver has to be written from that, and the smoke
-    tests' binary counts will move by 33.
+  **Two real defects found, both by building rather than by reading:**
+  1. **The udev rule installed itself un-namespaced**, to the exact filename a
+     distribution package for the same hardware owns. Five driver directories
+     use `RULES_INSTALL_DIR` set without `CACHE`, which no `-D` can override,
+     so the `-libs` redirect approach silently does nothing. Fixed by
+     re-homing on destination in both packagings, with an assertion that
+     nothing is left at an upstream filename.
+  2. **`INDI_DATA_DIR` was resolved from the build host.** On `ubuntuastro`,
+     where the distro's `libindi-data` owns `/usr/share/indi`, every catalogue
+     except `eqmod`'s installed outside the private prefix. Fedora never
+     showed it — a `mock` chroot has no `libindi-data` to find. Both
+     packagings now pin it. The build failed later and elsewhere, at
+     `dh_install` complaining about touptek, which pointed nowhere near the
+     cause.
 
-  **What has NOT been done: nothing has been built.** No `%package`/`%files`
-  stanzas, no Debian binary packages, no configure run with these 21 enabled.
-  Specific things known to be waiting there:
-
-  - `test-maxdomeii` and `nstest` are `add_executable()` targets that nothing
-    installs, so ninja builds them as part of `all` while `%files` never sees
-    them — the exact shape of the `toupcam_test`/`omegonprocam_test` failures
-    that cost two of the six iterations on the `-drivers` spec.
-  - Five drivers install udev rules (`armadillo-platypus`, `dsi`,
-    `nightscape`, `openogma`, `orion-ssg3`) and `indi-dsi` also installs a
-    firmware blob, `meade-deepskyimager.hex`, whose licence has not been read.
-  - Catalogue filenames do not follow the directory name:
-    `indi-armadillo-platypus` ships `indi_lunatico.xml`, `indi-aok` ships
-    `indi_aok.xml` for a binary called `indi_lx200aok`. Globbing by directory
-    name will silently miss files.
-  - Licence files are inconsistent — eight of the 21 carry none of their own
-    and inherit the top-level `LICENSE`, the rest carry one of five different
-    filenames. `%license` needs reading per driver, not a pattern.
+  **The rest of batch 1 remains: 19 drivers, still no new build dependency.**
+  The full list is in `DESIGN.md`'s survey. Known before starting:
+  - `indi-shelyak` is **GPL-2.0-or-later, not LGPL** — all four files grant
+    "version 2 ... or (at your option) any later version" under the plain GPL,
+    while the same headers point at a `COPYING.LIB`/`LICENSE` that does not
+    exist in the directory. It needs its own `License:` tag like `eqmod`, and
+    a decision about which licence text to ship, since `indi-shelyak/` carries
+    none and the top-level `LICENSE` is the wrong one for it.
+  - `indi-dsi` installs a firmware blob, `meade-deepskyimager.hex`, whose
+    licence has not been read. Settle that before including it.
+  - Four more drivers ship udev rules (`dsi`, `nightscape`, `openogma`,
+    `orion-ssg3`); the re-homing now in place handles them, but each needs its
+    own `%files`/`.install` line and the rule-count assertion updated.
 - **The License: tag's precision is a defensible aggregate, not a full
   per-file audit** — read in `indi-stable-3rdparty-libs.spec`'s own header
   comment for exactly which licences were read in full text versus inferred,
