@@ -110,8 +110,8 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `fedoraastro` | `~/mock-result-pcfix` | core `2.2.4.2-1` |
 | `fedoraastro` | `~/mock-result-symlinkfix` | `-libs` `2.2.4.1-1`, **post**-#22 fix |
 | `fedoraastro` | `~/mock-result-drivers-eqmod` | `-drivers` `2.2.4.1-1` **with eqmod**, 10 subpackages |
-| `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests |
-| `fedoraastro` | `~/mock-result-drivers-rel2new` | `-drivers` `2.2.4.1-2` scratch, with eqmod |
+| `fedoraastro` | `~/mock-result-libs-rel2new` | `-libs` `2.2.4.1-2` scratch, for upgrade tests, 18 RPMs |
+| `fedoraastro` | `~/mock-result-drivers-rel2full` | `-drivers` `2.2.4.1-2` scratch at **full scope, 30 subpackages** — replaces `-rel2new`, which held the 10-subpackage eqmod-era build |
 | `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
 | `fedoraastro` | `~/mock-result-drivers-slice7` | `-drivers` `2.2.4.1-1`, **30 subpackages** — the current build |
 | `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is the current **30-package** build |
@@ -265,6 +265,24 @@ baseline: 2153 packages, `/opt/indi-stable` completely absent (not even an
 empty directory, across all three source packages' worth of shared
 `%dir` declarations), only the distribution's own `99-indi_auxiliary.rules`
 left in `/usr/lib/udev/rules.d`.
+
+**Both RPM upgrade harnesses re-run green at full scope, 2026-09-09.**
+`-libs` against its own `-2` scratch, and `-drivers` against a fresh `-2`
+scratch built at 30 subpackages — the previous one held 10 and dated from
+eqmod. Neither harness needed changing: both glob their inputs and the
+drivers one loops over `rpm -qa 'indi-stable-3rdparty-drivers-*'`, so both
+scaled on their own. **All 30 driver packages were individually confirmed to
+resolve and run after the upgrade**, not one representative.
+
+Both controls fired: each harness plants a stray file under
+`/opt/indi-stable` and requires its orphan check to report it. `fedoraastro`
+back to its exact 2153-package baseline afterward, `gcc` still absent,
+`rpm -V` clean on `libindi`/`libindi-libs`/`kstars`.
+
+One thing worth not misreading in the teardown log: a distribution package,
+`rtl-sdr`, appears in the removal list. It is pulled in by
+`indi-stable-core`, not by anything here — checked, no `-drivers` subpackage
+requires it — and the diff-based restore removed it correctly.
 
 **Upgrade path also verified, 2026-08-26,
 `scripts/test-upgrade-path-drivers.sh`.** Run together with `-libs`'s own
