@@ -422,6 +422,20 @@ Description: AStarBox observatory controller INDI driver
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.
 
+Package: indi-stable-3rdparty-drivers-beefocus
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: BeeFocus network focuser INDI driver
+ indi_beefocus, for the BeeFocus WiFi focuser, which the driver reaches
+ over a network socket rather than a serial port.
+ .
+ Two source trees under different licences are compiled into the single
+ binary: driver/ is LGPL-2.0-only and firmware/ is LGPL-2.1-only. See
+ debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
 Package: indi-stable-3rdparty-drivers-touptek
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs,

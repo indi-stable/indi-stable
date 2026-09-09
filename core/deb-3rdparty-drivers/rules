@@ -76,7 +76,6 @@ override_dh_auto_configure:
 		-DWITH_ASTROLINK4=OFF \
 		-DWITH_ASTROMECHFOC=OFF \
 		-DWITH_AVALONUD=OFF \
-		-DWITH_BEEFOCUS=OFF \
 		-DWITH_DREAMFOCUSER=OFF \
 		-DWITH_DSI=OFF \
 		-DWITH_DUINO=OFF \
@@ -236,7 +235,7 @@ override_dh_auto_install:
 	                   indi_orion_ssg3_ccd indi_atik_efw indi_bresserexos2 \
 	                   indi_rtklib indi_gpsnmea indi_astarbox \
 	                   indi_shelyakeshel_spectrograph \
-	                   indi_shelyakspox_spectrograph; do \
+	                   indi_shelyakspox_spectrograph indi_beefocus; do \
 		test -x debian/tmp$(INDI_BINDIR)/$$bin \
 			|| { echo "ERROR: $$bin did not install -- an upstream WITH_* default or driver name changed"; exit 1; }; \
 	done

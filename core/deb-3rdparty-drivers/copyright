@@ -41,6 +41,37 @@ License: LGPL-2.0-only
  own, so there is no "or later" grant to upgrade the tag with. The
  conservative, defensible reading is the plain v2 text as written.
 
+Files: indi-beefocus/driver/*
+Copyright: 2018 Andrew Brownbill
+ Based on a driver Copyright 2012 Jasem Mutlaq
+License: LGPL-2.0-only
+ Five of the six files here grant "the GNU Library General Public License
+ version 2 as published by the Free Software Foundation" with no "or later"
+ clause. beesimfirmware.cpp carries no header while its own beesimfirmware.h
+ does, and states no contradicting grant.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.
+
+Files: indi-beefocus/firmware/*
+Copyright: 2018 Andrew Brownbill
+License: LGPL-2.1-only
+ No file in this directory carries a licence header. The directory ships
+ its own full LGPL-2.1 text as firmware/LICENSE, which is the only
+ statement of terms for it and therefore governs. Read as -only rather than
+ -or-later: a bundled licence text is not itself a grant of later versions.
+ .
+ This is not a licence on shipped-but-unused source. command_parser.cpp,
+ focuser_state.cpp and hardware_interface.cpp are all named in
+ indi-beefocus/CMakeLists.txt's add_executable and are compiled into
+ indi_beefocus.
+ .
+ indi-beefocus/unit_tests/ is NOT built -- CMakeLists.txt gates it behind
+ INDI_BUILD_UNITTESTS, which this project never sets.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
 Files: indi-bresserexos2/* indi-rtklib/* indi-shelyak/*
 Copyright: The Bresser EXOS-2, RTKLIB and Shelyak driver authors
  and the INDI Library contributors

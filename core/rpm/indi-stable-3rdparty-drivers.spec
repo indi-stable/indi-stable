@@ -589,6 +589,37 @@ eqmod relies on.
 Its bundled COPYING.LGPL is not shipped: despite the name it holds the
 GPL-3 text, matching neither grant in the directory.
 
+# The last driver in the non-blob batch, and the one whose licence took the
+# most reading. Its two source directories are under DIFFERENT licences and
+# both are compiled into the single binary, so it carries both.
+%package beefocus
+Summary:        BeeFocus network focuser INDI driver
+License:        LGPL-2.0-only AND LGPL-2.1-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description beefocus
+indi_beefocus, for the BeeFocus WiFi focuser, which the driver reaches over
+a network socket rather than a serial port.
+
+Two licences, because two source trees are compiled into one binary:
+
+  driver/     LGPL-2.0-only. Five of its six files grant "the GNU Library
+              General Public License version 2" with no "or later" clause;
+              beesimfirmware.cpp carries no header while its own .h does.
+  firmware/   LGPL-2.1-only. No file here carries a licence header at all,
+              but the directory ships its own full LGPL-2.1 as
+              firmware/LICENSE, which is the only statement of terms for it
+              and therefore governs. Three of these files --
+              command_parser.cpp, focuser_state.cpp and
+              hardware_interface.cpp -- are in this driver's add_executable,
+              so this is not a licence on shipped-but-unused source.
+
+Both texts are shipped. Neither is guessed at: firmware/LICENSE is the
+driver's own file, and the LGPL-2.0 comes from indi-inovaplx/COPYING.LIB,
+the same file the inovasdk and LGPL-2.0-only subpackages here already use.
+
+unit_tests/ is not built -- indi-beefocus/CMakeLists.txt gates it behind
+INDI_BUILD_UNITTESTS, which this project never sets.
+
 %package touptek
 Summary:        Touptek and rebranded-Touptek camera INDI drivers (11 brands)
 Requires:       indi-stable-core-libs%{?_isa}
@@ -747,7 +778,6 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_ASTROLINK4=OFF \
     -DWITH_ASTROMECHFOC=OFF \
     -DWITH_AVALONUD=OFF \
-    -DWITH_BEEFOCUS=OFF \
     -DWITH_DREAMFOCUSER=OFF \
     -DWITH_DSI=OFF \
     -DWITH_DUINO=OFF \
@@ -958,7 +988,8 @@ for _bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
             indi_starbook_ten indi_aagcloudwatcher_ng indi_nightscape_ccd \
             indi_openogma indi_orion_ssg3_ccd indi_atik_efw \
             indi_bresserexos2 indi_rtklib indi_gpsnmea indi_astarbox \
-            indi_shelyakeshel_spectrograph indi_shelyakspox_spectrograph; do
+            indi_shelyakeshel_spectrograph indi_shelyakspox_spectrograph \
+            indi_beefocus; do
     test -x %{buildroot}%{indi_bindir}/${_bin} \
         || { echo "ERROR: ${_bin} did not install -- an upstream WITH_* default or driver name changed"; exit 1; }
 done
@@ -1297,6 +1328,18 @@ done
 %dir %{indi_datadir}
 %{indi_bindir}/indi_astarbox
 %{indi_datadir}/indi_astarbox.xml
+
+# The only subpackage here shipping TWO licence texts, because it genuinely
+# links two differently-licensed source trees. See the %%package block.
+%files beefocus
+%license indi-inovaplx/COPYING.LIB
+%license indi-beefocus/firmware/LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_beefocus
+%{indi_datadir}/indi_beefocus.xml
 
 %files touptek
 %license indi-toupbase/COPYING.LGPL
