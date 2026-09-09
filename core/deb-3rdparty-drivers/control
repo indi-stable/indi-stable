@@ -19,7 +19,8 @@ Build-Depends: debhelper-compat (= 13),
                indi-stable-3rdparty-libs-touptek-dev (= 2.2.4.1-1),
                indi-stable-3rdparty-libs-fishcamp-dev (= 2.2.4.1-1),
                libnova-dev,
-               libgsl-dev
+               libgsl-dev,
+               libftdi1-dev
 Standards-Version: 4.6.2
 Homepage: https://github.com/indilib/indi-3rdparty
 Rules-Requires-Root: no
@@ -30,6 +31,9 @@ Rules-Requires-Root: no
 # scope for now, STATUS.md).
 # Read that spec's header comment for the full rationale; core/deb-
 # 3rdparty-drivers/rules carries only the Debian-specific mechanics.
+#
+# libftdi1-dev is nightscape's, and only nightscape's. Fedora spells the
+# same library libftdi-devel, with no 1 -- see core/rpm's own comment.
 #
 # libnova-dev and libgsl-dev are eqmod's, and only eqmod's -- no vendor
 # driver here needs either. They are the entire new build-dependency surface
@@ -288,6 +292,72 @@ Description: Vixen Starbook TEN mount INDI driver
  .
  The only package here containing MIT code: it bundles cpp-httplib, which
  is genuinely compiled in rather than merely present.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-aagcloudwatcher-ng
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: AAG CloudWatcher weather station INDI driver
+ indi_aagcloudwatcher_ng, for Lunatico AAG CloudWatcher cloud and rain
+ sensors. The "ng" is upstream's own name for the rewritten driver.
+ .
+ Does not include aagcloudwatcher_test_ng, a standalone CLI test tool
+ upstream installs alongside the driver. It is in no catalogue and is not
+ an INDI driver.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-nightscape
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Celestron Nightscape 8300 CCD INDI driver
+ indi_nightscape_ccd, for the Celestron Nightscape 8300 camera.
+ .
+ No source file in this driver carries a licence header; its bundled
+ COPYING.LIB is the only statement of terms. See debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-openogma
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: OpenOGMA camera INDI driver
+ indi_openogma, for OpenOGMA cameras.
+ .
+ The only AGPL-licensed package in this project. Neither source file
+ carries a licence header, so the bundled AGPL-3 LICENSE.txt governs. The
+ Affero clause binds operators who offer modified versions over a network;
+ it adds no condition on redistributing this package.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-orion-ssg3
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Orion StarShoot G3 CCD INDI driver
+ indi_orion_ssg3_ccd, for the Orion StarShoot G3 camera.
+ .
+ Its bundled LICENSE is the GPL-3 text and contradicts its own source
+ headers, which grant LGPL-2.1-or-later. See debian/copyright.
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+Package: indi-stable-3rdparty-drivers-atik-efw
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: Atik EFW filter wheel INDI driver
+ indi_atik_efw, for Atik electronic filter wheels.
+ .
+ Despite the name this has no relationship to indi-atik or to the Atik
+ vendor SDK, which this project excludes on licence grounds. Its
+ CMakeLists.txt asks only for INDI and Threads, and it talks to the filter
+ wheel over USB HID directly.
  .
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.

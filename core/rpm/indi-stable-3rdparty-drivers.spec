@@ -179,6 +179,17 @@ BuildRequires:  indi-stable-3rdparty-libs-fishcamp-devel = %{version}-%{release}
 # built here -- they arrive with eqmod and would leave with it.
 BuildRequires:  libnova-devel
 BuildRequires:  gsl-devel
+# nightscape's, and only nightscape's. NOTE THE NAME: Fedora has no
+# libftdi1-devel -- the package is libftdi-devel and IS libftdi1, the 1
+# living in the version (1.5) rather than the name. Debian's really is
+# libftdi1-dev. See DESIGN.md's dependency survey, where that asymmetry is
+# recorded along with two other Fedora names that cannot be derived from
+# their Debian counterparts.
+#
+# indi-nightscape also FIND_PACKAGE(D2XX), FTDI's proprietary driver, which
+# is not REQUIRED and is packaged by neither distro. Left unfound
+# deliberately: the build falls back to libftdi.
+BuildRequires:  libftdi-devel
 
 %description
 INDI drivers for the 9 vendor camera/focuser SDKs indi-stable-3rdparty-libs
@@ -429,6 +440,79 @@ The only subpackage here carrying MIT code: it bundles cpp-httplib
 this subpackage's License: tag. Unlike its three siblings in this group it
 ships its OWN COPYING.LESSER, which is the same LGPL-2.1 text.
 
+# --- The remaining no-vendor-dependency drivers ------------------------------
+# Five drivers needing nothing beyond INDI itself. Their licences are the
+# most varied group in this spec and every one was read per file: three carry
+# a tag of their own, and two of the five ship a bundled licence file that
+# CONTRADICTS their own source headers rather than merely being stale.
+%package aagcloudwatcher-ng
+Summary:        AAG CloudWatcher weather station INDI driver
+License:        GPL-3.0-or-later
+Requires:       indi-stable-core-libs%{?_isa}
+%description aagcloudwatcher-ng
+indi_aagcloudwatcher_ng, for Lunatico AAG CloudWatcher cloud and rain
+sensors. The "ng" is upstream's own name for the rewritten driver; the
+obsolete original lives in indi-3rdparty's obsolete/ directory and is not
+built here.
+
+The only GPL-3 subpackage besides eqmod, and unlike eqmod its bundled
+LICENSE.txt is the matching GPL-3 text, so that is what it ships.
+
+Does NOT include aagcloudwatcher_test_ng, a standalone CLI test tool
+upstream installs alongside the driver. It is in no catalogue and is not an
+INDI driver, so it is removed in %%install, the same treatment the asi and
+playerone diagnostic tools get.
+
+%package nightscape
+Summary:        Celestron Nightscape 8300 CCD INDI driver
+License:        LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description nightscape
+indi_nightscape_ccd, for the Celestron Nightscape 8300 camera.
+
+No source file in this driver carries a licence header at all; the only
+statement is its bundled COPYING.LIB, which is the LGPL-2.0 text. That
+makes it the one subpackage here whose licence text is BOTH bundled by
+upstream and an exact match for its tag.
+
+%package openogma
+Summary:        OpenOGMA camera INDI driver
+License:        AGPL-3.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description openogma
+indi_openogma, for OpenOGMA cameras.
+
+The only AGPL subpackage in this project. Neither of its two source files
+carries a licence header, so its bundled LICENSE.txt -- the GNU Affero
+General Public License v3 -- is the only statement of terms and governs.
+The Affero clause binds operators who offer modified versions over a
+network; it places no additional condition on redistributing this package.
+
+%package orion-ssg3
+Summary:        Orion StarShoot G3 CCD INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description orion-ssg3
+indi_orion_ssg3_ccd, for the Orion StarShoot G3 camera.
+
+Inherits this spec's LGPL-2.1-or-later aggregate on the strength of its own
+source headers. Its bundled LICENSE is the GPL-3 text, which contradicts
+them, so it is not shipped -- the same call indi-ocs's contradictory file
+gets, and for the same reason: a GPL text beside LGPL code overstates the
+terms in the direction that can mislead a redistributor.
+
+%package atik-efw
+Summary:        Atik EFW filter wheel INDI driver
+Requires:       indi-stable-core-libs%{?_isa}
+%description atik-efw
+indi_atik_efw, for Atik electronic filter wheels.
+
+Despite the name it has NO relationship to indi-atik or to the Atik vendor
+SDK, which this project excludes on licence grounds. Checked directly
+rather than inferred from the shared prefix: its CMakeLists.txt calls
+find_package for INDI and Threads only, and links ${INDI_LIBRARIES} and rt.
+It talks to the filter wheel over USB HID directly, and all three of its
+source files are plainly LGPL-2.1-or-later.
+
 %package touptek
 Summary:        Touptek and rebranded-Touptek camera INDI drivers (11 brands)
 Requires:       indi-stable-core-libs%{?_isa}
@@ -580,7 +664,6 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DINDI_DATA_DIR=%{indi_datadir} \
     -DWITH_ASTROASIS=OFF \
     -DWITH_ATIK=OFF \
-    -DWITH_ATIK_EFW=OFF \
     -DWITH_QHY=OFF \
     -DWITH_SVBONY=OFF \
     -DWITH_PENTAX=OFF \
@@ -591,7 +674,6 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_AVALONUD=OFF \
     -DWITH_BEEFOCUS=OFF \
     -DWITH_BRESSEREXOS2=OFF \
-    -DWITH_CLOUDWATCHER=OFF \
     -DWITH_DREAMFOCUSER=OFF \
     -DWITH_DSI=OFF \
     -DWITH_DUINO=OFF \
@@ -602,9 +684,6 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_GPSNMEA=OFF \
     -DWITH_LIMESDR=OFF \
     -DWITH_MGEN=OFF \
-    -DWITH_NIGHTSCAPE=OFF \
-    -DWITH_OPENOGMA=OFF \
-    -DWITH_ORION_SSG3=OFF \
     -DWITH_RADIOSIM=OFF \
     -DWITH_ROLLOFFINO=OFF \
     -DWITH_RTKLIB=OFF \
@@ -647,6 +726,14 @@ rm -f %{buildroot}%{indi_bindir}/asi_camera_bench
 rm -f %{buildroot}%{indi_bindir}/asi_wheel_test
 rm -f %{buildroot}%{indi_bindir}/playerone_camera_test
 rm -f %{buildroot}%{indi_bindir}/playerone_camera_bench
+# aagcloudwatcher_test_ng is the same class: a standalone CLI test tool, a
+# real install(TARGETS) target upstream, in no catalogue, and not an INDI
+# driver. Removed rather than merely omitted from %%files, for the same
+# reason as the six above -- rpmbuild's unpackaged-file check would
+# otherwise fail the build on it. Note this is UNLIKE maxdomeii's
+# test-maxdomeii, which upstream builds but never installs, so never
+# reaches the buildroot at all.
+rm -f %{buildroot}%{indi_bindir}/aagcloudwatcher_test_ng
 
 # --- eqmod: drop the catalogue entry for the driver we do not build ---------
 # indi_eqmod.xml catalogues indi_ahpgt_telescope, but indi-eqmod's own local
@@ -724,11 +811,24 @@ rm -rf %{buildroot}%{indi_prefix}/udev-rules
 # least one": a second rule appearing means a driver started shipping one and
 # needs a %%files line, which would otherwise surface much later as an
 # unpackaged-file failure with nothing pointing at the cause.
+# Four drivers in scope ship one rule each. Asserting the COUNT rather than
+# "at least one" is what makes a fifth appearing -- an upstream driver newly
+# shipping a rule -- fail here with an explanation, instead of much later as
+# an unpackaged file.
+#
+# These four reach /usr/lib/udev/rules.d by THREE different upstream
+# mechanisms, which is why the loop above keys on destination rather than on
+# any one variable: nightscape uses UDEVRULES_INSTALL_DIR (a CACHE variable,
+# so the -D redirect works); armadillo-platypus and orion-ssg3 use
+# RULES_INSTALL_DIR (a plain set(), so no -D can move it); and openogma
+# hardcodes the literal path in its install() call with no variable at all.
 _rules=$(ls -1 %{buildroot}%{_udevrulesdir}/*.rules 2>/dev/null | wc -l)
-test "$_rules" -eq 1 \
-    || { echo "ERROR: expected exactly 1 udev rule from this package, found $_rules:"; ls -1 %{buildroot}%{_udevrulesdir}/ 2>/dev/null; exit 1; }
-test -e %{buildroot}%{_udevrulesdir}/99-indi-stable-3rdparty-armadilloplatypus.rules \
-    || { echo "ERROR: the armadillo-platypus rule is not at its re-homed name. Found:"; ls -1 %{buildroot}%{_udevrulesdir}/; exit 1; }
+test "$_rules" -eq 4 \
+    || { echo "ERROR: expected exactly 4 udev rules from this package, found $_rules:"; ls -1 %{buildroot}%{_udevrulesdir}/ 2>/dev/null; exit 1; }
+for _r in armadilloplatypus nightscape openogma orionssg3; do
+    test -e %{buildroot}%{_udevrulesdir}/99-indi-stable-3rdparty-${_r}.rules \
+        || { echo "ERROR: the ${_r} rule is not at its re-homed name. Found:"; ls -1 %{buildroot}%{_udevrulesdir}/; exit 1; }
+done
 # And nothing may be left at an upstream, un-namespaced filename -- that is
 # the actual coexistence assertion, and the one the first build failed.
 _bare_rules=$(ls -1 %{buildroot}%{_udevrulesdir}/*.rules 2>/dev/null | grep -v -- '-indi-stable-3rdparty-' || true)
@@ -784,7 +884,8 @@ for _bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
             indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
             indi_maxdomeii indi_lx200aok indi_lx200stargo \
             indi_celestron_aux indi_nexdome indi_talon6 indi_ocs \
-            indi_starbook_ten; do
+            indi_starbook_ten indi_aagcloudwatcher_ng indi_nightscape_ccd \
+            indi_openogma indi_orion_ssg3_ccd indi_atik_efw; do
     test -x %{buildroot}%{indi_bindir}/${_bin} \
         || { echo "ERROR: ${_bin} did not install -- an upstream WITH_* default or driver name changed"; exit 1; }
 done
@@ -1008,6 +1109,57 @@ done
 %dir %{indi_datadir}
 %{indi_bindir}/indi_starbook_ten
 %{indi_datadir}/indi_starbook_ten.xml
+
+%files aagcloudwatcher-ng
+%license indi-aagcloudwatcher-ng/LICENSE.txt
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_aagcloudwatcher_ng
+%{indi_datadir}/indi_aagcloudwatcher_ng.xml
+%{indi_datadir}/indi_aagcloudwatcher_ng_sk.xml
+
+# The one subpackage whose bundled licence text exactly matches its tag.
+%files nightscape
+%license indi-nightscape/COPYING.LIB
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_nightscape_ccd
+%{indi_datadir}/indi_nightscape.xml
+%{_udevrulesdir}/*-indi-stable-3rdparty-*nightscape*.rules
+
+%files openogma
+%license indi-openogma/LICENSE.txt
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_openogma
+%{indi_datadir}/indi_openogma.xml
+%{_udevrulesdir}/*-indi-stable-3rdparty-*openogma*.rules
+
+# Top-level LICENSE, not the driver's own: see the %%package block.
+%files orion-ssg3
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_orion_ssg3_ccd
+%{indi_datadir}/indi_orion_ssg3.xml
+%{_udevrulesdir}/*-indi-stable-3rdparty-*orionssg3*.rules
+
+%files atik-efw
+%license LICENSE
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_atik_efw
+%{indi_datadir}/indi_atik_efw.xml
 
 %files touptek
 %license indi-toupbase/COPYING.LGPL

@@ -41,6 +41,64 @@ License: LGPL-2.0-only
  own, so there is no "or later" grant to upgrade the tag with. The
  conservative, defensible reading is the plain v2 text as written.
 
+Files: indi-aagcloudwatcher-ng/*
+Copyright: Lunatico Astronomia and the INDI Library contributors
+License: GPL-3.0-or-later
+ All seven source files grant "either version 3 of the License, or (at your
+ option) any later version" under the plain GPL, and the directory ships the
+ matching GPL-3 text as LICENSE.txt -- one of the few drivers here where the
+ bundled file and the source headers agree.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-3.
+
+Files: indi-nightscape/*
+Copyright: The Celestron Nightscape driver authors and the INDI Library
+ contributors
+License: LGPL-2.0-only
+ No source file in this directory carries a licence header at all. Its
+ bundled COPYING.LIB -- the GNU Library General Public License version 2 --
+ is the only statement of terms, so it governs, and it is shipped as the
+ package's licence text. This is the one driver here whose bundled text is
+ an exact match for its grant.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.
+
+Files: indi-openogma/*
+Copyright: The OpenOGMA driver authors and the INDI Library contributors
+License: AGPL-3.0-only
+ Neither source file carries a licence header, so the bundled LICENSE.txt --
+ the GNU Affero General Public License version 3 -- is the only statement of
+ terms and governs. The Affero clause obliges operators who offer a modified
+ version over a network to provide source to its users; it places no
+ additional condition on redistributing this package.
+ .
+ The full text is shipped with the binary package. Debian's
+ /usr/share/common-licenses does not carry the AGPL.
+
+Files: indi-orion-ssg3/* indi-atik-efw/*
+Copyright: The Orion StarShoot and Atik EFW driver authors
+ and the INDI Library contributors
+License: LGPL-2.1-or-later
+ Read per file: indi-orion-ssg3/orion_ssg3.cpp and indi_orion_ssg3.cpp, and
+ all three files in indi-atik-efw, grant "version 2.1 ... or (at your
+ option) any later version". indi-orion-ssg3/orion_ssg3.h carries no
+ header and states no contradicting grant.
+ .
+ indi-orion-ssg3 bundles a LICENSE which is the GPL-3 text, contradicting
+ every source header in its own directory. It is NOT shipped: a GPL text
+ beside LGPL code overstates the terms in the direction that can mislead a
+ redistributor. The same call indi-ocs's contradictory file gets.
+ .
+ indi-atik-efw has NO relationship to indi-atik or the Atik vendor SDK,
+ which this project excludes on licence grounds -- checked directly rather
+ than inferred from the shared name prefix: its CMakeLists.txt calls
+ find_package for INDI and Threads only.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.1.
+
 Files: indi-nexdome/* indi-talon6/* indi-ocs/* indi-starbook-ten/*
 Copyright: 2019 Jasem Mutlaq
  2017 Rozeware Development Ltd

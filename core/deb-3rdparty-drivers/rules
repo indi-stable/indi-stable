@@ -69,7 +69,6 @@ override_dh_auto_configure:
 		-DBUILD_LIBS=OFF \
 		-DWITH_ASTROASIS=OFF \
 		-DWITH_ATIK=OFF \
-		-DWITH_ATIK_EFW=OFF \
 		-DWITH_QHY=OFF \
 		-DWITH_SVBONY=OFF \
 		-DWITH_PENTAX=OFF \
@@ -80,7 +79,6 @@ override_dh_auto_configure:
 		-DWITH_AVALONUD=OFF \
 		-DWITH_BEEFOCUS=OFF \
 		-DWITH_BRESSEREXOS2=OFF \
-		-DWITH_CLOUDWATCHER=OFF \
 		-DWITH_DREAMFOCUSER=OFF \
 		-DWITH_DSI=OFF \
 		-DWITH_DUINO=OFF \
@@ -91,9 +89,6 @@ override_dh_auto_configure:
 		-DWITH_GPSNMEA=OFF \
 		-DWITH_LIMESDR=OFF \
 		-DWITH_MGEN=OFF \
-		-DWITH_NIGHTSCAPE=OFF \
-		-DWITH_OPENOGMA=OFF \
-		-DWITH_ORION_SSG3=OFF \
 		-DWITH_RADIOSIM=OFF \
 		-DWITH_ROLLOFFINO=OFF \
 		-DWITH_RTKLIB=OFF \
@@ -115,6 +110,9 @@ override_dh_auto_install:
 	rm -f debian/tmp$(INDI_BINDIR)/asi_wheel_test
 	rm -f debian/tmp$(INDI_BINDIR)/playerone_camera_test
 	rm -f debian/tmp$(INDI_BINDIR)/playerone_camera_bench
+	# Same class: a standalone CLI test tool upstream install()s, in no
+	# catalogue and not an INDI driver. See core/rpm's %%install.
+	rm -f debian/tmp$(INDI_BINDIR)/aagcloudwatcher_test_ng
 	# --- udev rules: re-home under a namespaced filename --------------------
 	# NEW with the armadillo-platypus slice. Until then nothing in THIS source
 	# package shipped a udev rule -- every rule this project installed came
@@ -146,11 +144,19 @@ override_dh_auto_install:
 	# A loop that finds nothing must not pass as though it worked (#1).
 	# Exactly one driver in scope ships a rule; maxdomeii deliberately ships
 	# none, so assert a COUNT, not "at least one".
+	# Four drivers in scope ship one rule each, by THREE different upstream
+	# mechanisms -- a CACHE variable (nightscape), a plain set() no -D can
+	# move (armadillo-platypus, orion-ssg3), and a literal path with no
+	# variable at all (openogma). That is why the loop above keys on
+	# destination. Asserting the COUNT makes a fifth fail here with an
+	# explanation rather than later as an uninstalled file.
 	set -e; n=$$(ls -1 debian/tmp/usr/lib/udev/rules.d/*.rules 2>/dev/null | wc -l); \
-	test "$$n" -eq 1 \
-		|| { echo "ERROR: expected exactly 1 udev rule, found $$n:"; ls -1 debian/tmp/usr/lib/udev/rules.d/ 2>/dev/null; exit 1; }
-	test -e debian/tmp/usr/lib/udev/rules.d/99-indi-stable-3rdparty-armadilloplatypus.rules \
-		|| { echo "ERROR: the armadillo-platypus rule is not at its re-homed name"; ls -1 debian/tmp/usr/lib/udev/rules.d/; exit 1; }
+	test "$$n" -eq 4 \
+		|| { echo "ERROR: expected exactly 4 udev rules, found $$n:"; ls -1 debian/tmp/usr/lib/udev/rules.d/ 2>/dev/null; exit 1; }
+	set -e; for r in armadilloplatypus nightscape openogma orionssg3; do \
+		test -e debian/tmp/usr/lib/udev/rules.d/99-indi-stable-3rdparty-$$r.rules \
+			|| { echo "ERROR: the $$r rule is not at its re-homed name"; ls -1 debian/tmp/usr/lib/udev/rules.d/; exit 1; }; \
+	done
 	# Nothing may be left at an upstream filename. This is the coexistence
 	# assertion, and the one the RPM side's first build failed.
 	set -e; bare=$$(ls -1 debian/tmp/usr/lib/udev/rules.d/*.rules 2>/dev/null | grep -v -- '-indi-stable-3rdparty-' || true); \
@@ -230,7 +236,9 @@ override_dh_auto_install:
 	                   indi_dragonfly indi_dragonfly_dome indi_beaver_dome \
 	                   indi_maxdomeii indi_lx200aok indi_lx200stargo \
 	                   indi_celestron_aux indi_nexdome indi_talon6 indi_ocs \
-	                   indi_starbook_ten; do \
+	                   indi_starbook_ten indi_aagcloudwatcher_ng \
+	                   indi_nightscape_ccd indi_openogma \
+	                   indi_orion_ssg3_ccd indi_atik_efw; do \
 		test -x debian/tmp$(INDI_BINDIR)/$$bin \
 			|| { echo "ERROR: $$bin did not install -- an upstream WITH_* default or driver name changed"; exit 1; }; \
 	done
