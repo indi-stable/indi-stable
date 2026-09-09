@@ -1180,14 +1180,75 @@ code. A fifth (`indi_ahpgt_telescope`) is gated behind `indi-eqmod/CMakeLists.tx
 top-level `WITH_AHP_GT` above, defaults `Off` either way, not something enabling `eqmod`
 touches.
 
-**Not yet decided: which of the 44 to actually build.** Discussed with Will 2026-09-08;
-options on the table were EQMod alone (fast, unblocks the mount today, minimal new
-`BuildRequires` surface), the full 44 minus the licence-adjacent pair noted above (matches
-upstream's own defaults, but real new dependency surface — `gphoto2-devel`, `libraw-devel`,
-`libftdi1-devel`, `libdc1394-devel`, `libgpiod-devel` — and the same build/install/
-coexistence/upgrade rigor the original 9-vendor work needed, likely with its own real defects
-per `LESSONS_LEARNED.md` #1), or a curated batch in between. Deferred, not decided either way.
-See `STATUS.md` for next steps.
+### Decided: eqmod first, then widen — 2026-09-08
+
+**Scope decided with Will: build `eqmod` alone first, as a complete vertical
+slice, then widen.** The options weighed were EQMod alone, the full 44 minus the
+licence-adjacent `qhy`/`atik-efw` pair, and a curated "no new dependency surface"
+batch of roughly twenty (everything needing only `libnova`+`GSL`, or nothing).
+
+The deciding argument was not scope but *sequence*. Every widening option
+eventually wants the same thing — the build, install, coexistence and upgrade
+rigor the original 9-vendor work needed — and `LESSONS_LEARNED.md` #1's track
+record says the first non-blob driver will surface real defects. Doing that
+discovery against one driver rather than forty means each defect is
+unambiguous about what caused it. Widening afterward is repetition of a proven
+shape rather than new risk, so this is a decision about ordering, not a cap:
+the remaining drivers are still wanted.
+
+**A second decision, also Will's: one subpackage per driver**, not a grouped
+`-misc` lump. It keeps the shape the 9 vendor subpackages already established,
+and it keeps heavy dependencies isolated — installing `eqmod` must never pull
+`libraw` in on behalf of `gphoto`. The cost, once the widening happens, is
+roughly forty `%package` stanzas and forty Debian binary packages.
+
+**`eqmod` is the only subpackage here that is not LGPL**, found by reading
+every `.cpp`/`.h` header in `indi-eqmod/` on 2026-09-08 rather than
+spot-checking one, and it is genuinely two bodies of code:
+
+- Geehalel's original Skywatcher-protocol driver (`eqmod*`, `skywatcher*`,
+  `align/`, `scope-limits/`, `simulator/`) grants "either version 3 of the
+  License, or (at your option) any later version" and the directory ships a
+  full GPLv3 `COPYING` — **GPL-3.0-or-later**.
+- The 2020 AZ-GTi and Star Adventurer additions (`azgtibase`,
+  `staradventurergtibase`, `staradventurer2ibase`) grant "GNU Library General
+  Public License version 2" with **no** "or later" clause — **LGPL-2.0-only**,
+  the same conservative reading `indi-inovaplx` already gets, for the same
+  reason.
+
+All four binaries compile `skywatcher.cpp`, so all four are GPL-3.0-or-later as
+distributed; LGPL-2.0's own section 3 is what permits that combination.
+
+**This forced a packaging decision about the `License:` tag.** Adding
+`GPL-3.0-or-later` to the spec's top-level `License:` was tried first and was
+wrong: rpm propagates that tag to every subpackage that does not override it,
+so all nine vendor subpackages — none of which contain a line of GPL-3 code —
+would have declared it. Caught by running `rpmspec -q --qf '%{license}'` over
+the built package list rather than by reading the spec back. The top-level tag
+stays the LGPL aggregate and `eqmod` alone carries its own `License:`. The
+cost is that the SRPM's tag understates the SRPM's contents; the benefit is
+that all ten binary RPMs — the artifacts anyone actually installs and
+redistributes — declare exactly what they hold. Debian has no equivalent
+tension: `debian/copyright` is per-file-glob by construction, so `eqmod`'s two
+grants are simply two more `Files:` stanzas.
+
+**One real defect found while adding it, before any build ran**, and it
+generalized into `LESSONS_LEARNED.md` #24: `indi_eqmod.xml` catalogues
+`indi_ahpgt_telescope`, a driver gated behind an upstream option that defaults
+off and which this project therefore never builds. Left alone that entry would
+have survived the catalogue rewrite as a *bare* name — and a bare name is what
+`indiserver` resolves through `PATH`, making it the one entry in our own
+catalogue capable of launching a distribution binary. Both packagings now strip
+the `<device>` block and then assert that no `<driver>` entry anywhere survives
+as a bare name.
+
+`eqmod` also installs **five** XML files, not one: `indi_eqmod.xml` is the
+driver catalogue, and the four `*_sk.xml` are INDI property skeletons. The
+skeletons match the rewrite loop's own `indi_*.xml` glob but contain no
+`<driver>` element at all (checked), so the rewrite correctly leaves them
+untouched.
+
+See `STATUS.md` for what remains.
 
 ### Three more absolute paths found while writing `indi-stable-3rdparty-libs.spec` — 2026-08-26
 

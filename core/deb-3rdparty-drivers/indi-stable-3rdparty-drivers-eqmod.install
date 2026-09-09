@@ -1,0 +1,9 @@
+opt/indi-stable/bin/indi_eqmod_telescope
+opt/indi-stable/bin/indi_azgti_telescope
+opt/indi-stable/bin/indi_staradventurergti_telescope
+opt/indi-stable/bin/indi_staradventurer2i_telescope
+opt/indi-stable/share/indi/indi_eqmod.xml
+opt/indi-stable/share/indi/indi_eqmod_sk.xml
+opt/indi-stable/share/indi/indi_eqmod_simulator_sk.xml
+opt/indi-stable/share/indi/indi_align_sk.xml
+opt/indi-stable/share/indi/indi_eqmod_scope_limits_sk.xml

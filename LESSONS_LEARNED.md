@@ -542,3 +542,39 @@ you expected going in or the host's "mergeable: clean" status.
 candidates stale anyway; caught only by reading the merged file directly
 while verifying an unrelated, later change, and fixed with a direct commit
 against `main`'s tip instead of another merge.
+
+## 24. A catalogue entry for a driver you did not build is worse than none
+
+Adding `eqmod` meant shipping `indi_eqmod.xml`, upstream's own driver
+catalogue for that directory. It lists eight `<device>` entries, one of which
+names `indi_ahpgt_telescope` — a binary gated behind an upstream option that
+defaults off, so this project never builds it.
+
+That entry looked harmless. It is not. This project rewrites every catalogue
+entry from a bare binary name to an absolute path inside the private prefix,
+which is the mechanism that stops our catalogue from launching a
+distribution's binary. The rewrite works by substituting names it found an
+installed binary for, so an entry naming a binary that was never built is
+exactly the one the rewrite cannot touch — and a bare name is what
+`indiserver` resolves through `PATH`. The single unrewritten entry would
+therefore have been the one entry in the file capable of starting a distro
+driver out of our own catalogue: the precise failure the rewrite exists to
+prevent, reintroduced by the one line the rewrite skipped.
+
+The general shape: **a partial transformation is most dangerous on the
+elements it does not transform**, because the surrounding correctness makes
+the survivors look intentional. Counting how many entries were rewritten
+(which this project already did) cannot see this — the count was healthy and
+the defect was in the remainder.
+
+**Rule:** when a build ships a manifest it did not author, assert on what the
+manifest still contains after your rewrite, not only on how much of it you
+changed. Here that is a check that **no** `<driver>` entry survives as a bare
+name; it is cheap, and it turns "we handled the AHP GT case" into "no
+unhandled case can arrive silently" when upstream adds the next one.
+
+*Evidence:* found 2026-09-08 while adding `eqmod` to
+`indi-stable-3rdparty-drivers`. Verified non-vacuous rather than assumed: run
+against the already-shipped `2.2.4.1-1` packages all 56 existing entries were
+already absolute (so the check passes for a real reason, #1), and run against
+an unstripped `indi_eqmod.xml` it fires on the AHP GT line.

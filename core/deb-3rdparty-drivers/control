@@ -17,16 +17,22 @@ Build-Depends: debhelper-compat (= 13),
                indi-stable-3rdparty-libs-micam-dev (= 2.2.4.1-1),
                indi-stable-3rdparty-libs-sbig-dev (= 2.2.4.1-1),
                indi-stable-3rdparty-libs-touptek-dev (= 2.2.4.1-1),
-               indi-stable-3rdparty-libs-fishcamp-dev (= 2.2.4.1-1)
+               indi-stable-3rdparty-libs-fishcamp-dev (= 2.2.4.1-1),
+               libnova-dev,
+               libgsl-dev
 Standards-Version: 4.6.2
 Homepage: https://github.com/indilib/indi-3rdparty
 Rules-Requires-Root: no
 
 # Mirrors core/rpm/indi-stable-3rdparty-drivers.spec -- same private prefix,
-# same 9 vendor drivers, same scope decision (the ~50 other indi-3rdparty
-# drivers that need no vendor blob are deliberately out of scope, STATUS.md).
+# same 9 vendor drivers plus eqmod, same scope decision (the ~40 other
+# non-blob indi-3rdparty drivers stay out of scope for now, STATUS.md).
 # Read that spec's header comment for the full rationale; core/deb-
 # 3rdparty-drivers/rules carries only the Debian-specific mechanics.
+#
+# libnova-dev and libgsl-dev are eqmod's, and only eqmod's -- no vendor
+# driver here needs either. They are the entire new build-dependency surface
+# this package took on to gain eqmod.
 #
 # Every Depends: on indi-stable-3rdparty-libs-<vendor> below is pinned to a
 # LITERAL version (= X.Y.Z-1), not a substvar -- there is no dpkg
@@ -135,6 +141,28 @@ Description: Fishcamp Engineering CCD camera INDI driver
  indi_fishcamp_ccd, linked against the bundled Fishcamp library
  (indi-stable-3rdparty-libs-fishcamp). Added 2026-08-27 once Fishcamp's
  licence was confirmed clear (DESIGN.md).
+ .
+ This is an unofficial third-party build. It is not affiliated with or
+ endorsed by the INDI project.
+
+# The only binary package here with no indi-stable-3rdparty-libs-<vendor>
+# Depends, because eqmod has no vendor blob behind it -- it talks the
+# Skywatcher serial/network protocol directly. libnova and libgsl arrive
+# through ${shlibs:Depends} on their own, both being ordinary distribution
+# packages that ship real shlibs files.
+Package: indi-stable-3rdparty-drivers-eqmod
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, indi-stable-core-libs
+Description: EQMod / Skywatcher-protocol mount INDI drivers
+ indi_eqmod_telescope, indi_azgti_telescope,
+ indi_staradventurergti_telescope and indi_staradventurer2i_telescope --
+ four binaries, not one, sharing skywatcher.cpp's motor-control code:
+ EQMod-protocol Skywatcher mounts (including the Wave 100i/150i), the AZ-GTi
+ in equatorial WiFi mode, and both Star Adventurer GTi and 2i variants.
+ .
+ Needs no vendor SDK, so unlike every other package here it depends only on
+ indi-stable-core-libs. Does not include indi_ahpgt_telescope, which
+ upstream gates behind an option that is off by default.
  .
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.

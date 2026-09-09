@@ -1,8 +1,14 @@
-# indi-stable-3rdparty-drivers -- the INDI drivers for the same 9 vendors
-# indi-stable-3rdparty-libs bundles the vendor SDKs for, built from the SAME
-# upstream indi-3rdparty tag with -DBUILD_LIBS=OFF, so this build links
-# against the -devel subpackages -libs already produces rather than building
-# any vendor SDK a second time.
+# indi-stable-3rdparty-drivers -- the INDI drivers for the 9 vendors
+# indi-stable-3rdparty-libs bundles the vendor SDKs for, plus eqmod, built
+# from the SAME upstream indi-3rdparty tag with -DBUILD_LIBS=OFF, so this
+# build links against the -devel subpackages -libs already produces rather
+# than building any vendor SDK a second time.
+#
+# eqmod is the FIRST driver here with no vendor blob behind it, added
+# 2026-09-08: it needs no -libs subpackage at all, only libnova and GSL, and
+# so Requires only indi-stable-core-libs. It is the pathfinder for the
+# remaining non-blob drivers rather than a one-off -- see DESIGN.md, "The ~50
+# non-blob drivers", for the survey and the eqmod-first scope decision.
 #
 # Builds, installs and removes cleanly alongside indi-stable-core and
 # indi-stable-3rdparty-libs as of 2026-08-26 (see STATUS.md) -- verified
@@ -14,12 +20,14 @@
 # git history for this file) -- LESSONS_LEARNED.md #1/#2 held again. Fishcamp
 # added 2026-08-27 once its licence was confirmed clear (DESIGN.md).
 #
-# Deliberately scoped to the SAME 9 vendors -libs bundles (apogee, asi, fli,
-# playerone, inovasdk, micam, sbig, touptek, fishcamp) and no others.
-# indi-3rdparty ships roughly 50 more drivers (eqmod, gpsd, celestronaux, ...)
-# that need no vendor blob at all and have no dependency on -libs whatsoever
-# -- a deliberately separate, not-yet-made scope decision (confirmed with
-# Will, 2026-08-26). See STATUS.md, "3rdparty -- remaining".
+# Scoped to the 9 vendors -libs bundles (apogee, asi, fli, playerone,
+# inovasdk, micam, sbig, touptek, fishcamp) plus eqmod. indi-3rdparty ships
+# roughly 40 more non-blob drivers (gpsd, celestronaux, nexdome, ...) that
+# need no vendor blob and have no dependency on -libs whatsoever; those stay
+# off for now. Scope decided with Will 2026-09-08: eqmod alone first, as a
+# complete build/install/coexistence/upgrade slice on both distros, then
+# widen -- so that the defects a first non-blob driver brings surface against
+# one driver rather than forty. See STATUS.md, "3rdparty -- remaining".
 #
 # See DESIGN.md, "Resolution -- two source packages, not one and not
 # sixty-one", for why this is a second source package rather than a second
@@ -58,7 +66,7 @@
 Name:           indi-stable-3rdparty-drivers
 Version:        2.2.4.1
 Release:        1%{?dist}
-Summary:        INDI drivers for 9 vendor camera/focuser SDKs (stable upstream release, private prefix)
+Summary:        INDI drivers for 9 vendor camera/focuser SDKs and EQMod mounts (stable upstream release, private prefix)
 
 # Aggregate across 9 driver source trees, confirmed by reading actual SOURCE
 # FILE license headers (not the bundled COPYING file alone -- two of them,
@@ -86,10 +94,44 @@ Summary:        INDI drivers for 9 vendor camera/focuser SDKs (stable upstream r
 #                                 defensible reading is the plain v2 text as
 #                                 written, not v2.1-or-later by analogy to
 #                                 its siblings.
+#   eqmod                     -- GPL-3.0-or-later AND LGPL-2.0-only. The ONLY
+#                                 subpackage here that is not LGPL, and the
+#                                 reason it carries its own License: tag
+#                                 below rather than inheriting this one.
+#                                 indi-eqmod/ is genuinely two bodies of code
+#                                 with different grants, read directly from
+#                                 every .cpp/.h header in the directory
+#                                 (2026-09-08, not spot-checked): Geehalel's
+#                                 original Skywatcher-protocol driver
+#                                 (eqmod*, skywatcher*, align/, scope-limits/,
+#                                 simulator/) reads "either version 3 of the
+#                                 License, or (at your option) any later
+#                                 version" and ships a full GPLv3 COPYING;
+#                                 the 2020 AZ-GTi/Star Adventurer additions
+#                                 (azgtibase, staradventurer*base) read
+#                                 "Library General Public License version 2"
+#                                 with NO "or later" grant -- LGPL-2.0-only,
+#                                 the same conservative reading inovasdk gets
+#                                 above and for the same reason. All four
+#                                 binaries compile skywatcher.cpp, so all four
+#                                 are GPL-3.0-or-later as built; LGPL-2.0's
+#                                 own section 3 is what permits that
+#                                 combination.
 # %%license below points at indi-3rdparty's own top-level LICENSE (correct
 # 2.1 text) rather than apogee's/fli's/micam's/sbig's own bundled files where
 # those are missing or stale -- packaging a license file whose TEXT actually
 # matches the declared tag, not merely whatever happened to be closest.
+# eqmod is the exception: it has its own COPYING carrying real GPLv3 text.
+#
+# This tag is the DEFAULT every subpackage inherits, not a description of the
+# source tarball, and that distinction is load-bearing here. Adding eqmod's
+# GPL-3.0-or-later to it was tried first and was wrong: rpm propagated it to
+# all 9 vendor subpackages, none of which contain a line of GPL-3 code, so
+# every installed RPM would have overstated its own licence. eqmod carries its
+# own License: tag instead and is the only subpackage that overrides this one.
+# The cost is that the SRPM's tag understates what the SRPM contains; the
+# benefit is that all 10 binary RPMs -- the things anyone actually installs
+# and redistributes -- declare exactly what they hold.
 License:        LGPL-2.1-or-later AND LGPL-2.0-only
 URL:            https://github.com/indilib/indi-3rdparty
 Source0:        https://github.com/indilib/indi-3rdparty/archive/refs/tags/%{upstream_tag}.tar.gz#/indi-3rdparty-%{upstream_tag}.tar.gz
@@ -121,16 +163,23 @@ BuildRequires:  indi-stable-3rdparty-libs-micam-devel = %{version}-%{release}
 BuildRequires:  indi-stable-3rdparty-libs-sbig-devel = %{version}-%{release}
 BuildRequires:  indi-stable-3rdparty-libs-touptek-devel = %{version}-%{release}
 BuildRequires:  indi-stable-3rdparty-libs-fishcamp-devel = %{version}-%{release}
+# eqmod only. find_package(Nova REQUIRED) and find_package(GSL REQUIRED) in
+# indi-eqmod/CMakeLists.txt, and nothing else beyond INDI/ZLIB, which the
+# 9 vendor drivers already pull in. Neither is needed by any other driver
+# built here -- they arrive with eqmod and would leave with it.
+BuildRequires:  libnova-devel
+BuildRequires:  gsl-devel
 
 %description
 INDI drivers for the 9 vendor camera/focuser SDKs indi-stable-3rdparty-libs
-bundles, built with -DBUILD_LIBS=OFF from the same upstream indi-3rdparty tag
-that project builds from with -DBUILD_LIBS=ON.
+bundles, plus the EQMod/Skywatcher mount drivers, built with -DBUILD_LIBS=OFF
+from the same upstream indi-3rdparty tag that project builds from with
+-DBUILD_LIBS=ON.
 
 Installs into %{indi_prefix}, the same private prefix as indi-stable-core and
 indi-stable-3rdparty-libs, so it never collides with any distribution-
-provided INDI or driver package. Only drivers for the 9 already-bundled
-vendors are built here -- see DESIGN.md for the scope decision.
+provided INDI or driver package. The remaining non-blob drivers upstream
+ships are not built here yet -- see DESIGN.md for the scope decision.
 
 This is an unofficial third-party build. It is not affiliated with or
 endorsed by the INDI project.
@@ -210,6 +259,31 @@ indi_fishcamp_ccd, linked against the bundled Fishcamp library
 (indi-stable-3rdparty-libs-fishcamp). Added 2026-08-27 once Fishcamp's
 licence was confirmed clear (DESIGN.md).
 
+# The only subpackage here with no indi-stable-3rdparty-libs-<vendor>
+# Requires, because eqmod has no vendor blob behind it: it talks the
+# Skywatcher serial/network protocol directly. libnova and libgsl are picked
+# up as ordinary auto-generated SONAME Requires -- deliberately NOT added to
+# %%global __requires_exclude above, which covers only libraries this project
+# ships inside the private prefix. These two come from the distribution, so
+# rpm SHOULD depend on them by soname, exactly as it would for libc.
+%package eqmod
+Summary:        EQMod / Skywatcher-protocol mount INDI drivers
+License:        GPL-3.0-or-later AND LGPL-2.0-only
+Requires:       indi-stable-core-libs%{?_isa}
+%description eqmod
+indi_eqmod_telescope, indi_azgti_telescope, indi_staradventurergti_telescope
+and indi_staradventurer2i_telescope -- four binaries, not one, sharing
+skywatcher.cpp's motor-control code: EQMod-protocol Skywatcher mounts
+(including the Wave 100i/150i), the AZ-GTi in equatorial WiFi mode, and both
+Star Adventurer GTi and 2i variants.
+
+Needs no vendor SDK, so unlike every other subpackage here it depends only on
+indi-stable-core-libs. Does NOT include indi_ahpgt_telescope, which
+indi-eqmod/CMakeLists.txt gates behind its own local option(WITH_AHP_GT ...
+OFF) -- a same-named but independent option from the top-level WITH_AHP_GT,
+and off by default either way. Its catalogue entry is stripped in %%install
+rather than left dangling; see there for why that matters.
+
 %package touptek
 Summary:        Touptek and rebranded-Touptek camera INDI drivers (11 brands)
 Requires:       indi-stable-core-libs%{?_isa}
@@ -272,7 +346,8 @@ sed -i '/add_executable(omegonprocam_test /a set_target_properties(omegonprocam_
 # libindi*.so (core) and the vendor libraries (-libs), both of which live in
 # the SAME %%{indi_libdir}, so one RPATH entry covers both.
 #
-# 46 WITH_<X>=OFF overrides -- the full "everything except our 9" list, and
+# 47 WITH_<X>=OFF overrides -- the full "everything except our 9 vendors and
+# eqmod" list, and
 # the single biggest way this %%build differs from -libs's own. Found the
 # hard way on the first real build attempt (2026-08-26): -DBUILD_LIBS=ON (the
 # libs phase) only ever processes "lib*" subdirectories, and non-blob vendors
@@ -312,10 +387,22 @@ sed -i '/add_executable(omegonprocam_test /a set_target_properties(omegonprocam_
 # add_subdirectory(indi-fishcamp)` branch is what actually runs, not the
 # library-build fallback.
 #
-# The other 38 are entirely out of THIS project's scope, not excluded for
-# any licence reason -- non-blob drivers this packaging effort has not yet
-# decided whether to bundle at all (STATUS.md, "3rdparty -- remaining"; the
-# file header above).
+# The other 37 are out of THIS project's CURRENT scope, not excluded for any
+# licence reason -- non-blob drivers deferred by the eqmod-first decision
+# (STATUS.md, "3rdparty -- remaining"; the file header above), to be revisited
+# once eqmod has been through the full verification cycle on both distros.
+#
+# The last two, WITH_WEBCAM and WITH_NUT, are a DIFFERENT case from every
+# other line here and must stay pinned whatever the scope becomes. Neither is
+# a fixed upstream default: indi-3rdparty's own top-level CMakeLists.txt sets
+# each one by running find_package(FFmpeg) / find_package(NUTClient) at
+# CONFIGURE time, so leaving either unset makes the build's contents depend on
+# what happens to be installed in that day's mock chroot -- the exact
+# nondeterminism this project's pinned Source0 hashes exist to prevent. Pinned
+# Off rather than On because WITH_WEBCAM needs ffmpeg-devel, which is not in
+# base Fedora at all (RPM Fusion only, a repo this project has never
+# depended on). Found by reading upstream's CMakeLists.txt, 2026-09-08;
+# neither had ever been passed explicitly before.
 #
 # Extra -I%%{indi_includedir}: found on the first real build (2026-08-26),
 # indi-apogee/apogee_ccd.cpp mixes BOTH include styles for the same vendor
@@ -364,7 +451,6 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_DREAMFOCUSER=OFF \
     -DWITH_DSI=OFF \
     -DWITH_DUINO=OFF \
-    -DWITH_EQMOD=OFF \
     -DWITH_FFMV=OFF \
     -DWITH_GPHOTO=OFF \
     -DWITH_GPIO=OFF \
@@ -389,7 +475,9 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_SX=OFF \
     -DWITH_TALON6=OFF \
     "-DWITH_TICFOCUSER-NG=OFF" \
-    -DWITH_WEEWX_JSON=OFF
+    -DWITH_WEEWX_JSON=OFF \
+    -DWITH_WEBCAM=OFF \
+    -DWITH_NUT=OFF
 %cmake_build
 
 %install
@@ -422,6 +510,30 @@ rm -f %{buildroot}%{indi_bindir}/asi_wheel_test
 rm -f %{buildroot}%{indi_bindir}/playerone_camera_test
 rm -f %{buildroot}%{indi_bindir}/playerone_camera_bench
 
+# --- eqmod: drop the catalogue entry for the driver we do not build ---------
+# indi_eqmod.xml catalogues indi_ahpgt_telescope, but indi-eqmod's own local
+# option(WITH_AHP_GT ... OFF) means that binary is never built here. Left
+# alone it would survive the rewrite below as a BARE name (the rewrite only
+# substitutes names it found an installed binary for), and a bare name is
+# strictly worse than a missing entry: indiserver resolves it through PATH,
+# so a distribution-provided indi_ahpgt_telescope would be what actually ran
+# out of OUR catalogue -- precisely the coexistence violation the rewrite
+# exists to prevent (DESIGN.md, "Driver-manifest discoverability").
+# The count assertion is LESSONS_LEARNED.md #1: a deletion that silently
+# matched nothing would otherwise look identical to a successful one.
+_ahpgt_before=$(grep -c 'indi_ahpgt_telescope' %{buildroot}%{indi_datadir}/indi_eqmod.xml)
+test "$_ahpgt_before" -eq 1 \
+    || { echo "ERROR: expected exactly 1 indi_ahpgt_telescope catalogue entry, found $_ahpgt_before -- indi_eqmod.xml.cmake changed upstream"; exit 1; }
+sed -i '/<device label="AHP GT Mount"/,/<\/device>/d' %{buildroot}%{indi_datadir}/indi_eqmod.xml
+grep -q 'indi_ahpgt_telescope' %{buildroot}%{indi_datadir}/indi_eqmod.xml \
+    && { echo "ERROR: indi_ahpgt_telescope still present in indi_eqmod.xml after the device-block delete"; exit 1; }
+# The four real eqmod drivers must survive that delete, not be collateral.
+for _d in indi_eqmod_telescope indi_azgti_telescope \
+          indi_staradventurergti_telescope indi_staradventurer2i_telescope; do
+    grep -q "${_d}" %{buildroot}%{indi_datadir}/indi_eqmod.xml \
+        || { echo "ERROR: ${_d} lost from indi_eqmod.xml -- the AHP GT device-block delete over-matched"; exit 1; }
+done
+
 # --- driver catalogue: absolute paths, not bare names -----------------------
 # Same defect, same fix, same verification method as core's %%install -- see
 # core's spec for the full reasoning (DESIGN.md, "Driver-manifest
@@ -447,11 +559,26 @@ rm -f "$_sed"
 test "$_rewritten" -gt 0 || { echo "ERROR: rewrote 0 catalogue entries across every indi_*.xml; the <driver> form changed upstream"; exit 1; }
 echo "driver catalogues: rewrote $_rewritten entries to %{indi_bindir}"
 
+# Every <driver> entry must now name an absolute path. Any that does not is a
+# catalogue entry for a binary this package did not build, and would resolve
+# through PATH to whatever the distribution provides -- the AHP GT case
+# stripped above, found 2026-09-08 while adding eqmod, generalized so the
+# next one cannot arrive silently. Verified non-vacuous before being relied
+# on: run against the already-shipped 2.2.4.1-1 packages all 56 entries were
+# already absolute, and against an unstripped indi_eqmod.xml it fires.
+_bare=$(grep -hoE '<driver[^>]*>[^<]+</driver>' %{buildroot}%{indi_datadir}/indi_*.xml \
+        | grep -vE '>%{indi_bindir}/' || true)
+test -z "$_bare" || { echo "ERROR: catalogue entries left as bare names, which resolve via PATH to a distro binary:"; echo "$_bare"; exit 1; }
+
 # Assert every vendor this spec means to ship actually landed, rather than
 # trusting a clean cmake_build exit (LESSONS_LEARNED.md #1 and #5).
+# All four eqmod binaries are listed, not one representative: they are four
+# separate add_executable() targets whose only shared fate is skywatcher.cpp,
+# so any one of them can go missing on its own.
 for _bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
             indi_inovaplx_ccd indi_mi_ccd indi_sbig_ccd indi_toupcam_ccd \
-            indi_fishcamp_ccd; do
+            indi_fishcamp_ccd indi_eqmod_telescope indi_azgti_telescope \
+            indi_staradventurergti_telescope indi_staradventurer2i_telescope; do
     test -x %{buildroot}%{indi_bindir}/${_bin} \
         || { echo "ERROR: ${_bin} did not install -- an upstream WITH_* default or driver name changed"; exit 1; }
 done
@@ -552,6 +679,30 @@ done
 %dir %{indi_datadir}
 %{indi_bindir}/indi_fishcamp_ccd
 %{indi_datadir}/indi_fishcamp.xml
+
+# The only %%license here pointing at a driver directory's own file rather
+# than indi-3rdparty's top-level LICENSE: indi-eqmod/COPYING is real GPLv3
+# text, which is what this subpackage's own License: tag declares. The
+# top-level LICENSE is LGPL-2.1 and would be the wrong text for it.
+# The four *_sk.xml files are INDI property skeletons, not driver
+# catalogues -- they carry no <driver> element at all (checked, 2026-09-08),
+# so the catalogue rewrite in %%install correctly leaves them untouched
+# despite matching its indi_*.xml glob.
+%files eqmod
+%license indi-eqmod/COPYING
+%dir %{indi_prefix}
+%dir %{indi_bindir}
+%dir %{indi_prefix}/share
+%dir %{indi_datadir}
+%{indi_bindir}/indi_eqmod_telescope
+%{indi_bindir}/indi_azgti_telescope
+%{indi_bindir}/indi_staradventurergti_telescope
+%{indi_bindir}/indi_staradventurer2i_telescope
+%{indi_datadir}/indi_eqmod.xml
+%{indi_datadir}/indi_eqmod_sk.xml
+%{indi_datadir}/indi_eqmod_simulator_sk.xml
+%{indi_datadir}/indi_align_sk.xml
+%{indi_datadir}/indi_eqmod_scope_limits_sk.xml
 
 %files touptek
 %license indi-toupbase/COPYING.LGPL

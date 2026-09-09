@@ -2,11 +2,18 @@
 #
 # Debian build for indi-stable-3rdparty-drivers. Mirrors
 # core/rpm/indi-stable-3rdparty-drivers.spec -- same private prefix, same 9
-# vendor drivers, same 46-entry WITH_<X>=OFF scope list, same CFLAGS fix and
-# toupcam_test/omegonprocam_test patch. Read that spec's header and %%build
-# comments for the full rationale; this file carries only the Debian-
-# specific mechanics. core/deb-3rdparty-libs/rules is the sibling this
-# package Build-Depends and Depends on.
+# vendor drivers plus eqmod, same 47-entry WITH_<X>=OFF scope list, same
+# CFLAGS fix and toupcam_test/omegonprocam_test patch. Read that spec's
+# header and %%build comments for the full rationale; this file carries only
+# the Debian-specific mechanics. core/deb-3rdparty-libs/rules is the sibling
+# this package Build-Depends and Depends on.
+#
+# eqmod (added 2026-09-08) needs NO debian/shlibs.local entry of its own,
+# unlike every vendor driver here: the only private libraries it links are
+# core's libindidriver and libindiAlignmentDriver, both already listed there,
+# and its other two dependencies (libnova, libgsl) are ordinary distribution
+# packages that ship real shlibs files, so ${shlibs:Depends} resolves them
+# with no help from us.
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 
@@ -70,7 +77,6 @@ override_dh_auto_configure:
 		-DWITH_DREAMFOCUSER=OFF \
 		-DWITH_DSI=OFF \
 		-DWITH_DUINO=OFF \
-		-DWITH_EQMOD=OFF \
 		-DWITH_FFMV=OFF \
 		-DWITH_GPHOTO=OFF \
 		-DWITH_GPIO=OFF \
@@ -95,7 +101,9 @@ override_dh_auto_configure:
 		-DWITH_SX=OFF \
 		-DWITH_TALON6=OFF \
 		"-DWITH_TICFOCUSER-NG=OFF" \
-		-DWITH_WEEWX_JSON=OFF
+		-DWITH_WEEWX_JSON=OFF \
+		-DWITH_WEBCAM=OFF \
+		-DWITH_NUT=OFF
 
 override_dh_auto_install:
 	dh_auto_install
@@ -106,6 +114,28 @@ override_dh_auto_install:
 	rm -f debian/tmp$(INDI_BINDIR)/asi_wheel_test
 	rm -f debian/tmp$(INDI_BINDIR)/playerone_camera_test
 	rm -f debian/tmp$(INDI_BINDIR)/playerone_camera_bench
+	# --- eqmod: drop the catalogue entry for the driver we do not build -----
+	# indi_eqmod.xml catalogues indi_ahpgt_telescope, which indi-eqmod's own
+	# local option(WITH_AHP_GT ... OFF) means we never build. Left alone it
+	# would survive the rewrite below as a BARE name, and a bare name is
+	# strictly worse than a missing entry: indiserver resolves it through
+	# PATH, so a distribution indi_ahpgt_telescope would be what actually ran
+	# out of OUR catalogue. See core/rpm's %%install for the full finding;
+	# the count assertion is LESSONS_LEARNED.md #1.
+	set -e; \
+	cat=debian/tmp$(INDI_DATADIR)/indi_eqmod.xml; \
+	before=$$(grep -c 'indi_ahpgt_telescope' "$$cat"); \
+	test "$$before" -eq 1 \
+		|| { echo "ERROR: expected exactly 1 indi_ahpgt_telescope catalogue entry, found $$before -- indi_eqmod.xml.cmake changed upstream"; exit 1; }; \
+	sed -i '/<device label="AHP GT Mount"/,/<\/device>/d' "$$cat"; \
+	if grep -q 'indi_ahpgt_telescope' "$$cat"; then \
+		echo "ERROR: indi_ahpgt_telescope still present after the device-block delete"; exit 1; \
+	fi; \
+	for d in indi_eqmod_telescope indi_azgti_telescope \
+	         indi_staradventurergti_telescope indi_staradventurer2i_telescope; do \
+		grep -q "$$d" "$$cat" \
+			|| { echo "ERROR: $$d lost from indi_eqmod.xml -- the AHP GT delete over-matched"; exit 1; }; \
+	done
 	# --- driver catalogue: absolute paths, not bare names -------------------
 	# Same defect, same fix, same verification method as core/deb/rules --
 	# see that file's comment for the full reasoning (DESIGN.md,
@@ -130,11 +160,30 @@ override_dh_auto_install:
 	rm -f "$$sedf"; \
 	test "$$n_done" -gt 0 || { echo "ERROR: rewrote 0 catalogue entries across every indi_*.xml; the <driver> form changed upstream"; exit 1; }; \
 	echo "driver catalogues: rewrote $$n_done entries to $(INDI_BINDIR)"
+	# Every <driver> entry must now name an absolute path. Any that does not is
+	# a catalogue entry for a binary this package did not build, and would
+	# resolve through PATH to whatever the distribution provides -- the AHP GT
+	# case stripped above, found 2026-09-08 while adding eqmod, generalized so
+	# the next one cannot arrive silently. Verified non-vacuous before being
+	# relied on: all 56 entries in the already-shipped 2.2.4.1-1 debs were
+	# already absolute, and against an unstripped indi_eqmod.xml it fires.
+	set -e; \
+	bare=$$(grep -hoE '<driver[^>]*>[^<]+</driver>' debian/tmp$(INDI_DATADIR)/indi_*.xml \
+	        | grep -vE ">$(INDI_BINDIR)/" || true); \
+	if [ -n "$$bare" ]; then \
+		echo "ERROR: catalogue entries left as bare names, which resolve via PATH to a distro binary:"; \
+		echo "$$bare"; \
+		exit 1; \
+	fi
 	# Assert every vendor this package means to ship actually landed, rather
 	# than trusting a clean cmake build exit (LESSONS_LEARNED.md #1 and #5).
+	# All four eqmod binaries are listed, not one representative: they are four
+	# separate add_executable() targets whose only shared fate is skywatcher.cpp,
+	# so any one of them can go missing on its own.
 	set -e; for bin in indi_apogee_ccd indi_asi_ccd indi_fli_ccd indi_playerone_ccd \
 	                   indi_inovaplx_ccd indi_mi_ccd indi_sbig_ccd indi_toupcam_ccd \
-	                   indi_fishcamp_ccd; do \
+	                   indi_fishcamp_ccd indi_eqmod_telescope indi_azgti_telescope \
+	                   indi_staradventurergti_telescope indi_staradventurer2i_telescope; do \
 		test -x debian/tmp$(INDI_BINDIR)/$$bin \
 			|| { echo "ERROR: $$bin did not install -- an upstream WITH_* default or driver name changed"; exit 1; }; \
 	done

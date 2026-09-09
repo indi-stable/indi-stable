@@ -392,39 +392,48 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   this repo will resolve it. See `DESIGN.md`, "QSI and Fishcamp resolved",
   for how the other two members of this same "never actually read" group
   were settled the same day.
-- **The ~50 non-blob indi-3rdparty drivers (eqmod, gpsd, celestronaux,
-  ticfocuser-ng, ...) are entirely out of scope for `-drivers` as written,
-  and still are** — real work here, not yet started. Will needs `eqmod` for
-  his mount (2026-09-08); a real dependency survey against the actual
-  upstream `v2.2.4.1` tree is now in `DESIGN.md`, "The ~50 non-blob drivers —
-  real dependency survey, scope still undecided", but no spec, no build, no
-  BuildRequires added yet. **Next steps, in order:**
-  1. Decide scope with Will — EQMod alone, the full ~44 minus the two
-     licence-adjacent ones (`qhy`, `atik-efw`) `DESIGN.md` flags as needing a
-     second look, or a curated batch. Not decided as of 2026-09-08.
-  2. Whatever the scope, confirm `libnova-devel`/`gsl-devel` (Fedora) and
-     `libnova-dev`/`libgsl-dev` (Debian) actually resolve on `fedoraastro`/
-     `ubuntuastro` — assumed present as ordinary base-repo packages, not yet
-     confirmed by an actual `dnf`/`apt` resolve.
-  3. Edit `-DWITH_EQMOD=OFF` (and whichever other `-DWITH_<X>=OFF` lines the
-     scope decision covers) out of `core/rpm/indi-stable-3rdparty-drivers.spec`
-     `%build`, add `%package`/`%files eqmod` (four binaries — see `DESIGN.md`
-     for which), pin `-DWITH_WEBCAM=OFF`/`-DWITH_NUT=OFF` explicitly regardless
-     of scope (`DESIGN.md` — both are configure-time auto-detected upstream,
-     not a fixed default, so leaving them unset is nondeterministic across
-     `mock` chroots).
-  4. Same edits on the Debian side (`core/deb-3rdparty-drivers/`) — not yet
-     looked at for this.
-  5. Real `mock` build on `fedoraastro`, real `dpkg-buildpackage` on
-     `ubuntuastro` (this repo's own current session machine — confirmed
-     available 2026-09-08), then the same install/coexistence/upgrade
-     verification every other package here got. Expect real defects on the
-     first attempt — `LESSONS_LEARNED.md` #1's track record has held every
-     time so far.
-  6. `qhy` and `atik-efw` specifically need their licence relationship to the
-     existing "bundle by licence tier" decision checked before either is
-     included, not assumed clear by omission from the blob-driver list
-     (`DESIGN.md`).
+- **`eqmod` is packaged on both distros but has never been built.** Scope
+  decided with Will 2026-09-08 — eqmod alone first as a complete vertical
+  slice, then widen; one subpackage per driver. See `DESIGN.md`, "Decided:
+  eqmod first, then widen", for the reasoning, the licence finding
+  (`eqmod` is the only non-LGPL subpackage here) and the catalogue defect
+  found while writing it.
+
+  Done, no build yet: `-DWITH_EQMOD=OFF` removed and
+  `-DWITH_WEBCAM=OFF`/`-DWITH_NUT=OFF` pinned in both
+  `core/rpm/indi-stable-3rdparty-drivers.spec` and
+  `core/deb-3rdparty-drivers/rules`; `libnova`/`GSL` BuildRequires added on
+  both; `%package`/`%files eqmod` and the Debian `-eqmod` binary package,
+  `.install` and `.lintian-overrides` written; `debian/copyright` given
+  eqmod's two licence stanzas; the AHP GT catalogue entry stripped and a
+  no-bare-names assertion added to both packagings.
+
+  **Next steps, in order:**
+  1. Real `dpkg-buildpackage` on `ubuntuastro` (this session's own machine).
+     All 14 candidate build-deps for the eventual widening were confirmed
+     available here 2026-09-08 by `apt-cache policy`, `libnova-dev` and
+     `libgsl-dev` among them.
+  2. Real `mock` build on `fedoraastro`. **`libnova-devel`/`gsl-devel` are
+     still unconfirmed there** — a different machine, nothing checked with
+     `dnf` yet, and `WITH_QSI` already failed once on that box for exactly
+     this class of missing `-devel`.
+  3. Then the same install/coexistence/upgrade verification every other
+     package here got. Both `smoke-test-3rdparty*.sh` harnesses are driven by
+     package contents rather than a hardcoded vendor list, so they pick eqmod
+     up with no edit — but confirm that by watching eqmod appear in their
+     per-vendor output, not by trusting the glob.
+  4. Expect real defects on the first attempt — `LESSONS_LEARNED.md` #1's
+     track record has held every time so far, and the two found while merely
+     *writing* this packaging (the `License:` tag propagating to all nine
+     vendor subpackages, the dangling AHP GT catalogue entry) both landed
+     before a compiler ever ran.
+- **Widening past eqmod: the ~40 remaining non-blob drivers.** Still wanted,
+  deliberately sequenced after eqmod. `DESIGN.md`'s dependency table was
+  re-derived mechanically 2026-09-08 and had four wrong rows before that, so
+  build any batch from the corrected table, not from memory of the old one.
+  `qhy` and `atik-efw` specifically need their licence relationship to the
+  existing "bundle by licence tier" decision checked before either is
+  included, not assumed clear by omission from the blob-driver list.
 - **The License: tag's precision is a defensible aggregate, not a full
   per-file audit** — read in `indi-stable-3rdparty-libs.spec`'s own header
   comment for exactly which licences were read in full text versus inferred,

@@ -9,7 +9,7 @@ Comment:
  project. Problems with these packages should be reported to indi-stable,
  not to INDI upstream.
  .
- Aggregate across 9 driver source trees, confirmed by reading actual SOURCE
+ Aggregate across 10 driver source trees, confirmed by reading actual SOURCE
  FILE licence headers (not the bundled COPYING file alone -- two of them,
  apogee's and sbig's, are stale "Library GPL v2" text left over from before
  upstream's own 2.1 relicense, contradicted by every .cpp header in both
@@ -40,6 +40,34 @@ License: LGPL-2.0-only
  directories above, no source file here carries a licence header of its
  own, so there is no "or later" grant to upgrade the tag with. The
  conservative, defensible reading is the plain v2 text as written.
+
+Files: indi-eqmod/*
+Copyright: 2012-2017 Geehalel <geehalel@gmail.com>
+ 2020 Jasem Mutlaq
+License: GPL-3.0-or-later
+ The original EQMod/Skywatcher-protocol driver (eqmod*, skywatcher*, align/,
+ scope-limits/, simulator/) grants "either version 3 of the License, or (at
+ your option) any later version" and ships a full GPLv3 COPYING. Read from
+ every .cpp/.h header in the directory 2026-09-08, not spot-checked -- the
+ only directory in this source package that is not LGPL.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/GPL-3.
+
+Files: indi-eqmod/azgtibase.* indi-eqmod/staradventurergtibase.*
+ indi-eqmod/staradventurer2ibase.cpp indi-eqmod/staradventurer2i.h
+Copyright: 2020 Jasem Mutlaq
+License: LGPL-2.0-only
+ The 2020 AZ-GTi and Star Adventurer additions read "GNU Library General
+ Public License version 2 as published by the Free Software Foundation"
+ with no "or later" clause, so the conservative reading is plain v2 -- the
+ same treatment indi-inovaplx gets above, for the same reason. All four
+ built binaries also compile skywatcher.cpp and are therefore
+ GPL-3.0-or-later as distributed; LGPL-2.0 section 3 is what permits that
+ combination.
+ .
+ On Debian systems the full text of this license can be found in
+ /usr/share/common-licenses/LGPL-2.
 
 Files: debian/*
 Copyright: 2026 Will Snyder
