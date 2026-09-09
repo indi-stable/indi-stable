@@ -19,7 +19,7 @@ Two rules keep it living rather than growing:
 |---|---|
 | **Fedora `core/`** | **Testing complete.** Built, installed, coexisting (runtime, metadata, `-devel`, and Ekos in *both* the opt-in and bystander cases), upgraded and removed — all verified, and the whole suite re-run green on 2026-08-26. The one item left is release tooling, not a test. |
 | **Debian `core/`** | **Testing complete.** Built, installed, coexisting (runtime, metadata, `-dev`), upgraded and removed — verified in **configuration B**, against a distribution INDI carrying the same SONAME and the same upstream release, and now scripted as four harnesses in `scripts/`. Nothing outstanding is a test. |
-| **`3rdparty/`** | RPM and Debian sides both complete for both source packages, all three verified together (`indi-stable-core`, `-3rdparty-libs`, `-3rdparty-drivers`), on both distros. **9 vendors plus 21 non-blob drivers as of 2026-09-09 — 30 `-drivers` packages, 86 driver binaries**, added across seven slices and each one built, installed, coexistence- and smoke-verified on both distros. None of it ships yet: `-drivers` needs a `Release: 2`/`-2` bump first, because its contents grew while the upstream tag stayed put. Only `dsi` and `rolloffino` remain unbuilt, both on licence grounds rather than packaging ones. **A serious defect was found and fixed 2026-09-04 that all of the earlier verification had missed: 45 of 56 driver binaries could not load on a runtime-only install**, because 17 vendor blobs carry an unversioned SONAME and their bare `.so` symlink was shipped in `-devel`/`-dev` rather than the runtime package (`LESSONS_LEARNED.md` #22). Fixed and re-verified on both distros — see the dated section below. See "3rdparty — remaining" for what is still genuinely open (QSI stays excluded for a confirmed reason; `flipro`/`flialgo` licence coverage; non-blob drivers). |
+| **`3rdparty/`** | RPM and Debian sides both complete for both source packages, all three verified together (`indi-stable-core`, `-3rdparty-libs`, `-3rdparty-drivers`), on both distros. **9 vendors plus 21 non-blob drivers as of 2026-09-09 — 30 `-drivers` packages, 86 driver binaries**, added across seven slices and each one built, installed, coexistence- and smoke-verified on both distros. **It shipped 2026-09-09**: `-drivers` is at `Release: 2` / `-2`, published as GitHub Release `indi-stable-3rdparty-v2.2.4.1-2` (96 assets), and `main` carries the bump. Only `dsi` and `rolloffino` remain unbuilt, both on licence grounds rather than packaging ones. **A serious defect was found and fixed 2026-09-04 that all of the earlier verification had missed: 45 of 56 driver binaries could not load on a runtime-only install**, because 17 vendor blobs carry an unversioned SONAME and their bare `.so` symlink was shipped in `-devel`/`-dev` rather than the runtime package (`LESSONS_LEARNED.md` #22). Fixed and re-verified on both distros — see the dated section below. See "3rdparty — remaining" for what is still genuinely open (QSI stays excluded for a confirmed reason; `flipro`/`flialgo` licence coverage; non-blob drivers). |
 | **`pyindi-client/`** | Both sides built, installed, imported for real, and coexistence/upgrade-tested via scripted harnesses: Debian 2026-08-26/27 (`pyindi-client/deb/`), RPM 2026-08-27 (`pyindi-client/rpm/`). Release automation added 2026-09-04, including a smoke check that every symbol the SWIG wrapper references is actually exported — the `DESIGN.md` 2026-09-03 incident's failure mode, which `import PyIndi` and `BaseClient()` both survive. Nothing outstanding on the packaging itself. |
 | **CI (all three)** | **Verified end to end ON THIS REPO, 2026-09-04**, not just inherited from the seed's own history. Core, 3rdparty and pyindi-client each ran a real (not dry-run) check → build → smoke-test → promote cycle here for the first time, each publishing a real GitHub Release and pushing a real promotion commit: `indi-stable-core-v2.2.4.2` (6 assets), `indi-stable-3rdparty-v2.2.4.1` (54 assets, at a clean `Release: 1` — see below for why that needed a real fix first), `indi-stable-pyindi-client-2.2.0` (2 assets, symbol-check counts 1172/1199 confirmed substantive, not vacuous). All three promote jobs now create the GitHub Release **before** committing the version bump (`53cef94`) — closing a real, if narrow, window where a downstream workflow reading `versions.json` could see a release referenced before it existed; confirmed on this run by the release's `publishedAt` and the promote commit's own timestamp landing in the same second, not by trusting the reorder alone. |
 | **3rdparty's first real run here failed, and the cause was worth finding.** The fresh-history seed carried over the archived repo's already-bumped state (`Release: 2%{?dist}`, changelogs and all 18 control pins at `-2` — leftover from a repackage test run there). This repo's own release history starts fresh, so the first real promotion attempt collided: Debian's `dch` correctly refused to write a lower version than what its changelog already claimed, but the RPM side's plain `sed` had no equivalent check and **silently regressed `Release: 2` back down to `1`**, reporting success. Fixed in two parts, `01b52b9`: the seed's phantom `-2` content reset to a clean `-1` (nothing describing that content ever actually shipped from this repo), and all three bump scripts hardened to refuse moving RPM `Release:` backward for an unchanged upstream version, matching what `dch` already enforced on the Debian side. Re-run afterward: all 8 jobs passed. |
@@ -42,16 +42,34 @@ with a direct commit against `main`'s tip; confirmed byte-identical to
 `development`'s `versions.json` and against upstream's actual latest tags
 via `scripts/check-upstream-tag.sh`.
 
-**`promote`'s new branch-create → PR → self-merge → delete-branch path is
-still unexercised.** All three `workflow_dispatch` runs on 2026-09-05 that
-confirmed the poll itself is quiet again correctly found nothing new, so
-`build`/`smoke-test`/`promote` were all skipped in every one of them — the
-YAML has been reviewed but never actually run. Deliberately not forced via
-a `repackage: true` run (would publish a real extra GitHub Release just to
-test plumbing); verify this for real on whichever component's `promote`
-job runs next for a genuine reason, and check afterward that its
-`ci/promote-<component>-...` branch was actually deleted, not just that
-the job went green.
+**`promote`'s branch-create → PR → self-merge → delete-branch path is
+verified for real, 2026-09-09.** A `repackage: true` dispatch of
+`3rdparty-release` first failed at the PR-create step: this org's Actions
+tokens had no permission to open pull requests, a repo/org setting rather
+than anything in the YAML. Fixed by enabling "Allow GitHub Actions to
+create and approve pull requests" at the `indi-stable` org level (Will,
+2026-09-09). Re-run confirmed end to end: PR #11
+(`ci/promote-3rdparty-v2.2.4.1-2-34410506784`) was opened and **merged by
+`github-actions[bot]` itself**, `mergedAt` landing in the same run, and the
+branch was gone from the remote afterward — the exact two things this
+section previously said to check.
+
+**That same re-run found a second, previously-unexercised bug**: the
+job's next step, fast-forwarding `development` from `main`, failed with
+`git`'s "refusing to merge unrelated histories" — not real divergence
+(`git merge-base --is-ancestor` on a full clone confirmed `development` was
+a clean ancestor), but `actions/checkout@v4`'s default `fetch-depth: 1`
+truncating both branches' history at different points with no common
+commit visible to the job's local git. Every earlier promote attempt, on
+all three release workflows, had died at the PR-create step before ever
+reaching this one, so it had been broken and silently unexercised since
+whichever commit first wrote it. `LESSONS_LEARNED.md` #28. Fixed by adding
+`fetch-depth: 0` to the `promote` job's own checkout in `core-release.yml`,
+`3rdparty-release.yml` and `pyindi-client-release.yml` alike — that job is
+a lightweight version-bump-and-merge, not a build, so the cost is
+negligible. `development` was fast-forwarded to `main` by hand once
+(`39e2676`), confirmed a genuine ancestor first; the fix means the next
+real promotion on any of the three does this itself.
 
 **This repo is public**, with Will as its only collaborator with write
 access (`gh api repos/:owner/:repo/collaborators`, confirmed 2026-09-05).
@@ -556,14 +574,13 @@ re-verified back at exact baseline afterward. Full detail in `DEBIAN.md`.
   `indi_apogee_ccd`. **Three real defects in the harnesses themselves were
   found by running them** — see `LESSONS_LEARNED.md` #25 and the note below.
 
-  **What is left for eqmod:**
-  1. `-drivers` needs a `Release: 2` / `-2` revision before it can ship, the
-     upstream tag being unchanged while its contents have grown. Do not
-     hand-edit it — the bump scripts own `Release:`, and the repackage path's
-     `-N` suffix has never actually run in a runner (see the correction in
-     the release-automation section below).
-  2. Nothing else. Build, install, coexistence, smoke test and upgrade path
-     are all verified on both distros.
+  **eqmod shipped along with the rest of batch 1**: the `Release: 2` / `-2`
+  bump landed 2026-09-09 as part of promoting all 30 driver packages at
+  once, via the repackage path's `-N` suffix — now verified to actually run
+  in a runner, not just reviewed (see the release-automation section
+  below). Nothing left for eqmod specifically; build, install,
+  coexistence, smoke test and upgrade path were verified on both distros
+  before this, and the release itself afterward.
 
   **Three harness defects found by running them, all now fixed** — the tests
   were wrong, the packaging was not, which is this project's usual ratio:

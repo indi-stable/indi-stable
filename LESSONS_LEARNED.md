@@ -710,3 +710,43 @@ installing 8 of 30 driver packages and reporting a clean coexistence pass.
 While writing this entry I also stated "eleven subpackages override the
 default `License:`" from memory; it was fourteen, checked with `rpmspec`
 before the sentence was committed. The habit is the hard part, not the rule.
+
+## 28. An untested branch of automation can hide a second bug behind the first
+
+Once the org-level "Allow GitHub Actions to create and approve pull
+requests" setting was fixed (#27's neighbor problem, not itself a numbered
+lesson), the `3rdparty-release` promote job self-merged into `main` for the
+first time ever — and immediately hit a second, different failure one step
+later: `git merge --ff-only` refused `development` against `main` with
+"refusing to merge unrelated histories," even though `development` really
+was a clean ancestor.
+
+Cause: `actions/checkout@v4` defaults to `fetch-depth: 1`. The `promote`
+job's own checkout, and its later `git fetch origin main development`, both
+respect that shallow boundary, so the two branches' histories are each
+truncated at a different point with no shared commit visible to the local
+git. A `merge --ff-only` across two independently-shallow histories reports
+"unrelated" even when a full clone shows a clean ancestor relationship —
+confirmed directly with `git merge-base --is-ancestor` before touching
+anything.
+
+The general shape: **a job that has three sequential steps and has only
+ever failed on step one has never actually tested steps two and three.**
+Every earlier promote attempt on every one of this project's three release
+workflows died at "PR create failed" — so this fast-forward step, present
+in `core-release.yml`, `3rdparty-release.yml` and `pyindi-client-release.yml`
+alike, had been sitting broken and unexercised in all three since whichever
+commit first wrote it. Fixing the first bug didn't just let the run
+succeed; it changed which code had ever actually been exercised.
+
+**Rule:** fixing a blocking failure earlier in a pipeline is not evidence
+the rest of the pipeline works — it is the first opportunity to find out
+whether it does. Re-run and watch the *whole* thing, not just confirm the
+step you fixed went green.
+
+*Evidence:* found 2026-09-09, the same session, minutes after the org
+permission fix that unblocked the self-merge step. Fixed by adding
+`fetch-depth: 0` to the `promote` job's own checkout in all three
+workflows — the job is a lightweight version-bump-and-merge, not a build, so
+the cost of a full clone there is negligible. `development` was fast-
+forwarded to `main` by hand once, confirmed a genuine ancestor first.
