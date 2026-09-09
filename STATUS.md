@@ -118,10 +118,29 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `fedoraastro` | `~/mock-result-drivers-rel2new` | `-drivers` `2.2.4.1-2` scratch, with eqmod |
 | `fedoraastro` | `~/eqmod-build/` | the copied spec, harnesses and every build log |
 | `fedoraastro` | `~/mock-result-drivers-slice7` | `-drivers` `2.2.4.1-1`, **30 subpackages** — the current build |
-| `fedoraastro` | `~/mock-result-drivers-slice2`..`-slice6`, `-lic` | 12- to 29-subpackage predecessors, superseded |
-| `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is now the 12-package slice-2 build |
+| `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is the current **30-package** build |
 | `ubuntuastro` | `~/build/slice7-stage/` | the runtime-only 41-deb set the slice-7 smoke test ran against, one version of each |
 | `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`, freshly rebuilt from current packaging |
+
+**Disk cleanup, 2026-09-09.** `ubuntuastro` reached 99% full (643 MB free)
+during the driver widening. The cause was seven unpacked `indi-3rdparty`
+build trees, one per slice, at ~1.5 GB each. All were deleted, along with
+six superseded smoke-test staging directories and, on `fedoraastro`, the
+six superseded `mock-result-drivers-slice*` sets. `ubuntuastro` went to 71%
+used, `fedoraastro` to 59%.
+
+**None of that was an artifact.** `dpkg-buildpackage` writes the `.deb`s to
+the *parent* of the build tree, so they were always in `~/build` itself, and
+every staging directory was a copy of files already there — both checked
+before deleting rather than assumed. The trees are regenerable in one
+`tar xf` from `~/build/indi-3rdparty-v2.2.4.1.tar.gz`, which is kept.
+
+**`ubuntuastro` still holds ~9 GB of older unpacked trees from previous
+sessions** — `indi-2.2.4.2`, `rel2-libs`, `rel2-drivers`,
+`indi-3rdparty-2.2.4.1-libsfix`, `-drivers` and `-eqmod`. They were left
+alone because they predate this session. `-eqmod` in particular is the tree
+the upstream source surveys read from, so deleting it costs a re-unpack;
+the rest look like ordinary leftovers.
 
 `~/mock-result-3rdparty` and `~/mock-result-3rdparty-fishcamp` on
 `fedoraastro` both **predate the #22 runtime-symlink fix** and must not be
