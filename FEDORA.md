@@ -591,11 +591,11 @@ the identical SONAME: all four eqmod binaries still resolve into
 rather than counted, `/opt/indi-stable` completely absent and only the
 distribution's own `99-indi_auxiliary.rules` left behind.
 
-**`fedoraastro` has no clone of this repository.** It carries only
-`~/src/packaging`, the retired predecessor. This build was done by copying the
-spec to `~/eqmod-build/` and checking its `sha256sum` matched the working
-copy on `ubuntuastro`, which is fine for a one-off but is not a workflow —
-clone this repo there before the next Fedora session.
+**That build predated `fedoraastro` having a clone of this repository**, so
+it was done by copying the spec to `~/eqmod-build/` and checking its
+`sha256sum` matched the working copy on `ubuntuastro`. That workaround is no
+longer needed and should not be repeated; build from the clone. `STATUS.md`
+carries the current state of both machines.
 
 The upgrade path is scripted too, and — unlike `-libs`'s own upgrade test —
 run TOGETHER with `-libs`'s upgrade, not standalone, because `-drivers`

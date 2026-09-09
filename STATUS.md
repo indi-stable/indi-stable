@@ -78,20 +78,16 @@ force-pushes/deletion are disabled. Confirmed by testing, not just reading
 the settings back — a direct push to `main` was rejected with GitHub's own
 `GH006` error before this was trusted.
 
-**Switching machines?** `ubuntuastro` has a clone of this repo at
-`~/src/indi-stable`. **`fedoraastro` does not** — as of 2026-09-08 it carries
-only `~/src/packaging`, the retired predecessor repo, so there is nothing to
-`git pull` there. This section previously said "both clones were in sync",
-which was true of the old repo and was never re-checked after this one became
-primary on 2026-09-04. The 2026-09-08 Fedora build worked around it by copying
-the one spec across and checking its `sha256sum` against the working copy;
-clone this repo onto `fedoraastro` before the next Fedora session rather than
-repeating that.
+**Switching machines?** **Both boxes now have a clone of this repo at
+`~/src/indi-stable`**, `fedoraastro`'s added 2026-09-09 and both sitting on
+`development` at the same commit. `fedoraastro` still also carries
+`~/src/packaging`, the retired predecessor repo — do not confuse the two; the
+spec-copying workaround the 2026-09-08 Fedora build needed is no longer
+required.
 
-Where a clone does exist, the box you are moving *to* will be behind —
-`git pull` on `development` first. Two per-clone git settings, applied on
-`ubuntuastro` — re-apply them on any new clone, because neither travels with
-a `git clone`:
+The box you are moving *to* will be behind — `git pull` on `development`
+first. Two per-clone git settings, applied on both clones — re-apply them on
+any new clone, because neither travels with a `git clone`:
 
 ```bash
 git config user.email william@williamlsnyder.org   # commit authorship
