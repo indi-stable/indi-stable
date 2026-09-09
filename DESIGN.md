@@ -1112,13 +1112,54 @@ needs redoing against the current 9-vendor scope; nothing below depends on the s
 `CMakeLists.txt`** (INDI/CFITSIO/ZLIB/USB1/Threads omitted — core's spec already covers
 those for every driver here):
 
-| Needs only `Nova` (`libnova-devel` / `libnova-dev`) | `indi-aok`, `indi-avalon`, `indi-bresserexos2`, `indi-celestronaux` (+`GSL`), `indi-eqmod` (+`GSL`), `indi-gpsd`, `indi-gpsnmea`, `indi-nexdome`, `indi-ocs`, `indi-qhy`\*, `indi-rolloffino`, `indi-rtklib`, `indi-starbook`, `indi-starbook-ten`, `indi-talon6` |
+| Needs only `Nova` (`libnova-devel` / `libnova-dev`) | `indi-aok`, `indi-avalon`, `indi-bresserexos2`, `indi-celestronaux` (+`GSL`), `indi-eqmod` (+`GSL`), `indi-gpsnmea`, `indi-nexdome`, `indi-ocs`, `indi-rolloffino`, `indi-rtklib`, `indi-starbook-ten`, `indi-talon6` |
 |---|---|
-| No extra dependency beyond INDI itself | `indi-armadillo-platypus`, `indi-astarbox`, `indi-nightscape`, `indi-openogma`, `indi-shelyak` |
-| `GTest` in `find_package()` but gated behind `INDI_BUILD_UNITTESTS`, confirmed in `indi-atik-efw` and `indi-maxdomeii`'s own `CMakeLists.txt` (`IF (INDI_BUILD_UNITTESTS) ... find_package(GTest REQUIRED)`) | `indi-atik-efw`\*, `indi-beefocus`, `indi-maxdomeii`, `indi-starbook` — **not a real `BuildRequires`**, since this project never turns `INDI_BUILD_UNITTESTS` on (same as core) |
-| One extra library, ordinary Fedora/Debian package | `indi-duino`/`indi-weewx-json` (`CURL`→`libcurl-devel`), `indi-avalonud` (`nlohmann_json`+`ZMQ`→`json-devel`+`cppzmq-devel`), `indi-sx` (`hidapi`→`hidapi-devel`), `indi-mgen` (`FTDI1`→`libftdi1-devel` — the same package `WITH_QSI` needed and didn't have on `fedoraastro`'s `mock` chroot, so confirm it resolves before counting on it), `indi-ffmv` (`DC1394`→`libdc1394-devel`, an EOL FireWire camera), `indi-limesdr` (`LIMESUITE`, may not be in either distro's base repos — unconfirmed) |
+| No extra dependency beyond INDI itself | `indi-armadillo-platypus`, `indi-nightscape`, `indi-openogma`, `indi-shelyak`, `indi-aagcloudwatcher-ng`, `indi-dsi`, `indi-orion-ssg3`, `indi-maxdomeii`, `indi-beefocus`, `indi-atik-efw`\* |
+| `find_package(RT)` and nothing else | `indi-astarbox`, `indi-asi-power`, `indi-rpi-gpio` — the latter two are Raspberry Pi GPIO drivers |
+| `GTest`/`GMock` in `find_package()` but their result unused, so **not a real `BuildRequires`** | `indi-atik-efw`\*, `indi-beefocus`, `indi-maxdomeii`, `indi-starbook`, `indi-eqmod`. Two different mechanisms, both checked: `indi-atik-efw` and `indi-maxdomeii` wrap the call in `IF (INDI_BUILD_UNITTESTS)`, which this project never sets; `indi-eqmod` instead hardcodes `set(INDI_BUILD_UNITTESTS FALSE)` immediately *before* an unguarded `find_package(GTest)`, so the call runs but nothing consumes it. Neither form is REQUIRED, so neither fails configure when GTest is absent |
+| One extra library, ordinary Fedora/Debian package | `indi-duino`/`indi-starbook` (`CURL`→`libcurl-devel`), `indi-weewx-json` (`CURL`+`nlohmann_json`), `indi-avalonud` (`nlohmann_json`+`ZMQ`→`json-devel`+`cppzmq-devel`), `indi-sx` (`hidapi`→`hidapi-devel`), `indi-mgen` (`FTDI1`→`libftdi1-devel` — the same package `WITH_QSI` needed and didn't have on `fedoraastro`'s `mock` chroot, so confirm it resolves before counting on it), `indi-ffmv` (`DC1394`→`libdc1394-devel`, an EOL FireWire camera), `indi-limesdr` (`LIMESUITE`), `indi-gpsd` (`GPSD`→`gpsd-devel`/`libgps-dev`), `indi-weather-mqtt` (`Mosquitto`) |
 | `find_package(GPIOD)` wrapped in its own success check, so the driver silently doesn't build if the package is absent rather than failing configure | `indi-gpio` (Raspberry Pi GPIO; `libgpiod-devel` exists on both distros if wanted) |
 | Heaviest new surface | `indi-gphoto` (`GPHOTO2`+`JPEG`+`LibRaw`→`gphoto2-devel`+`libjpeg-turbo-devel`+`libraw-devel` — DSLR control, plausibly wanted for an astrophotography audience despite the dependency count) |
+
+**The table above was re-derived mechanically on 2026-09-08 and corrected; the
+hand-read first version had four wrong rows.** Read every `indi-*/CMakeLists.txt`
+in the tree with one `find_package()` extraction rather than by eye, after a
+spot-check of `indi-gpsd` contradicted what the table claimed. The four errors,
+all of the same kind — a dependency present in the file and missed by the reader:
+
+- **`indi-gpsd` needs `GPSD`**, not Nova alone. It is `find_package(INDI Nova
+  ZLIB GPSD)`. Listing it as dependency-free would have put `gpsd-devel` /
+  `libgps-dev` in a "no new BuildRequires" batch that then failed to configure.
+- **`indi-starbook` needs `CURL`**, and was listed in the Nova-only row.
+- **`indi-weewx-json` needs `nlohmann_json`** as well as `CURL`, and was
+  grouped with `indi-duino` as if the two had identical dependencies.
+- **`indi-astarbox` calls `find_package(RT)`**, and was listed as needing
+  nothing beyond INDI.
+
+**Availability confirmed on `ubuntuastro` (Ubuntu 26.04) 2026-09-08**, by
+`apt-cache policy` against every candidate at once: `libnova-dev`, `libgsl-dev`,
+`libcurl4-openssl-dev`, `nlohmann-json3-dev`, `libzmq3-dev`, `libhidapi-dev`,
+`libftdi1-dev`, `libdc1394-dev`, `libgpiod-dev`, `libgphoto2-dev`, `libjpeg-dev`,
+`libraw-dev`, `liblimesuite-dev` and `libgps-dev` all resolve. That settles
+`LIMESUITE`, which this section previously flagged as possibly absent. **The
+Fedora half is still unconfirmed** — `fedoraastro` is a different machine and
+nothing here has been checked with `dnf`.
+
+**Five of the spec's `WITH_<X>=OFF` overrides are dead options upstream.**
+`WITH_ASTROLINK4`, `WITH_ASTROMECHFOC`, `WITH_DREAMFOCUSER`, `WITH_RADIOSIM`
+and `WITH_SPECTRACYBER` are each declared by `option()` in the top-level
+`CMakeLists.txt` but have no `add_subdirectory()` consumer anywhere and no
+matching source directory in the tree. Forcing them off is harmless and they
+are left in place, but they inflate any count of "drivers we are excluding" —
+they exclude nothing.
+
+**Option names do not reliably match directory names**, which matters when
+turning a scope decision into spec edits. `WITH_SKYWALKER` builds
+`indi-aok`; `WITH_CAUX` builds `indi-celestronaux`; `WITH_MAXDOME` builds
+`indi-maxdomeii`; `WITH_CLOUDWATCHER` builds `indi-aagcloudwatcher-ng`;
+`WITH_MI` builds `indi-mi`; `WITH_INOVAPLX` builds `indi-inovaplx`. The table
+above is indexed by directory, the spec by option — map through the
+`add_subdirectory()` calls, not by assuming the two agree.
 
 \* `indi-qhy` and `indi-atik-efw` are worth a second look before inclusion: `qhy` needs the
 `QHY` blob this project already excludes for licence reasons (no `COPYING` file — "bundle by
