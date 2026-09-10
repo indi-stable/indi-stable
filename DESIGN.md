@@ -1676,6 +1676,55 @@ output against a plain `pip install` deterministically, same machine, same
 headers, repeated. Full incident write-up: ACS's `LESSONS_LEARNED.md`, INDI
 section, #11.
 
+### Single-Python-version scope — real gap, scoped but not decided — 2026-09-10
+
+Raised from the ACS side while scoping which Python versions ACS itself
+should support (3.11–3.14): `indi-stable-pyindi-client` satisfies exactly
+one interpreter today, and it is the same on both distros, though for
+different reasons.
+
+**RPM**: `pyindi-client-release.yml` builds in a single `fedora:44`
+container, and the spec installs to `%{python3_sitearch}` — version-specific
+by construction, so the built RPM only satisfies whatever `python3`
+Fedora 44 currently defaults to (3.14). No matrix, no subpackages.
+
+**Debian**: `pyindi-client/deb/rules` documents this as a deliberate v1
+scope cut, not an oversight — "Single Python interpreter only (whatever
+`python3` resolves to at build time) — multi-version support is out of
+scope for v1", same narrowing style as `core/deb-3rdparty-drivers/rules`
+applies to driver count.
+
+**What widening actually costs, checked 2026-09-10, not assumed:**
+
+- Fedora 44's own official repos carry `python3.11-devel`,
+  `python3.12-devel` and `python3.13-devel` as packages installable in
+  parallel to the default `python3.14-devel` (`packages.fedoraproject.org`).
+  A build matrix — one job per target, each producing its own
+  `indi-stable-pyindi-client-pyNNN`-style subpackage against that version's
+  `%{python3_sitearch}` — needs no source outside Fedora's own official
+  repos. This is the low-risk half.
+- Ubuntu 26.04 ("resolute")'s own archive already defaults to Python 3.14
+  (`python3-dev` → `3.14.3-0ubuntu2`, `packages.ubuntu.com`) — so today's two
+  single-target builds already agree with each other, coincidentally. But
+  3.11/3.12/3.13 are **not** in Ubuntu 26.04's official archive at all; the
+  only source for them is the third-party `deadsnakes` PPA, which is outside
+  this project's sourcing discipline everywhere else (pinned sha256 against
+  an upstream-published or distro-official artifact — see e.g. this
+  section's own PyPI sha256 verification, or `core.spec`'s tag provenance).
+  Widening the Debian side for real therefore means either accepting a
+  third-party PPA as a `Build-Depends` source (a policy call nobody has made)
+  or building against *additional* Debian/Ubuntu releases (22.04, Debian 12,
+  …) as wholly new platforms — the same category of decision as "which
+  Fedora/Ubuntu versions does this project build on at all", which today is
+  fixed at exactly Fedora 44 + Ubuntu 26.04 for every other component too.
+
+**Not decided**: whether to do the Fedora matrix alone and leave Debian at
+one version, take the PPA dependency, or widen the build-platform set.
+Whoever picks this up should start with the Fedora side — it's mechanically
+straightforward and uses only official repos — and treat Debian as a
+separate decision requiring the policy call above, not a smaller version of
+the same fix.
+
 ## Upstream build-system facts the packaging depends on
 
 Checked against INDI's real sources, not assumed. Each of these is the reason a

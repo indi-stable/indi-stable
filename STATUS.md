@@ -1231,3 +1231,9 @@ is also scripted, `scripts/test-upgrade-path-3rdparty-deb.sh` and
   someone installing a *distribution package* expects their hardware supported.
   Current answer is build everything; revisit if build time or breakage surface
   proves unreasonable. (It does not: a full build is under four minutes.)
+- **Should `pyindi-client` build for more than one Python version?** Today it
+  satisfies exactly the one interpreter each distro's build container
+  defaults to (Fedora 44 / Ubuntu 26.04, both currently 3.14) — raised from
+  the ACS side, 2026-09-10. Scoped but not decided — see `DESIGN.md`,
+  "Single-Python-version scope" under "`pyindi-client` — packaging
+  decisions", for what widening each distro actually costs.
