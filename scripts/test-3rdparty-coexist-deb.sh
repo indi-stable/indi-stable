@@ -96,8 +96,15 @@ list_from() {   # $1 = dir, $2 = package-name prefix, $3 = version
   ls "$1"/"$2"-*_"$3"_amd64.deb 2>/dev/null \
     | sed -E "s|.*/$2-(.*)_$3_amd64\.deb|\1|"
 }
-LIBS_VENDORS=$(list_from "$LIBS_DIR" indi-stable-3rdparty-libs "$LIBS_VER" | grep -v -- '-dev$' | LC_ALL=C sort)
-DRIVER_PKGS=$(list_from "$DRIVERS_DIR" indi-stable-3rdparty-drivers "$DRIVERS_VER" | LC_ALL=C sort)
+# -dbgsym is excluded the same way -dev already was: debianastro's ~/build
+# keeps dbgsym .debs alongside the real packages (found 2026-09-10 running
+# this for the first time with both in one directory -- a bare
+# indi-stable-3rdparty-libs-apogee-dbgsym_*.deb glob-matched and was read as
+# a vendor named "apogee-dbgsym"). Not Debian-specific: ubuntuastro's own
+# builds carry the identical dbgsym packages, this just never had one sitting
+# in the same directory as the real ones before.
+LIBS_VENDORS=$(list_from "$LIBS_DIR" indi-stable-3rdparty-libs "$LIBS_VER" | grep -v -- '-dev$' | grep -v -- '-dbgsym$' | LC_ALL=C sort)
+DRIVER_PKGS=$(list_from "$DRIVERS_DIR" indi-stable-3rdparty-drivers "$DRIVERS_VER" | grep -v -- '-dbgsym$' | LC_ALL=C sort)
 
 # A list derived from a glob can come back empty, and an empty list makes
 # every loop below a no-op that passes. #1: refuse rather than pass.
@@ -112,6 +119,22 @@ OUR_DRIVER=/opt/indi-stable/bin/indi_apogee_ccd
 OUR_LIBDIR=/opt/indi-stable/lib
 DISTRO_SERVER=/usr/bin/indiserver
 DISTRO_LIBDIR=/usr/lib/x86_64-linux-gnu
+
+# The distro package owning the client library, resolved from whatever file
+# indi-bin's own dependencies actually installed, not assumed by name. This
+# whole script's real subject -- whether OUR bundled libapogee.so.3 shadows
+# or is shadowed by the archive's -- does not depend on which core INDI is
+# on the box at all, only on indi-bin being present as a bystander to check;
+# but it was written and first run in configuration B (Ubuntu's
+# ppa:mutlaqja/ppa), where that package happens to be named libindi1. Debian
+# 13 trixie's own archive splits it as libindiclient1 instead (found on
+# debianastro, 2026-09-10 -- `dpkg -s libindi1` matches nothing there), so a
+# literal `libindi1` precondition would abort this script before it ever
+# reached the vendor-library collision it actually tests. Same `dpkg -S` on
+# the real .so discipline as scripts/probe-devel-compile-deb.sh's own fix.
+DISTRO_CLIENT_SO=$(ls "$DISTRO_LIBDIR"/libindiclient.so.* 2>/dev/null | head -1)
+DISTRO_CLIENT_PKG=$(test -n "$DISTRO_CLIENT_SO" && dpkg -S "$DISTRO_CLIENT_SO" 2>/dev/null | cut -d: -f1 | head -1)
+DISTRO_CLIENT_PKG=${DISTRO_CLIENT_PKG:-libindi1}
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: $W"; exit 1; }
@@ -152,7 +175,7 @@ for f in $(libs_debs) $(drivers_debs) \
   test -f "$f" || die "missing $f -- build it first (DEBIAN.md)"
 done
 
-dpkg -s libindi1 >/dev/null 2>&1 || die "libindi1 is not installed -- this is not configuration B"
+dpkg -s "$DISTRO_CLIENT_PKG" >/dev/null 2>&1 || die "$DISTRO_CLIENT_PKG is not installed -- no distro INDI client library present"
 dpkg -s indi-bin >/dev/null 2>&1 || die "indi-bin is not installed -- it owns $DISTRO_SERVER"
 test -x "$DISTRO_SERVER" || die "$DISTRO_SERVER missing even though indi-bin is installed"
 dpkg -s indi-stable-core >/dev/null 2>&1 && die "ours is ALREADY installed -- start from the distribution-only state"
@@ -227,7 +250,7 @@ echo "############ STEP 4: distribution core INDI is a clean bystander after 3rd
 test "$(sha256sum "$DISTRO_SERVER" | awk '{print $1}')" = "$DISTRO_SHA" \
   && pass "$DISTRO_SERVER is byte-identical to before ($DISTRO_SHA)" \
   || fail "$DISTRO_SERVER CHANGED"
-for p in indi-bin libindi1 libindi-data libindi-dev; do
+for p in indi-bin "$DISTRO_CLIENT_PKG" libindi-data libindi-dev; do
   if dpkg -V "$p" >/dev/null 2>&1; then pass "dpkg -V $p clean"
   else fail "dpkg -V $p reports modifications:"; dpkg -V "$p" | sed 's/^/        /'; fi
 done

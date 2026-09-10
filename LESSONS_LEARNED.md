@@ -750,3 +750,51 @@ permission fix that unblocked the self-merge step. Fixed by adding
 workflows — the job is a lightweight version-bump-and-merge, not a build, so
 the cost of a full clone there is negligible. `development` was fast-
 forwarded to `main` by hand once, confirmed a genuine ancestor first.
+
+## 29. A Debian test harness that hardcodes a package NAME only covers the one distro it was written against
+
+Four `scripts/*-deb.sh` harnesses (`probe-devel-compile-deb.sh`,
+`test-3rdparty-coexist-deb.sh`, `test-upgrade-path-3rdparty-deb.sh`,
+`test-upgrade-path-drivers-deb.sh`) hardcoded the distro INDI client
+package as the literal string `libindi1` — correct on every box these
+scripts had ever run against, because all of them were `ubuntuastro`, where
+`ppa:mutlaqja/ppa` genuinely does ship one package by that name. The first
+run on a real Debian box (`debianastro`, Debian 13 trixie, 2026-09-10)
+aborted at STEP 0 on all four: Debian's own archive splits the same library
+into `libindiclient1` instead, so `dpkg -s libindi1` / `dpkg -V libindi1`
+matched nothing, and two of the four read that absence as a real defect
+(`dpkg -V libindi1` reporting "not installed" is not the same condition as
+"reports modifications", but the scripts' case logic could not tell them
+apart) rather than as a wrong assumption.
+
+This is #12's rule (a protection on one implementation is not evidence it
+exists on the other) at a smaller grain: not "Fedora's guarantee mechanism
+doesn't port to Debian," but "a Debian script's own assumptions don't
+necessarily port to a DIFFERENT Debian-family distro." Two distributions
+sharing a packaging *format* (`.deb`, `dpkg`, `apt`) do not have to share
+package *names* for the same upstream library — Debian's archive and
+Ubuntu's PPA independently chose different splits of the same INDI 1.9.9
+source.
+
+**Rule:** when a check needs to name the package that owns some file, resolve
+it from the file the box actually has (`dpkg -S <real-path-to-the-.so>`),
+not from a name remembered off one box. The same principle
+`scripts/test-3rdparty-coexist-deb.sh` already applied to *SONAME* trust
+(read the ELF, don't trust the package name) applies one layer up, to which
+*package* provides that file at all.
+
+A second, unrelated bug surfaced in the same first run: two of the same
+scripts derived their vendor/driver list by globbing
+`indi-stable-3rdparty-libs-*_<version>_amd64.deb` and stripping only a
+`-dev$` suffix, not `-dbgsym$` — harmless on every earlier run because
+nothing had ever built dbgsym packages into the *same directory* being
+globbed, so `indi-stable-3rdparty-libs-apogee-dbgsym` was read as a vendor
+named `apogee-dbgsym` and the script went looking for a nonexistent
+`apogee-dbgsym-dev` package. Same shape as #25 (a hardcoded list stops
+testing what it never anticipated) but from a directory-layout assumption
+rather than a literal list.
+
+*Evidence:* all four `libindi1` sites and both `-dbgsym`-derivation sites
+found and fixed 2026-09-10, running each harness for the first time on
+`debianastro` rather than `ubuntuastro`. Every fix was verified by re-running
+the same harness to a clean pass on the same box, not just read as correct.

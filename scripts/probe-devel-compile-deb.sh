@@ -41,13 +41,27 @@ DISTROLIB=/usr/lib/$MULTIARCH
 DISTROH=/usr/include/libindi/indiversion.h
 WORK=${PROBE_WORK:-$(mktemp -d /tmp/probe-devel.XXXXXX)}
 
+# The distro package that actually owns the client library, resolved from the
+# real installed file rather than assumed by name. Ubuntu's ppa:mutlaqja/ppa
+# ships it as one package, libindi1 -- the name this whole probe was written
+# against, 2026-08-26 -- but Debian's own archive splits it as libindiclient1
+# instead (found on debianastro, Debian 13 trixie, 2026-09-10: `dpkg -s
+# libindi1` matches nothing there at all, so every check below would abort at
+# STEP 1 before reaching the parts that do not actually depend on the PPA).
+# `dpkg -S` on the real .so is what generalizes across both namings, the same
+# "read from the artifact, not the assumed name" discipline as
+# LESSONS_LEARNED.md #11.
+DISTRO_CLIENT_SO=$(ls "$DISTROLIB"/libindiclient.so.* 2>/dev/null | head -1)
+DISTRO_CLIENT_PKG=$(test -n "$DISTRO_CLIENT_SO" && dpkg -S "$DISTRO_CLIENT_SO" 2>/dev/null | cut -d: -f1 | head -1)
+DISTRO_CLIENT_PKG=${DISTRO_CLIENT_PKG:-libindi1}
+
 echo
 echo "############ STEP 1: both trees really are here ############"
 # Assert the driver's install landed rather than inferring it from an exit
 # status: every measurement below is about which of two trees wins, and with
 # only one present they would all pass while testing nothing
 # (LESSONS_LEARNED.md #5).
-for p in indi-stable-core indi-stable-core-libs indi-stable-core-dev libindi1 libindi-dev; do
+for p in indi-stable-core indi-stable-core-libs indi-stable-core-dev "$DISTRO_CLIENT_PKG" libindi-dev; do
   if dpkg -s "$p" >/dev/null 2>&1; then
     echo "  present: $p $(dpkg-query -W -f='${Version}' "$p")"
   else
@@ -98,6 +112,17 @@ cat > "$WORK/consumer.cpp" <<'CPP'
 #include <indiversion.h>
 #include <baseclient.h>
 #include <cstdio>
+// Stringize INDI_VERSION rather than printing it as %s directly. Our own
+// header (and the Ubuntu PPA's) defines it as a quoted string, "2.2.4", but
+// Debian's ARCHIVE 1.9.9 package defines it as the bare, unquoted token
+// 1.9.9 -- a compile error under %s ("too many decimal points in number"),
+// found 2026-09-10 on debianastro building the "distro" consumer, the first
+// time this probe ever compiled against a real archive-1.9.9 header instead
+// of a 2.x one. The double-macro indirection is required so INDI_VERSION
+// expands before stringizing; DATA_INSTALL_DIR remains the actual
+// tree-discriminator either way (see this file's header comment).
+#define STR_(x) #x
+#define STR(x) STR_(x)
 int main()
 {
     // Heap-allocated and never deleted on purpose: the question is which
@@ -105,7 +130,7 @@ int main()
     auto *c = new INDI::BaseClient();
     c->setServer("127.0.0.1", 7624);
     printf("DATA_INSTALL_DIR=%s\n", DATA_INSTALL_DIR);
-    printf("INDI_VERSION=%s\n", INDI_VERSION);
+    printf("INDI_VERSION=%s\n", STR(INDI_VERSION));
     return 0;
 }
 CPP
@@ -254,9 +279,25 @@ echo "############ STEP 8: what does dpkg-shlibdeps generate for a consumer of o
 # Two answers would be defects, and they are the two asserted against:
 #   * naming indi-stable-core-libs -- we would be advertising ourselves as a
 #     system-wide provider of libindiclient.so.2;
-#   * naming libindi1 -- a consumer of OUR library would get a dependency on
-#     the DISTRIBUTION's package, which is silently the wrong library.
+#   * naming $DISTRO_CLIENT_PKG -- a consumer of OUR library would get a
+#     dependency on the DISTRIBUTION's package, which is silently the wrong
+#     library.
 # Anything else, including a hard error, is loud and therefore safe.
+#
+# This half only has teeth when the two SONAMEs actually collide (DEBIAN.md,
+# "configuration B") -- dpkg-shlibdeps can only misattribute our
+# libindiclient.so.2 to a package whose own .shlibs claims that exact string.
+# On a configuration-A box (Debian 13 trixie's archive is one: checked
+# 2026-09-10, $DISTRO_CLIENT_PKG ships libindiclient.so.1, not .so.2) nothing
+# installed claims our SONAME at all, so the "did not name $DISTRO_CLIENT_PKG"
+# pass below is a check that cannot fail, not a check that passed
+# (LESSONS_LEARNED.md #12) -- reported as such rather than left to read as a
+# real result.
+DISTRO_SONAME=$(test -n "$DISTRO_CLIENT_SO" && readelf -d "$DISTRO_CLIENT_SO" 2>/dev/null \
+  | grep -oE 'libindiclient\.so\.[0-9]+' | head -1)
+if test -n "$DISTRO_SONAME" && test "$DISTRO_SONAME" != "libindiclient.so.2"; then
+  info "distro SONAME is $DISTRO_SONAME, ours is libindiclient.so.2 -- STEP 8 cannot fail on this box (configuration A)"
+fi
 SD=$WORK/shlibdeps; rm -rf "$SD"; mkdir -p "$SD/debian"
 printf 'Source: probe\n\nPackage: probe\nArchitecture: any\nDescription: probe for scripts/probe-devel-compile-deb.sh\n .\n' > "$SD/debian/control"
 run_shlibdeps() {   # $1 binary
@@ -268,27 +309,40 @@ if test -x "$WORK/consumer-ours"; then
   case $OURS_DEPS in
     *indi-stable-core-libs*)
       fail "dpkg-shlibdeps named indi-stable-core-libs -- our private libraries are being advertised as a system-wide provider" ;;
-    *libindi1*)
-      fail "dpkg-shlibdeps named libindi1 for a consumer of OUR library -- the generated dependency points at the distribution's package while the binary links ours" ;;
+    *"$DISTRO_CLIENT_PKG"*)
+      fail "dpkg-shlibdeps named $DISTRO_CLIENT_PKG for a consumer of OUR library -- the generated dependency points at the distribution's package while the binary links ours" ;;
     *)
-      pass "dpkg-shlibdeps named neither indi-stable-core-libs nor libindi1 for a consumer built against ours" ;;
+      pass "dpkg-shlibdeps named neither indi-stable-core-libs nor $DISTRO_CLIENT_PKG for a consumer built against ours" ;;
   esac
 fi
 echo "  -- CONTROL: the same tool on a consumer built against the DISTRIBUTION --"
 # STEP 8 passes by NOT finding two package names, so the tool has to be shown
 # able to produce one at all (LESSONS_LEARNED.md #1). Built with pkg-config's
 # default path, this consumer links the distribution's library and MUST come
-# back with libindi1.
+# back with $DISTRO_CLIENT_PKG.
 if test "$(build distro "")" = COMPILED; then
   DISTRO_DEPS=$(run_shlibdeps "$WORK/consumer-distro")
   echo "$DISTRO_DEPS" | sed 's/^/        /'
   case $DISTRO_DEPS in
-    *libindi1*) ctl "dpkg-shlibdeps DOES emit libindi1 for a consumer of the distribution's library -- so its silence about our packages above is a real result, not a tool that produced nothing" ;;
-    *)          fail "CONTROL BROKEN: dpkg-shlibdeps did not name libindi1 even for a consumer linked against the distribution's library. It is producing nothing, so STEP 8's pass means nothing" ;;
+    *"$DISTRO_CLIENT_PKG"*) ctl "dpkg-shlibdeps DOES emit $DISTRO_CLIENT_PKG for a consumer of the distribution's library -- so its silence about our packages above is a real result, not a tool that produced nothing" ;;
+    *)          fail "CONTROL BROKEN: dpkg-shlibdeps did not name $DISTRO_CLIENT_PKG even for a consumer linked against the distribution's library. It is producing nothing, so STEP 8's pass means nothing" ;;
   esac
 else
-  fail "could not build a distribution-linked consumer -- STEP 8 keeps no positive control"
-  sed 's/^/        /' "$WORK/build-distro.err" | head -10
+  # Debian's own archive .pc, not ours: `Libs:` there is just `-L${libdir}`,
+  # with no `-lindiclient` at all (confirmed 2026-09-10 on debianastro,
+  # reading /usr/lib/x86_64-linux-gnu/pkgconfig/libindi.pc directly -- unlike
+  # ours and the Ubuntu PPA's, both of which DO list it). So on a stock
+  # Debian archive box, pkg-config alone cannot even link a BaseClient
+  # consumer against the distribution -- not a defect this control could ever
+  # have caught, and consistent with STEP 8 already being unable to fail here
+  # (the SONAME note above): treat as not-applicable rather than FAIL, same
+  # as the rest of this project's configuration-A framing (DEBIAN.md).
+  if ! grep -q -- '-lindiclient' "$DISTROPC" 2>/dev/null; then
+    info "distro libindi.pc's Libs: carries no -lindiclient at all -- STEP 8's control is not applicable on this archive, not broken"
+  else
+    fail "could not build a distribution-linked consumer -- STEP 8 keeps no positive control"
+    sed 's/^/        /' "$WORK/build-distro.err" | head -10
+  fi
 fi
 
 echo

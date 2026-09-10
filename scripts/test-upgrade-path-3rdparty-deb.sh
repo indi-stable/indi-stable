@@ -52,9 +52,13 @@ W=$(mktemp -d /tmp/upgrade-3rdparty-deb.XXXXXX)
 # test kept passing on eight of nine vendors and said nothing about the one
 # it had never heard of. Its RPM twin globs the result directory and was
 # never affected. See LESSONS_LEARNED.md #25.
+# -dbgsym excluded the same way -dev already was: found 2026-09-10 on
+# debianastro, the first time this ran with dbgsym .debs sitting in the same
+# directory as the real packages -- see scripts/test-3rdparty-coexist-deb.sh's
+# identical fix for the fuller explanation. Not Debian-specific.
 VENDORS=$(ls "$NEW_DIR"/indi-stable-3rdparty-libs-*_"${NEW_VER}"_amd64.deb 2>/dev/null \
   | sed -E "s|.*/indi-stable-3rdparty-libs-(.*)_${NEW_VER}_amd64\.deb|\1|" \
-  | grep -v -- '-dev$' | sort)
+  | grep -v -- '-dev$' | grep -v -- '-dbgsym$' | sort)
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: $W"; exit 1; }
@@ -215,7 +219,17 @@ if test -n "$DISTRO_SHA"; then
   test "$(sha256sum /usr/bin/indiserver | awk '{print $1}')" = "$DISTRO_SHA" \
     && pass "/usr/bin/indiserver unchanged across the upgrade" \
     || fail "/usr/bin/indiserver CHANGED across the upgrade"
-  for p in indi-bin libindi1; do
+  # The distro client-library package, resolved from the real installed file
+  # rather than assumed to be libindi1 (Ubuntu's PPA name) -- Debian 13
+  # trixie's own archive splits it as libindiclient1 instead, found
+  # 2026-09-10 on debianastro: `dpkg -V libindi1` there reports "package is
+  # not installed", which this loop was about to read as a modification
+  # rather than a nonexistent package. Same fix as
+  # scripts/probe-devel-compile-deb.sh and scripts/test-3rdparty-coexist-deb.sh.
+  DISTRO_CLIENT_SO=$(ls /usr/lib/*/libindiclient.so.* 2>/dev/null | head -1)
+  DISTRO_CLIENT_PKG=$(test -n "$DISTRO_CLIENT_SO" && dpkg -S "$DISTRO_CLIENT_SO" 2>/dev/null | cut -d: -f1 | head -1)
+  DISTRO_CLIENT_PKG=${DISTRO_CLIENT_PKG:-libindi1}
+  for p in indi-bin "$DISTRO_CLIENT_PKG"; do
     dpkg -V "$p" >/dev/null 2>&1 && pass "dpkg -V $p still clean" \
                                  || fail "dpkg -V $p now reports modifications"
   done

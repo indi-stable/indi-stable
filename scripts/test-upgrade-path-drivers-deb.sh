@@ -58,8 +58,12 @@ list_from() {   # $1 = dir, $2 = package-name prefix
   ls "$1"/"$2"-*_"${NEW_VER}"_amd64.deb 2>/dev/null \
     | sed -E "s|.*/$2-(.*)_${NEW_VER}_amd64\.deb|\1|"
 }
-LIBS_VENDORS=$(list_from "$NEW_LIBS_DIR" indi-stable-3rdparty-libs | grep -v -- '-dev$' | sort)
-DRIVER_PKGS=$(list_from "$NEW_DRIVERS_DIR" indi-stable-3rdparty-drivers | sort)
+# -dbgsym excluded the same way -dev already was: found 2026-09-10 on
+# debianastro, the first time this ran with dbgsym .debs sitting in the same
+# directory as the real packages -- see scripts/test-3rdparty-coexist-deb.sh's
+# identical fix for the fuller explanation. Not Debian-specific.
+LIBS_VENDORS=$(list_from "$NEW_LIBS_DIR" indi-stable-3rdparty-libs | grep -v -- '-dev$' | grep -v -- '-dbgsym$' | sort)
+DRIVER_PKGS=$(list_from "$NEW_DRIVERS_DIR" indi-stable-3rdparty-drivers | grep -v -- '-dbgsym$' | sort)
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: $W"; exit 1; }
@@ -265,7 +269,13 @@ if test -n "$DISTRO_SHA"; then
   test "$(sha256sum /usr/bin/indiserver | awk '{print $1}')" = "$DISTRO_SHA" \
     && pass "/usr/bin/indiserver unchanged across the upgrade" \
     || fail "/usr/bin/indiserver CHANGED across the upgrade"
-  for p in indi-bin libindi1; do
+  # Resolved from the real installed file, not assumed to be Ubuntu's
+  # libindi1 -- same fix as test-upgrade-path-3rdparty-deb.sh's identical
+  # loop, and for the same reason (debianastro, 2026-09-10).
+  DISTRO_CLIENT_SO=$(ls /usr/lib/*/libindiclient.so.* 2>/dev/null | head -1)
+  DISTRO_CLIENT_PKG=$(test -n "$DISTRO_CLIENT_SO" && dpkg -S "$DISTRO_CLIENT_SO" 2>/dev/null | cut -d: -f1 | head -1)
+  DISTRO_CLIENT_PKG=${DISTRO_CLIENT_PKG:-libindi1}
+  for p in indi-bin "$DISTRO_CLIENT_PKG"; do
     dpkg -V "$p" >/dev/null 2>&1 && pass "dpkg -V $p still clean" \
                                  || fail "dpkg -V $p now reports modifications"
   done
