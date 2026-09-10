@@ -1020,3 +1020,71 @@ upgraded underneath an already-installed, untouched pyindi-client. Reuses
 the existing `2.2.4.2-1`/`2.2.4.2-2` core builds in `~/build` (the same pair
 core's own upgrade test uses); no new build needed. All checks passed on the
 first run -- full detail in `STATUS.md`.
+
+## `debianastro` — real Debian 13, not just a second Ubuntu box — verified 2026-09-10
+
+Every result above through 2026-09-09 was `ubuntuastro` (Ubuntu 26.04) or
+Fedora. `debianastro` (Debian 13 "trixie", provisioned by Will,
+passwordless `sudo`, no pre-existing INDI or `/opt/indi-stable`) is the
+first real Debian box this project has built and tested on, raised because
+Debian 13's own default `python3` is 3.13.5 — genuinely different from both
+Fedora 44's and Ubuntu 26.04's 3.14, and unlike deadsnakes-on-Ubuntu, it is
+trixie's **own official archive default**, not a third-party PPA
+(`DESIGN.md`, "Single-Python-version scope").
+
+**core, `-3rdparty-libs` and `-3rdparty-drivers` all build, install, upgrade
+and remove cleanly here** — `dpkg-buildpackage`, `lintian --profile debian`,
+`test-devel-compile-deb.sh`, `test-upgrade-path-deb.sh`,
+`test-3rdparty-coexist-deb.sh`, `test-upgrade-path-3rdparty-deb.sh` and
+`test-upgrade-path-drivers-deb.sh` all pass, real output read each time, not
+assumed from exit codes. This is **configuration A only** for core itself —
+trixie's archive is frozen at INDI 1.9.9/`libindiclient.so.1`, same as
+Ubuntu's archive, and Debian has no PPA equivalent to reach a genuine
+core-SONAME collision (the "Prefer Ubuntu 26.04 LTS over Debian 13" bullet
+above still holds, unchanged).
+
+**`test-3rdparty-coexist-deb.sh` is the exception, and it is a real
+configuration-B-shaped result** even on a configuration-A box: Debian 13's
+own archive ships `indi-apogee` → `libapogee3t64`, the *same* package and
+SONAME (`libapogee.so.3`) Ubuntu's archive ships, and it collides with our
+bundled `libapogee.so.3` exactly the way `DEBIAN.md` already documented for
+Ubuntu — confirmed by extracting the real archive `.deb` and reading its
+ELF, not by trusting the package name. This collision is at the *vendor
+library* layer, independent of which core INDI SONAME is on the box, so it
+is real evidence here even though core-level configuration B is not
+reachable on Debian at all.
+
+**`indi-stable-pyindi-client` built genuinely for Python 3.13**, not just
+theorized: `_PyIndi.cpython-313-x86_64-linux-gnu.so`, installed, and
+`scripts/smoke-test-pyindi-client-deb.sh` passed in full — `import PyIndi`
+resolves to a real path, `PyIndi.BaseClient()` constructs, all 1199 symbols
+the SWIG wrapper references are exported by the compiled extension (0
+missing), and `libindiclient.so.2` resolves into `/opt/indi-stable`, not any
+distro copy. `test-pyindi-client-coexist-upgrade-deb.sh` was **not** run —
+it hard-requires configuration B's `libindi1`, which does not exist on
+Debian archive at all, same limitation as core's own config-B tests. See
+`DESIGN.md`, "Single-Python-version scope", for what this closes and what it
+still leaves undecided about actually shipping a per-version build matrix.
+
+**Four existing test harnesses assumed Ubuntu's PPA package name
+(`libindi1`) and two assumed no `-dbgsym` `.deb` would ever sit in the same
+directory as the real ones — both wrong on first contact with a real Debian
+box, neither a defect in the packaging.** Fixed in
+`probe-devel-compile-deb.sh`, `test-3rdparty-coexist-deb.sh`,
+`test-upgrade-path-3rdparty-deb.sh` and `test-upgrade-path-drivers-deb.sh`
+by resolving the distro client package from the real installed file
+(`dpkg -S` on the actual `.so`) instead of a remembered name, and by
+excluding `-dbgsym` the same way `-dev` already was in the two vendor/driver
+list derivations. Full account: `LESSONS_LEARNED.md` #29.
+
+**Two more real, distro-specific findings, neither a packaging defect**:
+Debian archive's 1.9.9 `indiversion.h` defines `INDI_VERSION` as a bare
+unquoted token (`1.9.9`, not `"1.9.9"`) rather than a string — a compile
+error ("too many decimal points in number") the probe's shared consumer had
+never hit because every earlier run only ever compiled against 2.x-family
+headers. Fixed by stringizing the macro instead of printing it directly.
+And Debian archive's own `libindi.pc` carries no `-lindiclient` in its
+`Libs:` line at all (`Libs: -L${libdir}` only) — unlike ours and the Ubuntu
+PPA's, both of which do — so `probe-devel-compile-deb.sh`'s STEP 8 control
+consumer cannot be linked via pkg-config alone against the distro on this
+platform; reclassified from a false `FAIL` to explicitly not-applicable.

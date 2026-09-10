@@ -1234,6 +1234,11 @@ is also scripted, `scripts/test-upgrade-path-3rdparty-deb.sh` and
 - **Should `pyindi-client` build for more than one Python version?** Today it
   satisfies exactly the one interpreter each distro's build container
   defaults to (Fedora 44 / Ubuntu 26.04, both currently 3.14) — raised from
-  the ACS side, 2026-09-10. Scoped but not decided — see `DESIGN.md`,
-  "Single-Python-version scope" under "`pyindi-client` — packaging
-  decisions", for what widening each distro actually costs.
+  the ACS side, 2026-09-10. **A real second target now exists and was built
+  against, not just scoped**: Debian 13's own official archive defaults to
+  Python 3.13, and `pyindi-client/deb/` built and smoke-tested clean against
+  it unmodified on `debianastro`, same day — see `DEBIAN.md`, "`debianastro`
+  — real Debian 13". Still not decided whether to ship this for real (adding
+  Debian 13 as a fourth CI platform, or a Fedora RPM matrix instead) — see
+  `DESIGN.md`, "Single-Python-version scope" under "`pyindi-client` —
+  packaging decisions".

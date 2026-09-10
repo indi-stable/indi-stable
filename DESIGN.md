@@ -1725,6 +1725,26 @@ straightforward and uses only official repos — and treat Debian as a
 separate decision requiring the policy call above, not a smaller version of
 the same fix.
 
+**The "widen the build-platform set" option is no longer purely
+hypothetical — checked for real, 2026-09-10, on `debianastro` (Debian 13
+"trixie", a genuinely new box, not Ubuntu again).** Debian 13's own official
+archive defaults to Python 3.13.5, a *third* distinct version from Fedora
+44's and Ubuntu 26.04's 3.14, and — unlike the Ubuntu case above — reaching
+it needs no PPA or any other third-party source at all: it is simply
+trixie's own `python3`. `pyindi-client/deb/` built against it completely
+unmodified (`_PyIndi.cpython-313-x86_64-linux-gnu.so`), and
+`scripts/smoke-test-pyindi-client-deb.sh` passed in full — genuine evidence,
+not just the theoretical case this section describes above. `DEBIAN.md`,
+"`debianastro` — real Debian 13", has the full run.
+
+This resolves the *feasibility* question for one more concrete data point
+(a second official-archive Python target exists and works, no policy call
+needed to reach it) but not the *decision* above: shipping this for real
+still means either adding Debian 13 as a fourth CI build platform (today's
+set is fixed at exactly Fedora 44 + Ubuntu 26.04 for every component,
+`CLAUDE.md`) or finding another way to reach 3.13 from the existing two —
+neither done here, and doing it is still future work, not this session's.
+
 ## Upstream build-system facts the packaging depends on
 
 Checked against INDI's real sources, not assumed. Each of these is the reason a
