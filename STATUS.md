@@ -1231,14 +1231,30 @@ is also scripted, `scripts/test-upgrade-path-3rdparty-deb.sh` and
   someone installing a *distribution package* expects their hardware supported.
   Current answer is build everything; revisit if build time or breakage surface
   proves unreasonable. (It does not: a full build is under four minutes.)
-- **Should `pyindi-client` build for more than one Python version?** Today it
-  satisfies exactly the one interpreter each distro's build container
-  defaults to (Fedora 44 / Ubuntu 26.04, both currently 3.14) — raised from
-  the ACS side, 2026-09-10. **A real second target now exists and was built
-  against, not just scoped**: Debian 13's own official archive defaults to
-  Python 3.13, and `pyindi-client/deb/` built and smoke-tested clean against
-  it unmodified on `debianastro`, same day — see `DEBIAN.md`, "`debianastro`
-  — real Debian 13". Still not decided whether to ship this for real (adding
-  Debian 13 as a fourth CI platform, or a Fedora RPM matrix instead) — see
-  `DESIGN.md`, "Single-Python-version scope" under "`pyindi-client` —
+- **Should Fedora get a `pyindi-client` Python-version matrix, and does
+  Debian 13 become a permanent CI platform?** Both still genuinely open —
+  see `DESIGN.md`, "Single-Python-version scope" under "`pyindi-client` —
   packaging decisions".
+
+## Debian 12 and Ubuntu 24.04 — decided, blocked on machine provisioning
+
+**Decided 2026-09-10**: build full platforms (`core`, then `-3rdparty-libs`/
+`-3rdparty-drivers`, then `pyindi-client`) on Debian 12 "bookworm" (default
+Python 3.11) and Ubuntu 24.04 "noble" (default Python 3.12), raised from the
+ACS side. Not a smaller version of the Debian-13 work: `indi-stable-core-libs`
+carries its own glibc/libstdc++ ABI requirement, which a Python-version
+requirement cannot substitute for — confirmed concretely (a `debianastro`
+build already requires `GLIBC_2.38`, which bookworm's 2.36 does not have) —
+so `pyindi-client` needs `core` built on each of these two specifically, not
+just recompiled against an existing build. Full reasoning: `DESIGN.md`,
+"Decided: full platforms for Debian 12 and Ubuntu 24.04 too".
+
+**Not started.** Will is provisioning two VMs, same shape as `debianastro`
+(passwordless `sudo`, no pre-existing INDI). Once they exist, repeat the
+`debianastro` sequence on each: `core` build/install/
+`test-devel-compile-deb.sh`/`test-upgrade-path-deb.sh`, then `-3rdparty-*`
+build/coexist/upgrade, then `pyindi-client` build/smoke-test against that
+distro's native Python. Expect to hit the same class of distro-naming
+assumption `LESSONS_LEARNED.md` #29 just fixed for Debian 13 (Ubuntu's
+`libindi1` vs. Debian's `libindiclient1`) — check each box's own package
+names rather than assuming #29 already covers every distro.

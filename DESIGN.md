@@ -1745,6 +1745,58 @@ set is fixed at exactly Fedora 44 + Ubuntu 26.04 for every component,
 `CLAUDE.md`) or finding another way to reach 3.13 from the existing two —
 neither done here, and doing it is still future work, not this session's.
 
+### Decided: full platforms for Debian 12 and Ubuntu 24.04 too — 2026-09-10, not yet started
+
+Raised from the ACS side again: Ubuntu 24.04 LTS ("noble") is a real,
+widely-deployed target and defaults to Python 3.12; Debian 12 ("bookworm")
+defaults to 3.11. Checked, not assumed: both are official-archive defaults,
+neither needs a third-party source — `python3` is `3.12` on noble
+(`packages.ubuntu.com`) and `3.11.2` on bookworm (`packages.debian.org`).
+`python3.14` is available on **neither** as an official package (not even
+`bookworm-backports` — only a community, non-Debian backport exists there;
+noble's only path to 3.13/3.14 is `deadsnakes`, the same third-party PPA
+already ruled out above).
+
+**"Require the user to install Python 3.14 themselves" was considered and
+is wrong, not just impractical — it targets the wrong ABI.** `pyindi-client`
+`Depends: indi-stable-core-libs`, a compiled C++ library whose runtime
+requirement is the box's **glibc/libstdc++** version, entirely independent
+of whatever Python the user has. Checked concretely: `indi-stable-core-libs`
+built on `debianastro` (Debian 13, glibc 2.41) requires symbol
+`GLIBC_2.38` (`objdump -T … | grep GLIBC`); Debian 12 bookworm ships glibc
+**2.36** — two versions short, and not a hypothetical failure mode: a real
+`GLIBC_2.38' not found` bug report for exactly this shape of mismatch turned
+up in the same search that confirmed bookworm's version. A user installing
+Python 3.14 by hand (pyenv, source build, whatever) changes nothing about
+their system's glibc, so `apt install indi-stable-core-libs` would still be
+refused by its own auto-generated `libc6 (>= 2.38)` dependency, regardless
+of Python. The 2026-08-26 "Debian's `.pc` needs private-prefix RPATH, not
+`/usr`" reasoning this project is built on (`DESIGN.md`'s coexistence
+section) already establishes that a shared library's own ABI is the real
+constraint; this is the same fact applied one layer further out — a Python
+version requirement cannot paper over a C library ABI mismatch, because they
+are different axes entirely.
+
+**Decided**: `indi-stable-core` (and, for consistency with every other
+platform this project supports, `-3rdparty-libs`/`-3rdparty-drivers`) will
+be built on Debian 12 and Ubuntu 24.04 as two more full platforms —
+`pyindi-client` follows once core exists there, same dependency order as
+every other distro. This is the "widen the build-platform set" option
+`STATUS.md` already carried as undecided, now decided for these two
+specifically. Matches `CLAUDE.md`'s own rule: build and verify by hand
+first (mirroring the `debianastro` session, `DEBIAN.md`), CI automation
+only after that succeeds.
+
+**Not started — blocked on machine provisioning.** Will is building two new
+VMs (Debian 12, Ubuntu 24.04), same provisioning as `debianastro`
+(passwordless `sudo`, no pre-existing INDI). Pick this up once they exist:
+repeat the `debianastro` sequence (core build/install/`test-devel-compile-
+deb.sh`/`test-upgrade-path-deb.sh`, then `-3rdparty-*`, then
+`pyindi-client`) on each, expecting to hit the SAME class of distro-naming
+assumptions `LESSONS_LEARNED.md` #29 just fixed for Debian 13 — check
+`libindiclient1`-vs-`libindi1` and any other archive-specific package names
+again on each new box rather than assuming #29's fixes are exhaustive.
+
 ## Upstream build-system facts the packaging depends on
 
 Checked against INDI's real sources, not assumed. Each of these is the reason a
