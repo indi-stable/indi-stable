@@ -21,9 +21,9 @@
 #     libasi's own CMakeLists.txt installs the vendor blob via
 #     add_library(... SHARED IMPORTED) -- a real system install, not a
 #     source-tree reference. So this package's %files genuinely differ from
-#     what indi-stable-3rdparty-drivers (not yet written) will produce from
-#     the SAME source tree with BUILD_LIBS=OFF, and the drivers package will
-#     BuildRequire this one's -devel, ordinarily, the way
+#     what indi-stable-3rdparty-drivers produces from the SAME source tree
+#     with BUILD_LIBS=OFF, and the drivers package BuildRequires this one's
+#     -devel, ordinarily, the way
 #     Fedora's own indi-3rdparty-drivers.spec BuildRequires
 #     indi-3rdparty-libapogee-devel. See DESIGN.md, "Resolution -- two source
 #     packages, not one and not sixty-one".
