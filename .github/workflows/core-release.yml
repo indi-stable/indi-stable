@@ -416,13 +416,35 @@ jobs:
       # have silently rewritten nothing had that column ever shifted.
       - name: Bump spec and changelog for real
         run: bash scripts/bump-core-version.sh "${{ needs.check.outputs.new_tag }}" "${{ needs.check.outputs.release }}"
+      # release_tag records WHAT WAS PUBLISHED, which stops being derivable
+      # from .release the moment core is repackaged: upstream v2.2.4.2 rebuilt
+      # at release 2 publishes as indi-stable-core-v2.2.4.2-2, while .release
+      # stays v2.2.4.2. 3rdparty and pyindi-client used to rebuild that name
+      # from the upstream version, which resolved to the ORIGINAL release --
+      # a release that exists, so the download succeeded and quietly returned
+      # pre-repackage artifacts instead of failing. One place decides this
+      # identity now, and consumers read it rather than reconstructing it.
+      #
+      # Only core carries the field, because only core is built against.
       - name: Update versions.json
         env:
           NEW_TAG: ${{ needs.check.outputs.new_tag }}
+          RELEASE: ${{ needs.check.outputs.release }}
         run: |
-          jq --arg v "$NEW_TAG" '.core.candidate = $v | .core.release = $v' \
+          # Computed ONCE, here, and exported -- the Create GitHub Release step
+          # below consumes it rather than rebuilding the same string from the
+          # same `if`. Two copies of that construction is how versions.json
+          # ends up naming a release that was never created.
+          REL_TAG="indi-stable-core-${NEW_TAG}"
+          if [ "${RELEASE}" != "1" ]; then
+            REL_TAG="${REL_TAG}-${RELEASE}"
+          fi
+          echo "REL_TAG=${REL_TAG}" >> "$GITHUB_ENV"
+          jq --arg v "$NEW_TAG" --arg rt "$REL_TAG" \
+            '.core.candidate = $v | .core.release = $v | .core.release_tag = $rt' \
             versions.json > versions.json.tmp
           mv versions.json.tmp versions.json
+          echo "core.release_tag = ${REL_TAG}"
       # Release BEFORE commit, deliberately -- and this order matters more than
       # it looks. Until 2026-09-05 this was reversed: the version-bump commit
       # landed on `development` first, and the GitHub Release was created
@@ -461,10 +483,13 @@ jobs:
           # upstream version already exists. That is not a hypothetical: it is
           # exactly why core's own pipeline cannot be re-run against an
           # already-released tag (STATUS.md).
-          REL_TAG="indi-stable-core-${NEW_TAG}"
+          # REL_TAG comes from the Update versions.json step's GITHUB_ENV, so
+          # the release is created under exactly the name versions.json now
+          # advertises to 3rdparty and pyindi-client. Only the human-facing
+          # title is built here.
+          test -n "${REL_TAG}" || { echo "ERROR: REL_TAG unset -- the versions.json step did not export it"; exit 1; }
           REL_TITLE="indi-stable-core ${NEW_TAG}"
           if [ "${RELEASE}" != "1" ]; then
-            REL_TAG="${REL_TAG}-${RELEASE}"
             REL_TITLE="${REL_TITLE} (release ${RELEASE})"
           fi
           echo "creating release: ${REL_TAG}"

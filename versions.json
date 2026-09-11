@@ -1,7 +1,8 @@
 {
   "core": {
     "release": "v2.2.4.2",
-    "candidate": "v2.2.4.2"
+    "candidate": "v2.2.4.2",
+    "release_tag": "indi-stable-core-v2.2.4.2-2"
   },
   "3rdparty": {
     "release": "v2.2.4.1",

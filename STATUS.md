@@ -1318,6 +1318,13 @@ itself**, the release published three seconds before the bump commit (the
 deliberate ordering), `development` was fast-forwarded to zero divergence,
 and the promotion branch was deleted.
 
+**`versions.json` now carries `.core.release_tag`**, the name core actually
+published under, because `.core.release` (the upstream tag) stopped being
+enough the moment core was repackaged — `indi-stable-core-v2.2.4.2-2` against
+a `.release` of `v2.2.4.2`. The consumers read that field rather than
+rebuilding the string, and refuse a missing one. `LESSONS_LEARNED.md` #32 for
+why the old derivation failed *silently* rather than loudly.
+
 ### Open: `3rdparty` and `pyindi-client` CI is still unexercised
 
 Their workflows carry the identical four-platform shape but have never run.

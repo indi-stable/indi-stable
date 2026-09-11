@@ -110,11 +110,25 @@ jobs:
       - name: Resolve the core release to build against
         id: core
         run: |
-          CORE_TAG=$(jq -r '.core.release' versions.json)
-          [ -n "$CORE_TAG" ] && [ "$CORE_TAG" != "null" ] \
-            || { echo "could not read .core.release from versions.json" >&2; exit 1; }
+          # The PUBLISHED RELEASE TAG, not the upstream version. These differ
+          # the moment core is repackaged: upstream v2.2.4.2 rebuilt at
+          # release 2 publishes as indi-stable-core-v2.2.4.2-2, while
+          # .core.release still reads v2.2.4.2. Constructing
+          # "indi-stable-core-${upstream}" therefore resolved to the ORIGINAL
+          # release -- which exists, so the download succeeded and returned
+          # the wrong, pre-split artifacts. Found 2026-09-11, before the
+          # first 3rdparty run against a repackaged core.
+          #
+          # core's promote writes this field, so one place decides the
+          # identity of what was published and consumers do not rebuild the
+          # string from parts. No fallback to .core.release: a missing field
+          # means core has not promoted since this was introduced, and
+          # guessing would resolve to exactly the wrong release again.
+          CORE_TAG=$(jq -r '.core.release_tag // empty' versions.json)
+          [ -n "$CORE_TAG" ] \
+            || { echo "could not read .core.release_tag from versions.json -- core must promote once before this workflow can resolve its release" >&2; exit 1; }
           echo "core_tag=${CORE_TAG}" >> "$GITHUB_OUTPUT"
-          echo "building against core ${CORE_TAG}"
+          echo "building against core release ${CORE_TAG}"
 
   build-libs-fedora:
     needs: check
@@ -132,7 +146,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-rpms
-          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+          gh release download "${{ needs.check.outputs.core_tag }}" \
             --repo "${{ github.repository }}" --pattern '*.rpm' --dir core-rpms
           ls -la core-rpms/
       - name: Install core and core-devel into the build container
@@ -179,7 +193,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-rpms
-          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+          gh release download "${{ needs.check.outputs.core_tag }}" \
             --repo "${{ github.repository }}" --pattern '*.rpm' --dir core-rpms
       - uses: actions/download-artifact@v4
         with:
@@ -279,7 +293,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-debs
-          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+          gh release download "${{ needs.check.outputs.core_tag }}" \
             --repo "${{ github.repository }}" \
             --pattern "${{ matrix.asset_glob }}" --dir core-debs
           ls -la core-debs/
@@ -288,7 +302,7 @@ jobs:
           # from an empty directory then "succeeds" and the real failure
           # surfaces much later as a missing header.
           test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
-            echo "ERROR: the core release indi-stable-core-${{ needs.check.outputs.core_tag }}"
+            echo "ERROR: the core release ${{ needs.check.outputs.core_tag }}"
             echo "       has no ${{ matrix.vsuffix }} packages. core must be released with"
             echo "       per-platform suffixes before 3rdparty can build against it."
             exit 1; }
@@ -380,7 +394,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-debs
-          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+          gh release download "${{ needs.check.outputs.core_tag }}" \
             --repo "${{ github.repository }}" \
             --pattern "${{ matrix.asset_glob }}" --dir core-debs
           test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
@@ -476,7 +490,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-rpms
-          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+          gh release download "${{ needs.check.outputs.core_tag }}" \
             --repo "${{ github.repository }}" --pattern '*.rpm' --dir core-rpms
       - uses: actions/download-artifact@v4
         with:
@@ -527,7 +541,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-debs
-          gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
+          gh release download "${{ needs.check.outputs.core_tag }}" \
             --repo "${{ github.repository }}" \
             --pattern "${{ matrix.asset_glob }}" --dir core-debs
           test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
@@ -673,7 +687,7 @@ jobs:
           echo "creating release: ${REL_TAG}"
           gh release create "${REL_TAG}" release-assets/* \
             --title "${REL_TITLE}" \
-            --notes "Automated release. Built from upstream indilib/indi-3rdparty ${NEW_TAG} against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on all four platforms -- Fedora 44, Debian 12, Ubuntu 24.04 and Ubuntu 26.04 (build, clean runtime install, every shipped driver resolves its libraries, one driver from each vendor executes, each on the platform it was built for). Unofficial third-party build -- see README.md."
+            --notes "Automated release. Built from upstream indilib/indi-3rdparty ${NEW_TAG} against core release ${{ needs.check.outputs.core_tag }}, gated on all four platforms -- Fedora 44, Debian 12, Ubuntu 24.04 and Ubuntu 26.04 (build, clean runtime install, every shipped driver resolves its libraries, one driver from each vendor executes, each on the platform it was built for). Unofficial third-party build -- see README.md."
       # main is protected (PR required), so the bump lands via a PR the bot
       # opens and immediately merges itself -- main's branch protection
       # requires a pull request but zero approving reviews, so this is not a
