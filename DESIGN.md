@@ -1797,6 +1797,54 @@ assumptions `LESSONS_LEARNED.md` #29 just fixed for Debian 13 — check
 `libindiclient1`-vs-`libindi1` and any other archive-specific package names
 again on each new box rather than assuming #29's fixes are exhaustive.
 
+### Decided: no XISF on Debian 12 and Ubuntu 24.04 — 2026-09-11
+
+Neither archive can build XISF (PixInsight `.xisf`) support for this INDI
+release, and the two fail differently. Debian 12 carries **no `libxisf-dev`
+at all** — main, security, updates and backports all checked on the box.
+Ubuntu 24.04 carries `0.2.8-1`, and its header was read directly rather than
+inferred from the version: it declares no `CompressionCodecSupported`, and
+its `CompressionCodec` enum is `None, Zlib, LZ4, LZ4HC` with **no `ZSTD`** —
+both of the things `indiccd.cpp:2568` calls. That is the same too-old version
+that broke `ubuntu-latest` in CI, now measured rather than inherited.
+
+**Decided with Will: disable XISF on these two platforms** rather than build
+a copy of `libxisf` into them. The alternative was genuinely considered — all
+of libxisf's own build dependencies (`cmake`, a C++17 `g++`, `liblz4-dev`,
+`libpugixml-dev`, `zlib1g-dev`, `pkg-config`) are available on both boxes, so
+it was feasible, not blocked. It was rejected on scope and on shape:
+
+- It would mean shipping a library the distribution is expected to provide.
+  This project bundles vendor SDKs in `3rdparty` only because no distribution
+  package for them exists *by nature* (binary blobs under vendor licences).
+  `libxisf` is ordinary packaged software that three of the five platforms
+  here already get from their own archive.
+- It needs a new pinned `Source` and a build mechanism `core` has never had —
+  compiling a dependency inside core's own build, which must also work with
+  no network access inside `mock`.
+- And it forces a choice with no good answer: either per-platform conditional
+  logic in the spec and `rules` (an axis of branching that exists nowhere in
+  this packaging today), or building it uniformly everywhere, which re-opens
+  Fedora, Debian 13 and Ubuntu 26.04 — all three currently testing-complete —
+  for a feature none of them is missing.
+
+The cost is bounded and legible: those two platforms save FITS and the native
+formats normally and lose only `.xisf` output. That is a real feature gap, so
+it is stated where a *user* will meet it — the README's platform table and
+the `indi-stable-core` package description — not only in build documentation.
+
+The mechanism is a `dpkg-build-profiles(7)` profile,
+`pkg.indi-stable-core.noxisf`, and it is **asserted rather than assumed**
+after configure, because upstream makes this feature silently optional. Both
+of those facts, and the dead `INDI_BUILD_XISF` option that makes the obvious
+approach a no-op, are in `LESSONS_LEARNED.md` #30.
+
+**The RPM side is deliberately not changed.** Fedora's `libXISF-devel` is
+fine, so it needs no profile; but its spec also carries no equivalent
+assertion, and `find_package(LibXISF)` is just as silently optional there.
+The hard `BuildRequires` covers the common case and not the whole of it. See
+`STATUS.md` for that as an open item.
+
 ## Upstream build-system facts the packaging depends on
 
 Checked against INDI's real sources, not assumed. Each of these is the reason a

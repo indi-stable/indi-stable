@@ -31,6 +31,22 @@ lintian --profile debian ../indi-stable-core_*.changes
 **`--profile debian` is required, not cosmetic**, and only when checking on an
 Ubuntu box. See "The changelog distribution" below before removing it.
 
+**On Debian 12 and Ubuntu 24.04, build with the `noxisf` profile instead** --
+both `apt-get build-dep` and `dpkg-buildpackage` need it, because it decides
+the `libxisf-dev` build dependency as well as the configure flag:
+
+```bash
+export DEB_BUILD_PROFILES=pkg.indi-stable-core.noxisf
+sudo -E apt-get build-dep -y .
+dpkg-buildpackage -us -uc -b
+```
+
+Without it on Debian 12 the build-dep step fails with `libxisf-dev but it is
+not installable`, which is the intended loud failure rather than a puzzle.
+Every other platform builds unprofiled and is unaffected. Why those two
+platforms, and what a user loses: `DESIGN.md`, "Decided: no XISF on Debian 12
+and Ubuntu 24.04".
+
 **The `rm -rf debian` is load-bearing and this file previously omitted it.** The
 upstream tarball ships INDI's *own* `debian/` directory — the packaging for
 `indi-bin`, `libindi1`, `libindi-data`, `libindi-dev`. Without the removal,

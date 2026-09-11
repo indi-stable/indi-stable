@@ -131,6 +131,31 @@ Install the base package and `-libs` together. The `-devel` (RPM) and `-dev`
 (DEB) packages are needed only to *build* against this project, as
 `pyindi-client` itself does.
 
+### XISF image-format support is missing on two older platforms
+
+Cameras can save images as FITS, as raw native formats, or as XISF — the
+PixInsight format. **The Debian 12 and Ubuntu 24.04 builds have no XISF
+support**; every other platform here does.
+
+| Platform | Saves `.xisf` |
+|---|---|
+| Fedora | yes |
+| Debian 13 "trixie" | yes |
+| Ubuntu 26.04 | yes |
+| Debian 12 "bookworm" | **no** |
+| Ubuntu 24.04 "noble" | **no** |
+
+The reason is the platform's own archive, not a choice about what to
+support: XISF needs `libxisf`, and Debian 12 ships no `libxisf-dev` at all
+while Ubuntu 24.04 ships 0.2.8, which predates the compression API this INDI
+release calls. Building it in anyway would mean shipping a copy of `libxisf`
+inside these packages, which this project does not do for a dependency the
+distribution is expected to provide.
+
+Nothing else differs. Those builds save FITS and native formats normally, and
+if you do not use PixInsight's format you will not notice. If you need
+`.xisf` output specifically, use one of the three platforms above.
+
 The other two components release the same way, with two differences worth
 knowing before you go looking for a file that is not there:
 
