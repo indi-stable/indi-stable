@@ -1291,6 +1291,30 @@ hold an unpacked `indi-2.2.4.2`, `indi-3rdparty-2.2.4.1` and
 `lintian`, `swig`, `dh-python`, `python3-dev`, plus the distribution's
 `libindi-dev` and `indi-bin`, which two harnesses require as preconditions).
 
+**Both platforms are wired into all three CI pipelines**, 2026-09-11 — each
+workflow's Debian jobs are matrixed over `debian:12`, `ubuntu:24.04` and
+`ubuntu:26.04`, all containerised, and every `promote` gates on all of them.
+The per-distribution version suffix that makes three same-named builds
+distinguishable, and its knock-on effect on `-drivers`' eighteen `-libs`
+pins, are in `DESIGN.md`, "Decided: a per-distribution version suffix on the
+Debian side".
+
+### Open: CI is not run-verified, and core must release first
+
+Two things, both consequences of that change:
+
+- **None of the three workflow changes has been exercised by a real run.**
+  They parse, every matrix expands to the intended three entries, and every
+  `download-artifact` name has a matching upload — all checked mechanically —
+  but a CI change can only be exercised by cutting a release, which is not
+  something a working session should do on its own.
+- **`3rdparty` and `pyindi-client` cannot build until core re-releases.**
+  Both now select their core packages by version suffix, and the current core
+  release predates the split, so it carries no suffixed files. Each asserts
+  it actually matched something, so they fail loudly rather than building
+  against nothing. A `repackage: true` dispatch of `core-release.yml` closes
+  the gap, and it has to come first.
+
 **Ubuntu names its dbgsym packages `.ddeb`, Debian names them `.deb`** — so
 `ubuntu24astro`'s `~/build` holds two `.ddeb` files a `*.deb` glob will not
 match at all, where `debian12astro`'s holds two `.deb` files that one will.

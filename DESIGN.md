@@ -1845,6 +1845,42 @@ assertion, and `find_package(LibXISF)` is just as silently optional there.
 The hard `BuildRequires` covers the common case and not the whole of it. See
 `STATUS.md` for that as an open item.
 
+### Decided: a per-distribution version suffix on the Debian side — 2026-09-11
+
+With four platforms in CI, three of them Debian-family, every Debian build
+emits a byte-different file at the **identical** name
+(`indi-stable-core_2.2.4.2-1_amd64.deb`). The promote jobs copy every artifact
+into one directory before uploading, so two of three would be silently
+overwritten and a release would ship one arbitrary platform's build under a
+name claiming to be universal.
+
+**Decided with Will: suffix the VERSION, not just the filename** — `~deb12`,
+`~ubuntu24.04`, `~ubuntu26.04`, stamped by each build job's own transient
+`dch`. Suffixing only the filename was the smaller change and was rejected
+for one reason: once the package is installed the filename is gone, so
+`dpkg -l` could not answer "which build is this?" — the first question any
+support conversation asks. `~` sorts *below* the bare version in dpkg's
+ordering, the ordinary Debian convention, so a per-distro build can never
+outrank an unsuffixed one.
+
+RPM is deliberately untouched. Fedora is one platform and its `Release:`
+already carries `%{?dist}`.
+
+**The suffix has one non-obvious consequence, and it is the reason
+`bump-3rdparty-version.sh` gained a `DEB_SUFFIX`:** `-drivers` pins `-libs`
+at eighteen exact literal versions, and a suffix applied to the changelog but
+not to those pins produces a `-drivers` whose `Build-Depends` name a `-libs`
+version no platform builds. Both are now stamped from one computed version in
+the script that already existed to keep them in step.
+
+**Ordering, once only:** the workflows select their core packages by suffix
+(`--pattern "*~deb12_*.deb"`), so `3rdparty` and `pyindi-client` cannot build
+until a core release exists that carries suffixed files. The current core
+release predates the split. A `repackage: true` dispatch of `core-release.yml`
+is what closes that gap, and it has to happen before the other two can run —
+they fail loudly rather than silently if it has not. No compatibility shim
+was added for the interim, per `CLAUDE.md`.
+
 ## Upstream build-system facts the packaging depends on
 
 Checked against INDI's real sources, not assumed. Each of these is the reason a
