@@ -882,3 +882,43 @@ than assuming they matched what `promote` uploaded. Both download patterns
 were then tested against the live release, the broken one confirmed to return
 zero files and the fixed one exactly three per platform, before either
 workflow ran.
+
+## 32. Two fields that have always been equal are not the same field
+
+`versions.json` records `.core.release` — the upstream tag, `v2.2.4.2`. Three
+workflows needed the name of core's GitHub Release, and built it as
+`indi-stable-core-${upstream_tag}`. That was correct for every release this
+project had ever made, because release 1 deliberately keeps the plain tag
+name, so the two strings were identical every single time.
+
+The first successful **repackage** separated them. Upstream v2.2.4.2 rebuilt
+at release 2 publishes as `indi-stable-core-v2.2.4.2-2`, while
+`.core.release` still reads `v2.2.4.2`.
+
+**The failure mode is the dangerous one: the derived name still resolved.**
+`indi-stable-core-v2.2.4.2` exists — it is the ORIGINAL release. So
+`gh release download` would have succeeded, returned the pre-repackage
+artifacts, and built `3rdparty` against a core that was not the one the
+release process had just gated and published. No 404, no error, a green run
+producing wrong output. It was caught only by checking what the tag resolved
+to before running the workflow, not by anything in the workflow itself.
+
+Compare #27: a count written into prose is a claim with an expiry date. This
+is the same shape at the level of an identifier — a derivation that is true
+until a new code path makes it false, and whose failure is silent because the
+wrong answer is still a valid one.
+
+**Rule:** when one value is derivable from another *only because no code path
+has yet made them differ*, record the real one rather than deriving it. Here
+`promote` computes the release tag once, exports it, creates the release
+under it and writes it to `versions.json` as `.core.release_tag`; consumers
+read that field and never rebuild the string. Consumers also refuse a missing
+field rather than falling back to the old derivation, because the fallback
+resolves to exactly the wrong release.
+
+*Evidence:* found 2026-09-11, between core's first repackage
+(`indi-stable-core-v2.2.4.2-2`, the first release this project ever made
+whose tag differs from its upstream version) and the first `3rdparty` run
+that would have consumed it. Confirmed by resolving both names against the
+live repo: the derived one returns the 6-asset 2026-09-04 release, the
+recorded one the 12-asset release built minutes earlier.
