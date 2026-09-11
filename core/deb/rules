@@ -12,6 +12,40 @@ INDI_LIBDIR := $(INDI_PREFIX)/lib
 INDI_BINDIR := $(INDI_PREFIX)/bin
 INDI_DATADIR := $(INDI_PREFIX)/share/indi
 
+# --- XISF (PixInsight image format) -----------------------------------------
+# Built in by default. Turned off only on platforms whose archive has no
+# usable libxisf, by building with the profile:
+#
+#   DEB_BUILD_PROFILES=pkg.indi-stable-core.noxisf dpkg-buildpackage -us -uc -b
+#
+# Debian 12 carries no libxisf-dev in any pocket (main, security, updates and
+# backports all checked); Ubuntu 24.04 carries 0.2.8-1, which predates the
+# LibXISF::DataBlock::CompressionCodecSupported()/ZSTD API indiccd.cpp calls
+# -- the same too-old version that broke ubuntu-latest in CI. Every other
+# platform builds XISF in, and a build with no profile set is unchanged.
+#
+# Two upstream facts decide the mechanism, both read from the source rather
+# than inferred from the option's name:
+#   * OPTION(INDI_BUILD_XISF) at CMakeLists.txt:100 is declared and never read
+#     by anything, so -DINDI_BUILD_XISF=OFF is a no-op and must not be
+#     mistaken for the switch.
+#   * find_package(LibXISF) at libs/indibase/CMakeLists.txt:51 is NOT REQUIRED
+#     and defines -DHAVE_XISF only on success, so the feature appears and
+#     disappears SILENTLY with the library's availability. The hard
+#     Build-Depends is the only thing pinning it on today.
+# CMAKE_DISABLE_FIND_PACKAGE_LibXISF is therefore the real control, and it is
+# what Ubuntu 24.04 needs specifically: dropping the build-dep there is not
+# enough, because the too-old libxisf is still installable and would be found.
+# Because the loss is silent, the outcome is asserted in both directions after
+# configure rather than assumed from the flag.
+ifneq (,$(filter pkg.indi-stable-core.noxisf,$(DEB_BUILD_PROFILES)))
+INDI_XISF_CONFIGURE := -DCMAKE_DISABLE_FIND_PACKAGE_LibXISF=ON
+INDI_XISF_EXPECT    := no
+else
+INDI_XISF_CONFIGURE :=
+INDI_XISF_EXPECT    := yes
+endif
+
 %:
 	dh $@ --buildsystem=cmake
 
@@ -38,7 +72,30 @@ override_dh_auto_configure:
 		-DINDI_BUILD_DRIVERS=ON \
 		-DINDI_BUILD_QT_CLIENT=OFF \
 		-DINDI_INSTALL_UDEV_RULES=ON \
-		-DUDEVRULES_INSTALL_DIR=$(INDI_PREFIX)/udev-rules
+		-DUDEVRULES_INSTALL_DIR=$(INDI_PREFIX)/udev-rules \
+		$(INDI_XISF_CONFIGURE)
+	# Read the XISF outcome back out of CMake's own cache -- the artifact,
+	# not the configure log -- and require it to match what was asked for.
+	# Without this an unsatisfied find_package(LibXISF) ships a quietly
+	# feature-less package instead of failing, in either direction: a
+	# platform that should have XISF losing it unnoticed, or the profile
+	# failing to suppress a libxisf that is present anyway.
+	set -e; \
+	cache=obj-$$(dpkg-architecture -qDEB_HOST_GNU_TYPE)/CMakeCache.txt; \
+	test -f "$$cache" || { echo "ERROR: $$cache is missing; the dh cmake build directory moved"; exit 1; }; \
+	if grep -q '^LibXISF_LIBRARY:FILEPATH=.*NOTFOUND$$' "$$cache" \
+	   || ! grep -q '^LibXISF_LIBRARY:FILEPATH=' "$$cache"; then \
+		got=no; \
+	else \
+		got=yes; \
+	fi; \
+	echo "XISF support: asked for $(INDI_XISF_EXPECT), configured $$got"; \
+	test "$$got" = "$(INDI_XISF_EXPECT)" || { \
+		echo "ERROR: XISF support configured '$$got' but this build asked for '$(INDI_XISF_EXPECT)'."; \
+		echo "       Platforms without a usable libxisf must build with"; \
+		echo "       DEB_BUILD_PROFILES=pkg.indi-stable-core.noxisf; every other"; \
+		echo "       platform needs libxisf-dev installed."; \
+		exit 1; }
 
 override_dh_auto_install:
 	dh_auto_install
