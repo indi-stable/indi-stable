@@ -41,9 +41,18 @@ HOMEDIR=$(getent passwd "$BUILD_USER" | cut -d: -f6)
 OLD_DIR=${1:-$HOMEDIR/build}
 NEW_DIR=${2:-$OLD_DIR}
 CORE_DIR=${3:-$HOMEDIR/build}
-OLD_VER=${OLD_VER:-2.2.4.1-1}
-NEW_VER=${NEW_VER:-2.2.4.1-2}
-CORE_VER=${CORE_VER:-2.2.4.2-1}
+
+# Each version is derived from its OWN directory rather than from a literal
+# that goes stale on the next packaging bump. See scripts/lib-debver.sh.
+. "$(dirname "$0")/lib-debver.sh"
+OLD_VER=${OLD_VER:-$(derive_deb_version "$OLD_DIR" indi-stable-3rdparty-libs-apogee OLD_VER)} || exit 1
+NEW_VER=${NEW_VER:-$(derive_deb_version "$NEW_DIR" indi-stable-3rdparty-libs-apogee NEW_VER)} || exit 1
+CORE_VER=${CORE_VER:-$(derive_deb_version "$CORE_DIR" indi-stable-core CORE_VER)} || exit 1
+# NEW_DIR defaults to OLD_DIR, so without a second build directory both sides
+# derive the same version -- an "upgrade" that upgrades nothing and would pass
+# every check below vacuously.
+test "$OLD_VER" != "$NEW_VER" \
+  || { echo "*** ABORT: OLD_VER and NEW_VER are both $OLD_VER -- there is no upgrade to test. Pass a second directory holding a different build. ***"; exit 1; }
 W=$(mktemp -d /tmp/upgrade-3rdparty-deb.XXXXXX)
 
 # Derived from the .debs actually present, NOT hardcoded. The hardcoded list

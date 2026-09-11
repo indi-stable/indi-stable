@@ -76,9 +76,13 @@ HOMEDIR=$(getent passwd "$BUILD_USER" | cut -d: -f6)
 LIBS_DIR=${1:-$HOMEDIR/build}
 DRIVERS_DIR=${2:-$HOMEDIR/build}
 CORE_DIR=${3:-$HOMEDIR/build}
-LIBS_VER=${LIBS_VER:-2.2.4.1-1}
-DRIVERS_VER=${DRIVERS_VER:-2.2.4.1-1}
-CORE_VER=${CORE_VER:-2.2.4.2-1}
+
+# Versions come from the .debs present, not from a literal that goes stale the
+# next time this repo bumps a packaging revision. See scripts/lib-debver.sh.
+. "$(dirname "$0")/lib-debver.sh"
+LIBS_VER=${LIBS_VER:-$(derive_deb_version "$LIBS_DIR" indi-stable-3rdparty-libs-apogee LIBS_VER)} || exit 1
+DRIVERS_VER=${DRIVERS_VER:-$(derive_deb_version "$DRIVERS_DIR" indi-stable-3rdparty-drivers-apogee DRIVERS_VER)} || exit 1
+CORE_VER=${CORE_VER:-$(derive_deb_version "$CORE_DIR" indi-stable-core CORE_VER)} || exit 1
 W=$(mktemp -d /tmp/3rdparty-coexist-deb.XXXXXX)
 
 # Derived from the .debs actually present, NOT hardcoded. The list this

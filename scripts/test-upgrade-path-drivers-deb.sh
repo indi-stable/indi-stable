@@ -38,9 +38,20 @@ NEW_LIBS_DIR=${2:-$OLD_LIBS_DIR}
 OLD_DRIVERS_DIR=${3:-$HOMEDIR/build}
 NEW_DRIVERS_DIR=${4:-$OLD_DRIVERS_DIR}
 CORE_DIR=${5:-$HOMEDIR/build}
-OLD_VER=${OLD_VER:-2.2.4.1-1}
-NEW_VER=${NEW_VER:-2.2.4.1-2}
-CORE_VER=${CORE_VER:-2.2.4.2-1}
+
+# Each version is derived from its OWN directory rather than from a literal
+# that goes stale on the next packaging bump. See scripts/lib-debver.sh.
+# -libs is what both versions are read from, because -drivers pins its
+# Depends to -libs's exact version: they always move together.
+. "$(dirname "$0")/lib-debver.sh"
+OLD_VER=${OLD_VER:-$(derive_deb_version "$OLD_LIBS_DIR" indi-stable-3rdparty-libs-apogee OLD_VER)} || exit 1
+NEW_VER=${NEW_VER:-$(derive_deb_version "$NEW_LIBS_DIR" indi-stable-3rdparty-libs-apogee NEW_VER)} || exit 1
+CORE_VER=${CORE_VER:-$(derive_deb_version "$CORE_DIR" indi-stable-core CORE_VER)} || exit 1
+# Both *_DIR pairs default to the same directory, so without a second build
+# both sides derive the same version -- an "upgrade" that upgrades nothing and
+# would pass every check below vacuously.
+test "$OLD_VER" != "$NEW_VER" \
+  || { echo "*** ABORT: OLD_VER and NEW_VER are both $OLD_VER -- there is no upgrade to test. Pass directories holding two different builds. ***"; exit 1; }
 W=$(mktemp -d /tmp/upgrade-drivers-deb.XXXXXX)
 
 # Derived from the .debs actually present, NOT hardcoded. The hardcoded list
