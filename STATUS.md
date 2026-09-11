@@ -1305,15 +1305,24 @@ Two things, both consequences of that change:
 
 - **None of the three workflow changes has been exercised by a real run.**
   They parse, every matrix expands to the intended three entries, and every
-  `download-artifact` name has a matching upload — all checked mechanically —
-  but a CI change can only be exercised by cutting a release, which is not
-  something a working session should do on its own.
+  `download-artifact` name has a matching upload — all checked mechanically.
+  **Rehearse it with the `build_only` dispatch input** rather than by cutting
+  a release: it runs check → build → smoke-test on every platform and skips
+  `promote`, which is where every publishing action in all three workflows
+  lives. Nothing is tagged, released, committed or consumed.
 - **`3rdparty` and `pyindi-client` cannot build until core re-releases.**
   Both now select their core packages by version suffix, and the current core
   release predates the split, so it carries no suffixed files. Each asserts
   it actually matched something, so they fail loudly rather than building
   against nothing. A `repackage: true` dispatch of `core-release.yml` closes
-  the gap, and it has to come first.
+  the gap, and it has to come first — their `build_only` rehearsals will fail
+  until it has.
+
+**`main` is 20 commits behind `development` and knows none of this.** Every
+workflow checks out `ref: main`, so a dispatch of any kind — `build_only`
+included — runs against main's packaging, which has no `noxisf` profile and
+no per-platform matrix. **Merging `development` into `main` is the first
+step of all of them**, before any rehearsal is meaningful.
 
 **Ubuntu names its dbgsym packages `.ddeb`, Debian names them `.deb`** — so
 `ubuntu24astro`'s `~/build` holds two `.ddeb` files a `*.deb` glob will not
