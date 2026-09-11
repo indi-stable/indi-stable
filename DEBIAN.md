@@ -1150,11 +1150,16 @@ noble — which is the whole reason these platforms were added.
   now derives it from `indi-apogee`'s own dependencies rather than naming it
   (`DISTRO_APOGEE_PKG` overrides). Assume *any* check naming a distribution
   library package has this problem until shown otherwise.
-- **`test-3rdparty-coexist-deb.sh` and both 3rdparty upgrade harnesses
-  default their versions to `2.2.4.1-1`**, which no longer exists — this repo
-  has been at `-2` since the 2026-09-09 release. Pass `LIBS_VER`/`DRIVERS_VER`/
-  `OLD_VER`/`NEW_VER` explicitly. They abort loudly rather than testing the
-  wrong thing, so this is a papercut, not a defect.
+- **Those same three harnesses derive their versions from the `.deb`s
+  present** (`scripts/lib-debver.sh`), so they no longer need
+  `LIBS_VER`/`DRIVERS_VER`/`OLD_VER`/`NEW_VER` passed on an ordinary run.
+  They still take them, and **still need `CORE_VER` on these boxes**, because
+  `~/build` legitimately holds core at two revisions at once — core's own
+  upgrade test needs `-1` and `-2` side by side. Where a directory is
+  ambiguous the derivation ABORTS and names the variable to set rather than
+  picking the highest: choosing silently between a real release and an
+  uncommitted scratch build is how a test ends up measuring the build it was
+  meant to upgrade *from*.
 
 ### Ubuntu spells dbgsym `.ddeb`, Debian spells it `.deb`
 

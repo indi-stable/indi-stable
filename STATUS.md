@@ -1298,14 +1298,15 @@ match at all, where `debian12astro`'s holds two `.deb` files that one will.
 spelling; nothing has yet needed the Ubuntu one, but a harness that derives a
 list by globbing `~/build` will see different things on these two boxes.
 
-### Open: the RPM packaging has no XISF assertion
+**Both packagings now assert the XISF outcome**, `core/deb/rules` in both
+directions and `core/rpm/indi-stable-core.spec` in the one direction Fedora
+has (always on — there is no profile there). Verified on `fedoraastro`
+2026-09-11 by a real `mock` build, and the assertion was shown able to FAIL:
+a scratch spec carrying `-DCMAKE_DISABLE_FIND_PACKAGE_LibXISF=ON` aborted the
+build at exactly that check and produced zero RPMs.
 
-`core/deb/rules` now asserts after configure that XISF came out the way the
-build asked for, because `find_package(LibXISF)` is silently optional
-upstream (`LESSONS_LEARNED.md` #30). `core/rpm/indi-stable-core.spec` has no
-equivalent. Fedora needs no `noxisf` profile — `libXISF-devel` is in its
-archive and the hard `BuildRequires` covers the ordinary case — but a
-`find_package` that failed for any other reason would still ship a quietly
-feature-less RPM. Not changed here because it could not be verified in the
-same session; changing it means a Fedora `mock` rebuild on a platform that is
-currently testing-complete.
+That rebuild also gives the cross-platform control for the Debian result:
+Fedora's own `libindidriver.so.2` carries `FORMAT_XISF` **and**
+`libXISF.so.0` in `DT_NEEDED`, where bookworm's and noble's carry neither —
+the same check on the same kind of artifact, finding it present on one
+platform and absent on the others.
