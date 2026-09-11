@@ -221,6 +221,32 @@ silently win. Build against this package with:
     -DINDI_BUILD_QT_CLIENT=OFF \
     -DINDI_INSTALL_UDEV_RULES=ON \
     -DUDEVRULES_INSTALL_DIR=%{indi_prefix}/udev-rules
+
+# XISF support is silently optional upstream: find_package(LibXISF) at
+# libs/indibase/CMakeLists.txt:51 is NOT REQUIRED and adds -DHAVE_XISF only on
+# success, so a libxisf that is present but not FOUND yields a quietly
+# feature-less RPM instead of a build failure. (Upstream also declares
+# OPTION(INDI_BUILD_XISF) at CMakeLists.txt:100 and never reads it, so that
+# flag is not the control it appears to be -- LESSONS_LEARNED.md #30.)
+#
+# BuildRequires: libXISF-devel covers the ordinary case and nothing more: a
+# renamed header, a moved library or an upstream change to the bundled Find
+# module would all still configure "successfully" with XISF quietly dropped.
+# So assert the configured outcome out of CMake's own cache -- the artifact,
+# not the configure log. Fedora has no equivalent of Debian 12's absent
+# libxisf, so unlike core/deb/rules this asserts one direction only: XISF is
+# always expected ON here, and there is no build profile to turn it off.
+test -f %{_vpath_builddir}/CMakeCache.txt \
+    || { echo "ERROR: %{_vpath_builddir}/CMakeCache.txt is missing; the %%cmake build directory moved"; exit 1; }
+if grep -q '^LibXISF_LIBRARY:FILEPATH=.*NOTFOUND$' %{_vpath_builddir}/CMakeCache.txt \
+   || ! grep -q '^LibXISF_LIBRARY:FILEPATH=' %{_vpath_builddir}/CMakeCache.txt; then
+    echo "ERROR: XISF support did not configure, but this spec BuildRequires libXISF-devel."
+    echo "       find_package(LibXISF) is not REQUIRED, so the build would otherwise have"
+    echo "       silently produced an RPM with no XISF support. See LESSONS_LEARNED.md #30."
+    exit 1
+fi
+echo "XISF support: configured yes"
+
 %cmake_build
 
 %install
