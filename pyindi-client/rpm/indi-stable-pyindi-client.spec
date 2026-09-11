@@ -179,4 +179,4 @@ rm -rf %{buildroot}%{python3_sitearch}/pyindi_client-*.egg-info
 - Initial package. Builds pyindi-client's 2.2.0 PyPI release against
   indi-stable-core, RPATH into the private prefix, installed to the ordinary
   system Python location rather than /opt/indi-stable (see header comment
-  and DESIGN.md). Not yet built or installed -- see STATUS.md.
+  and DESIGN.md).

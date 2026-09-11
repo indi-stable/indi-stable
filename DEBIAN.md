@@ -31,6 +31,22 @@ lintian --profile debian ../indi-stable-core_*.changes
 **`--profile debian` is required, not cosmetic**, and only when checking on an
 Ubuntu box. See "The changelog distribution" below before removing it.
 
+**On Debian 12 and Ubuntu 24.04, build with the `noxisf` profile instead** --
+both `apt-get build-dep` and `dpkg-buildpackage` need it, because it decides
+the `libxisf-dev` build dependency as well as the configure flag:
+
+```bash
+export DEB_BUILD_PROFILES=pkg.indi-stable-core.noxisf
+sudo -E apt-get build-dep -y .
+dpkg-buildpackage -us -uc -b
+```
+
+Without it on Debian 12 the build-dep step fails with `libxisf-dev but it is
+not installable`, which is the intended loud failure rather than a puzzle.
+Every other platform builds unprofiled and is unaffected. Why those two
+platforms, and what a user loses: `DESIGN.md`, "Decided: no XISF on Debian 12
+and Ubuntu 24.04".
+
 **The `rm -rf debian` is load-bearing and this file previously omitted it.** The
 upstream tarball ships INDI's *own* `debian/` directory — the packaging for
 `indi-bin`, `libindi1`, `libindi-data`, `libindi-dev`. Without the removal,
@@ -1020,3 +1036,135 @@ upgraded underneath an already-installed, untouched pyindi-client. Reuses
 the existing `2.2.4.2-1`/`2.2.4.2-2` core builds in `~/build` (the same pair
 core's own upgrade test uses); no new build needed. All checks passed on the
 first run -- full detail in `STATUS.md`.
+
+## `debianastro` — real Debian 13, not just a second Ubuntu box — verified 2026-09-10
+
+Every result above through 2026-09-09 was `ubuntuastro` (Ubuntu 26.04) or
+Fedora. `debianastro` (Debian 13 "trixie", provisioned by Will,
+passwordless `sudo`, no pre-existing INDI or `/opt/indi-stable`) is the
+first real Debian box this project has built and tested on, raised because
+Debian 13's own default `python3` is 3.13.5 — genuinely different from both
+Fedora 44's and Ubuntu 26.04's 3.14, and unlike deadsnakes-on-Ubuntu, it is
+trixie's **own official archive default**, not a third-party PPA
+(`DESIGN.md`, "Single-Python-version scope").
+
+**core, `-3rdparty-libs` and `-3rdparty-drivers` all build, install, upgrade
+and remove cleanly here** — `dpkg-buildpackage`, `lintian --profile debian`,
+`test-devel-compile-deb.sh`, `test-upgrade-path-deb.sh`,
+`test-3rdparty-coexist-deb.sh`, `test-upgrade-path-3rdparty-deb.sh` and
+`test-upgrade-path-drivers-deb.sh` all pass, real output read each time, not
+assumed from exit codes. This is **configuration A only** for core itself —
+trixie's archive is frozen at INDI 1.9.9/`libindiclient.so.1`, same as
+Ubuntu's archive, and Debian has no PPA equivalent to reach a genuine
+core-SONAME collision (the "Prefer Ubuntu 26.04 LTS over Debian 13" bullet
+above still holds, unchanged).
+
+**`test-3rdparty-coexist-deb.sh` is the exception, and it is a real
+configuration-B-shaped result** even on a configuration-A box: Debian 13's
+own archive ships `indi-apogee` → `libapogee3t64`, the *same* package and
+SONAME (`libapogee.so.3`) Ubuntu's archive ships, and it collides with our
+bundled `libapogee.so.3` exactly the way `DEBIAN.md` already documented for
+Ubuntu — confirmed by extracting the real archive `.deb` and reading its
+ELF, not by trusting the package name. This collision is at the *vendor
+library* layer, independent of which core INDI SONAME is on the box, so it
+is real evidence here even though core-level configuration B is not
+reachable on Debian at all.
+
+**`indi-stable-pyindi-client` built genuinely for Python 3.13**, not just
+theorized: `_PyIndi.cpython-313-x86_64-linux-gnu.so`, installed, and
+`scripts/smoke-test-pyindi-client-deb.sh` passed in full — `import PyIndi`
+resolves to a real path, `PyIndi.BaseClient()` constructs, all 1199 symbols
+the SWIG wrapper references are exported by the compiled extension (0
+missing), and `libindiclient.so.2` resolves into `/opt/indi-stable`, not any
+distro copy. `test-pyindi-client-coexist-upgrade-deb.sh` was **not** run —
+it hard-requires configuration B's `libindi1`, which does not exist on
+Debian archive at all, same limitation as core's own config-B tests. See
+`DESIGN.md`, "Single-Python-version scope", for what this closes and what it
+still leaves undecided about actually shipping a per-version build matrix.
+
+**Four existing test harnesses assumed Ubuntu's PPA package name
+(`libindi1`) and two assumed no `-dbgsym` `.deb` would ever sit in the same
+directory as the real ones — both wrong on first contact with a real Debian
+box, neither a defect in the packaging.** Fixed in
+`probe-devel-compile-deb.sh`, `test-3rdparty-coexist-deb.sh`,
+`test-upgrade-path-3rdparty-deb.sh` and `test-upgrade-path-drivers-deb.sh`
+by resolving the distro client package from the real installed file
+(`dpkg -S` on the actual `.so`) instead of a remembered name, and by
+excluding `-dbgsym` the same way `-dev` already was in the two vendor/driver
+list derivations. Full account: `LESSONS_LEARNED.md` #29.
+
+**Two more real, distro-specific findings, neither a packaging defect**:
+Debian archive's 1.9.9 `indiversion.h` defines `INDI_VERSION` as a bare
+unquoted token (`1.9.9`, not `"1.9.9"`) rather than a string — a compile
+error ("too many decimal points in number") the probe's shared consumer had
+never hit because every earlier run only ever compiled against 2.x-family
+headers. Fixed by stringizing the macro instead of printing it directly.
+And Debian archive's own `libindi.pc` carries no `-lindiclient` in its
+`Libs:` line at all (`Libs: -L${libdir}` only) — unlike ours and the Ubuntu
+PPA's, both of which do — so `probe-devel-compile-deb.sh`'s STEP 8 control
+consumer cannot be linked via pkg-config alone against the distro on this
+platform; reclassified from a false `FAIL` to explicitly not-applicable.
+
+## Debian 12 and Ubuntu 24.04 — verified 2026-09-11
+
+`debian12astro` (Debian 12 "bookworm") and `ubuntu24astro` (Ubuntu 24.04.5
+LTS "noble"), both provisioned like `debianastro`. Machine state, baselines
+and what is left: `STATUS.md`. Why these two platforms exist at all, and the
+XISF decision they forced: `DESIGN.md`.
+
+**Both are configuration A, and both call the distro's client library
+`libindiclient1`** — Debian's split, on the Ubuntu box too. `libindi1` is
+the *PPA's* name and appears on neither of these; `ubuntuastro` has it only
+because it runs `ppa:mutlaqja/ppa`. Archive INDI is 1.9.9 on both, so the
+SONAMEs (`.so.1` vs our `.so.2`) cannot collide and core-level configuration
+B is unreachable here, exactly as on `debianastro`.
+
+**`core` must be built with the `noxisf` profile on both** — see "Building"
+above for the command, and `DESIGN.md` for why. Everything else builds
+unprofiled: `-3rdparty-libs`, `-3rdparty-drivers` and `pyindi-client` do not
+reference `libxisf` at all.
+
+**What passed, on both boxes, real output read each time:**
+`dpkg-buildpackage` and `lintian --profile debian` for all four packagings;
+`test-devel-compile-deb.sh`; `test-upgrade-path-deb.sh`;
+`smoke-test-3rdparty-deb.sh`; `test-3rdparty-coexist-deb.sh`;
+`test-upgrade-path-3rdparty-deb.sh`; `test-upgrade-path-drivers-deb.sh`;
+`smoke-test-pyindi-client-deb.sh`. Every positive control fired, and each
+harness restored its box to an exact package-set baseline.
+
+`lintian` is clean on both beyond the standard `initial-upload-closes-no-bugs`,
+plus — on noble only — the `appstream-metadata-missing-modalias-provide`
+already accepted elsewhere here for udev rules.
+
+**Three counts agreed across both boxes and with the existing platforms**: 30
+`-drivers` packages, 86 driver binaries, and 1199 symbols referenced by
+`PyIndi.py` with 0 missing. `pyindi-client` genuinely compiled for each box's
+own Python — `_PyIndi.cpython-311-*.so` on bookworm, `cpython-312-*.so` on
+noble — which is the whole reason these platforms were added.
+
+### Two things that will bite again on a new Debian-family box
+
+- **The archive package shipping `libapogee.so.3` is named per release.**
+  Bookworm has `libapogee3`; noble and trixie, which went through the 64-bit
+  `time_t` transition, have `libapogee3t64`. `test-3rdparty-coexist-deb.sh`
+  now derives it from `indi-apogee`'s own dependencies rather than naming it
+  (`DISTRO_APOGEE_PKG` overrides). Assume *any* check naming a distribution
+  library package has this problem until shown otherwise.
+- **Those same three harnesses derive their versions from the `.deb`s
+  present** (`scripts/lib-debver.sh`), so they no longer need
+  `LIBS_VER`/`DRIVERS_VER`/`OLD_VER`/`NEW_VER` passed on an ordinary run.
+  They still take them, and **still need `CORE_VER` on these boxes**, because
+  `~/build` legitimately holds core at two revisions at once — core's own
+  upgrade test needs `-1` and `-2` side by side. Where a directory is
+  ambiguous the derivation ABORTS and names the variable to set rather than
+  picking the highest: choosing silently between a real release and an
+  uncommitted scratch build is how a test ends up measuring the build it was
+  meant to upgrade *from*.
+
+### Ubuntu spells dbgsym `.ddeb`, Debian spells it `.deb`
+
+Not cosmetic when a script or a shell loop globs a build directory: on noble
+`mv ~/*.deb` silently leaves the dbgsym packages behind, and `lintian` then
+refuses the whole `.changes` with "does not exist, exiting" rather than
+skipping the missing file. Hit for real here. `LESSONS_LEARNED.md` #29's
+`-dbgsym` half was written against the Debian spelling only.

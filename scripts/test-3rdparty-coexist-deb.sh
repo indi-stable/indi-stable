@@ -19,7 +19,8 @@
 # indi-3rdparty package at all, so RPM coexistence could only be checked
 # against distro CORE INDI, never against a real competing 3rdparty artifact.
 # Ubuntu's *archive* (not the PPA) is different: `apt-cache show indi-apogee`
-# resolves to a real package, `libapogee3t64` ships `libapogee.so.3` --
+# resolves to a real package, and the library package it depends on (named
+# per-release -- see STEP 2) ships `libapogee.so.3` --
 # BYTE-IDENTICAL SONAME to indi-stable-3rdparty-libs-apogee's own
 # libapogee.so.3 (confirmed 2026-08-26 by extracting the actual archive .deb
 # and reading its SONAME with readelf, not by trusting the package name --
@@ -75,9 +76,13 @@ HOMEDIR=$(getent passwd "$BUILD_USER" | cut -d: -f6)
 LIBS_DIR=${1:-$HOMEDIR/build}
 DRIVERS_DIR=${2:-$HOMEDIR/build}
 CORE_DIR=${3:-$HOMEDIR/build}
-LIBS_VER=${LIBS_VER:-2.2.4.1-1}
-DRIVERS_VER=${DRIVERS_VER:-2.2.4.1-1}
-CORE_VER=${CORE_VER:-2.2.4.2-1}
+
+# Versions come from the .debs present, not from a literal that goes stale the
+# next time this repo bumps a packaging revision. See scripts/lib-debver.sh.
+. "$(dirname "$0")/lib-debver.sh"
+LIBS_VER=${LIBS_VER:-$(derive_deb_version "$LIBS_DIR" indi-stable-3rdparty-libs-apogee LIBS_VER)} || exit 1
+DRIVERS_VER=${DRIVERS_VER:-$(derive_deb_version "$DRIVERS_DIR" indi-stable-3rdparty-drivers-apogee DRIVERS_VER)} || exit 1
+CORE_VER=${CORE_VER:-$(derive_deb_version "$CORE_DIR" indi-stable-core CORE_VER)} || exit 1
 W=$(mktemp -d /tmp/3rdparty-coexist-deb.XXXXXX)
 
 # Derived from the .debs actually present, NOT hardcoded. The list this
@@ -96,8 +101,15 @@ list_from() {   # $1 = dir, $2 = package-name prefix, $3 = version
   ls "$1"/"$2"-*_"$3"_amd64.deb 2>/dev/null \
     | sed -E "s|.*/$2-(.*)_$3_amd64\.deb|\1|"
 }
-LIBS_VENDORS=$(list_from "$LIBS_DIR" indi-stable-3rdparty-libs "$LIBS_VER" | grep -v -- '-dev$' | LC_ALL=C sort)
-DRIVER_PKGS=$(list_from "$DRIVERS_DIR" indi-stable-3rdparty-drivers "$DRIVERS_VER" | LC_ALL=C sort)
+# -dbgsym is excluded the same way -dev already was: debianastro's ~/build
+# keeps dbgsym .debs alongside the real packages (found 2026-09-10 running
+# this for the first time with both in one directory -- a bare
+# indi-stable-3rdparty-libs-apogee-dbgsym_*.deb glob-matched and was read as
+# a vendor named "apogee-dbgsym"). Not Debian-specific: ubuntuastro's own
+# builds carry the identical dbgsym packages, this just never had one sitting
+# in the same directory as the real ones before.
+LIBS_VENDORS=$(list_from "$LIBS_DIR" indi-stable-3rdparty-libs "$LIBS_VER" | grep -v -- '-dev$' | grep -v -- '-dbgsym$' | LC_ALL=C sort)
+DRIVER_PKGS=$(list_from "$DRIVERS_DIR" indi-stable-3rdparty-drivers "$DRIVERS_VER" | grep -v -- '-dbgsym$' | LC_ALL=C sort)
 
 # A list derived from a glob can come back empty, and an empty list makes
 # every loop below a no-op that passes. #1: refuse rather than pass.
@@ -112,6 +124,22 @@ OUR_DRIVER=/opt/indi-stable/bin/indi_apogee_ccd
 OUR_LIBDIR=/opt/indi-stable/lib
 DISTRO_SERVER=/usr/bin/indiserver
 DISTRO_LIBDIR=/usr/lib/x86_64-linux-gnu
+
+# The distro package owning the client library, resolved from whatever file
+# indi-bin's own dependencies actually installed, not assumed by name. This
+# whole script's real subject -- whether OUR bundled libapogee.so.3 shadows
+# or is shadowed by the archive's -- does not depend on which core INDI is
+# on the box at all, only on indi-bin being present as a bystander to check;
+# but it was written and first run in configuration B (Ubuntu's
+# ppa:mutlaqja/ppa), where that package happens to be named libindi1. Debian
+# 13 trixie's own archive splits it as libindiclient1 instead (found on
+# debianastro, 2026-09-10 -- `dpkg -s libindi1` matches nothing there), so a
+# literal `libindi1` precondition would abort this script before it ever
+# reached the vendor-library collision it actually tests. Same `dpkg -S` on
+# the real .so discipline as scripts/probe-devel-compile-deb.sh's own fix.
+DISTRO_CLIENT_SO=$(ls "$DISTRO_LIBDIR"/libindiclient.so.* 2>/dev/null | head -1)
+DISTRO_CLIENT_PKG=$(test -n "$DISTRO_CLIENT_SO" && dpkg -S "$DISTRO_CLIENT_SO" 2>/dev/null | cut -d: -f1 | head -1)
+DISTRO_CLIENT_PKG=${DISTRO_CLIENT_PKG:-libindi1}
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: $W"; exit 1; }
@@ -152,7 +180,7 @@ for f in $(libs_debs) $(drivers_debs) \
   test -f "$f" || die "missing $f -- build it first (DEBIAN.md)"
 done
 
-dpkg -s libindi1 >/dev/null 2>&1 || die "libindi1 is not installed -- this is not configuration B"
+dpkg -s "$DISTRO_CLIENT_PKG" >/dev/null 2>&1 || die "$DISTRO_CLIENT_PKG is not installed -- no distro INDI client library present"
 dpkg -s indi-bin >/dev/null 2>&1 || die "indi-bin is not installed -- it owns $DISTRO_SERVER"
 test -x "$DISTRO_SERVER" || die "$DISTRO_SERVER missing even though indi-bin is installed"
 dpkg -s indi-stable-core >/dev/null 2>&1 && die "ours is ALREADY installed -- start from the distribution-only state"
@@ -188,15 +216,30 @@ pass "$INSTALLED 3rdparty packages installed; $OUR_SERVER -> $(readlink -e "$OUR
 
 echo
 echo "############ STEP 2: get a REAL colliding artifact from the archive, without installing it ############"
-( cd "$W" && apt-get download libapogee3t64 >download.log 2>&1 )
-DISTRO_APOGEE_DEB=$(ls "$W"/libapogee3t64_*.deb 2>/dev/null | head -1)
+# Which archive package ships libapogee.so.3 is NOT a constant across the
+# Debian family, and it cannot be resolved the way LESSONS_LEARNED.md #29
+# resolves the others: that package is deliberately never installed here
+# (installing it drags in the distribution's own indi-apogee and removes
+# indi-bin), so there is no local file for `dpkg -S` to attribute. Ask the
+# archive's own metadata instead -- the distribution's indi-apogee depends on
+# whichever package ships the library. Debian 12 has libapogee3; Debian 13 and
+# Ubuntu 24.04, which went through the 64-bit time_t transition, have
+# libapogee3t64. A hardcoded name silently covers only the release it was
+# written on, which is #29 exactly.
+DISTRO_APOGEE_PKG=${DISTRO_APOGEE_PKG:-$(apt-cache depends indi-apogee 2>/dev/null \
+  | sed -n 's/.*Depends: \(libapogee[0-9a-z]*\)$/\1/p' | head -1)}
+test -n "$DISTRO_APOGEE_PKG" \
+  || die "could not resolve which archive package ships libapogee.so.3 from indi-apogee's dependencies -- set DISTRO_APOGEE_PKG explicitly"
+echo "  ....  archive package shipping libapogee.so.3 on this box: $DISTRO_APOGEE_PKG"
+( cd "$W" && apt-get download "$DISTRO_APOGEE_PKG" >download.log 2>&1 )
+DISTRO_APOGEE_DEB=$(ls "$W/${DISTRO_APOGEE_PKG}"_*.deb 2>/dev/null | head -1)
 test -f "$DISTRO_APOGEE_DEB" \
-  || { cat "$W/download.log"; die "apt-get download libapogee3t64 failed -- needs network access, see this script's header"; }
+  || { cat "$W/download.log"; die "apt-get download $DISTRO_APOGEE_PKG failed -- needs network access, see this script's header"; }
 dpkg-deb -x "$DISTRO_APOGEE_DEB" "$W/distro-apogee" \
   || die "dpkg-deb -x on the downloaded archive package failed"
 DISTRO_LIBAPOGEE=$(find "$W/distro-apogee" -name 'libapogee.so.3*' -type f | head -1)
 test -f "$DISTRO_LIBAPOGEE" || die "the downloaded archive package does not contain libapogee.so.3 -- cannot prove a real collision"
-dpkg -s libapogee3t64 >/dev/null 2>&1 && die "libapogee3t64 got INSTALLED somehow -- this step must only download, never install"
+dpkg -s "$DISTRO_APOGEE_PKG" >/dev/null 2>&1 && die "$DISTRO_APOGEE_PKG got INSTALLED somehow -- this step must only download, never install"
 pass "real distro libapogee.so.3 extracted to $W/distro-apogee, never installed via dpkg"
 
 OUR_SONAME=$(readelf -d "$OUR_LIBDIR/libapogee.so.3" 2>/dev/null | sed -n 's/.*Library soname: \[\(.*\)\]/\1/p')
@@ -227,7 +270,7 @@ echo "############ STEP 4: distribution core INDI is a clean bystander after 3rd
 test "$(sha256sum "$DISTRO_SERVER" | awk '{print $1}')" = "$DISTRO_SHA" \
   && pass "$DISTRO_SERVER is byte-identical to before ($DISTRO_SHA)" \
   || fail "$DISTRO_SERVER CHANGED"
-for p in indi-bin libindi1 libindi-data libindi-dev; do
+for p in indi-bin "$DISTRO_CLIENT_PKG" libindi-data libindi-dev; do
   if dpkg -V "$p" >/dev/null 2>&1; then pass "dpkg -V $p clean"
   else fail "dpkg -V $p reports modifications:"; dpkg -V "$p" | sed 's/^/        /'; fi
 done

@@ -1676,6 +1676,211 @@ output against a plain `pip install` deterministically, same machine, same
 headers, repeated. Full incident write-up: ACS's `LESSONS_LEARNED.md`, INDI
 section, #11.
 
+### Single-Python-version scope — real gap, scoped but not decided — 2026-09-10
+
+Raised from the ACS side while scoping which Python versions ACS itself
+should support (3.11–3.14): `indi-stable-pyindi-client` satisfies exactly
+one interpreter today, and it is the same on both distros, though for
+different reasons.
+
+**RPM**: `pyindi-client-release.yml` builds in a single `fedora:44`
+container, and the spec installs to `%{python3_sitearch}` — version-specific
+by construction, so the built RPM only satisfies whatever `python3`
+Fedora 44 currently defaults to (3.14). No matrix, no subpackages.
+
+**Debian**: `pyindi-client/deb/rules` documents this as a deliberate v1
+scope cut, not an oversight — "Single Python interpreter only (whatever
+`python3` resolves to at build time) — multi-version support is out of
+scope for v1", same narrowing style as `core/deb-3rdparty-drivers/rules`
+applies to driver count.
+
+**What widening actually costs, checked 2026-09-10, not assumed:**
+
+- Fedora 44's own official repos carry `python3.11-devel`,
+  `python3.12-devel` and `python3.13-devel` as packages installable in
+  parallel to the default `python3.14-devel` (`packages.fedoraproject.org`).
+  A build matrix — one job per target, each producing its own
+  `indi-stable-pyindi-client-pyNNN`-style subpackage against that version's
+  `%{python3_sitearch}` — needs no source outside Fedora's own official
+  repos. This is the low-risk half.
+- Ubuntu 26.04 ("resolute")'s own archive already defaults to Python 3.14
+  (`python3-dev` → `3.14.3-0ubuntu2`, `packages.ubuntu.com`) — so today's two
+  single-target builds already agree with each other, coincidentally. But
+  3.11/3.12/3.13 are **not** in Ubuntu 26.04's official archive at all; the
+  only source for them is the third-party `deadsnakes` PPA, which is outside
+  this project's sourcing discipline everywhere else (pinned sha256 against
+  an upstream-published or distro-official artifact — see e.g. this
+  section's own PyPI sha256 verification, or `core.spec`'s tag provenance).
+  Widening the Debian side for real therefore means either accepting a
+  third-party PPA as a `Build-Depends` source (a policy call nobody has made)
+  or building against *additional* Debian/Ubuntu releases (22.04, Debian 12,
+  …) as wholly new platforms — the same category of decision as "which
+  Fedora/Ubuntu versions does this project build on at all", which today is
+  fixed at exactly Fedora 44 + Ubuntu 26.04 for every other component too.
+
+**Not decided**: whether to do the Fedora matrix alone and leave Debian at
+one version, take the PPA dependency, or widen the build-platform set.
+Whoever picks this up should start with the Fedora side — it's mechanically
+straightforward and uses only official repos — and treat Debian as a
+separate decision requiring the policy call above, not a smaller version of
+the same fix.
+
+**The "widen the build-platform set" option is no longer purely
+hypothetical — checked for real, 2026-09-10, on `debianastro` (Debian 13
+"trixie", a genuinely new box, not Ubuntu again).** Debian 13's own official
+archive defaults to Python 3.13.5, a *third* distinct version from Fedora
+44's and Ubuntu 26.04's 3.14, and — unlike the Ubuntu case above — reaching
+it needs no PPA or any other third-party source at all: it is simply
+trixie's own `python3`. `pyindi-client/deb/` built against it completely
+unmodified (`_PyIndi.cpython-313-x86_64-linux-gnu.so`), and
+`scripts/smoke-test-pyindi-client-deb.sh` passed in full — genuine evidence,
+not just the theoretical case this section describes above. `DEBIAN.md`,
+"`debianastro` — real Debian 13", has the full run.
+
+This resolves the *feasibility* question for one more concrete data point
+(a second official-archive Python target exists and works, no policy call
+needed to reach it) but not the *decision* above: shipping this for real
+still means either adding Debian 13 as a fourth CI build platform (today's
+set is fixed at exactly Fedora 44 + Ubuntu 26.04 for every component,
+`CLAUDE.md`) or finding another way to reach 3.13 from the existing two —
+neither done here, and doing it is still future work, not this session's.
+
+### Decided: full platforms for Debian 12 and Ubuntu 24.04 too — 2026-09-10, not yet started
+
+Raised from the ACS side again: Ubuntu 24.04 LTS ("noble") is a real,
+widely-deployed target and defaults to Python 3.12; Debian 12 ("bookworm")
+defaults to 3.11. Checked, not assumed: both are official-archive defaults,
+neither needs a third-party source — `python3` is `3.12` on noble
+(`packages.ubuntu.com`) and `3.11.2` on bookworm (`packages.debian.org`).
+`python3.14` is available on **neither** as an official package (not even
+`bookworm-backports` — only a community, non-Debian backport exists there;
+noble's only path to 3.13/3.14 is `deadsnakes`, the same third-party PPA
+already ruled out above).
+
+**"Require the user to install Python 3.14 themselves" was considered and
+is wrong, not just impractical — it targets the wrong ABI.** `pyindi-client`
+`Depends: indi-stable-core-libs`, a compiled C++ library whose runtime
+requirement is the box's **glibc/libstdc++** version, entirely independent
+of whatever Python the user has. Checked concretely: `indi-stable-core-libs`
+built on `debianastro` (Debian 13, glibc 2.41) requires symbol
+`GLIBC_2.38` (`objdump -T … | grep GLIBC`); Debian 12 bookworm ships glibc
+**2.36** — two versions short, and not a hypothetical failure mode: a real
+`GLIBC_2.38' not found` bug report for exactly this shape of mismatch turned
+up in the same search that confirmed bookworm's version. A user installing
+Python 3.14 by hand (pyenv, source build, whatever) changes nothing about
+their system's glibc, so `apt install indi-stable-core-libs` would still be
+refused by its own auto-generated `libc6 (>= 2.38)` dependency, regardless
+of Python. The 2026-08-26 "Debian's `.pc` needs private-prefix RPATH, not
+`/usr`" reasoning this project is built on (`DESIGN.md`'s coexistence
+section) already establishes that a shared library's own ABI is the real
+constraint; this is the same fact applied one layer further out — a Python
+version requirement cannot paper over a C library ABI mismatch, because they
+are different axes entirely.
+
+**Decided**: `indi-stable-core` (and, for consistency with every other
+platform this project supports, `-3rdparty-libs`/`-3rdparty-drivers`) will
+be built on Debian 12 and Ubuntu 24.04 as two more full platforms —
+`pyindi-client` follows once core exists there, same dependency order as
+every other distro. This is the "widen the build-platform set" option
+`STATUS.md` already carried as undecided, now decided for these two
+specifically. Matches `CLAUDE.md`'s own rule: build and verify by hand
+first (mirroring the `debianastro` session, `DEBIAN.md`), CI automation
+only after that succeeds.
+
+**Not started — blocked on machine provisioning.** Will is building two new
+VMs (Debian 12, Ubuntu 24.04), same provisioning as `debianastro`
+(passwordless `sudo`, no pre-existing INDI). Pick this up once they exist:
+repeat the `debianastro` sequence (core build/install/`test-devel-compile-
+deb.sh`/`test-upgrade-path-deb.sh`, then `-3rdparty-*`, then
+`pyindi-client`) on each, expecting to hit the SAME class of distro-naming
+assumptions `LESSONS_LEARNED.md` #29 just fixed for Debian 13 — check
+`libindiclient1`-vs-`libindi1` and any other archive-specific package names
+again on each new box rather than assuming #29's fixes are exhaustive.
+
+### Decided: no XISF on Debian 12 and Ubuntu 24.04 — 2026-09-11
+
+Neither archive can build XISF (PixInsight `.xisf`) support for this INDI
+release, and the two fail differently. Debian 12 carries **no `libxisf-dev`
+at all** — main, security, updates and backports all checked on the box.
+Ubuntu 24.04 carries `0.2.8-1`, and its header was read directly rather than
+inferred from the version: it declares no `CompressionCodecSupported`, and
+its `CompressionCodec` enum is `None, Zlib, LZ4, LZ4HC` with **no `ZSTD`** —
+both of the things `indiccd.cpp:2568` calls. That is the same too-old version
+that broke `ubuntu-latest` in CI, now measured rather than inherited.
+
+**Decided with Will: disable XISF on these two platforms** rather than build
+a copy of `libxisf` into them. The alternative was genuinely considered — all
+of libxisf's own build dependencies (`cmake`, a C++17 `g++`, `liblz4-dev`,
+`libpugixml-dev`, `zlib1g-dev`, `pkg-config`) are available on both boxes, so
+it was feasible, not blocked. It was rejected on scope and on shape:
+
+- It would mean shipping a library the distribution is expected to provide.
+  This project bundles vendor SDKs in `3rdparty` only because no distribution
+  package for them exists *by nature* (binary blobs under vendor licences).
+  `libxisf` is ordinary packaged software that three of the five platforms
+  here already get from their own archive.
+- It needs a new pinned `Source` and a build mechanism `core` has never had —
+  compiling a dependency inside core's own build, which must also work with
+  no network access inside `mock`.
+- And it forces a choice with no good answer: either per-platform conditional
+  logic in the spec and `rules` (an axis of branching that exists nowhere in
+  this packaging today), or building it uniformly everywhere, which re-opens
+  Fedora, Debian 13 and Ubuntu 26.04 — all three currently testing-complete —
+  for a feature none of them is missing.
+
+The cost is bounded and legible: those two platforms save FITS and the native
+formats normally and lose only `.xisf` output. That is a real feature gap, so
+it is stated where a *user* will meet it — the README's platform table and
+the `indi-stable-core` package description — not only in build documentation.
+
+The mechanism is a `dpkg-build-profiles(7)` profile,
+`pkg.indi-stable-core.noxisf`, and it is **asserted rather than assumed**
+after configure, because upstream makes this feature silently optional. Both
+of those facts, and the dead `INDI_BUILD_XISF` option that makes the obvious
+approach a no-op, are in `LESSONS_LEARNED.md` #30.
+
+**The RPM side is deliberately not changed.** Fedora's `libXISF-devel` is
+fine, so it needs no profile; but its spec also carries no equivalent
+assertion, and `find_package(LibXISF)` is just as silently optional there.
+The hard `BuildRequires` covers the common case and not the whole of it. See
+`STATUS.md` for that as an open item.
+
+### Decided: a per-distribution version suffix on the Debian side — 2026-09-11
+
+With four platforms in CI, three of them Debian-family, every Debian build
+emits a byte-different file at the **identical** name
+(`indi-stable-core_2.2.4.2-1_amd64.deb`). The promote jobs copy every artifact
+into one directory before uploading, so two of three would be silently
+overwritten and a release would ship one arbitrary platform's build under a
+name claiming to be universal.
+
+**Decided with Will: suffix the VERSION, not just the filename** — `~deb12`,
+`~ubuntu24.04`, `~ubuntu26.04`, stamped by each build job's own transient
+`dch`. Suffixing only the filename was the smaller change and was rejected
+for one reason: once the package is installed the filename is gone, so
+`dpkg -l` could not answer "which build is this?" — the first question any
+support conversation asks. `~` sorts *below* the bare version in dpkg's
+ordering, the ordinary Debian convention, so a per-distro build can never
+outrank an unsuffixed one.
+
+RPM is deliberately untouched. Fedora is one platform and its `Release:`
+already carries `%{?dist}`.
+
+**The suffix has one non-obvious consequence, and it is the reason
+`bump-3rdparty-version.sh` gained a `DEB_SUFFIX`:** `-drivers` pins `-libs`
+at eighteen exact literal versions, and a suffix applied to the changelog but
+not to those pins produces a `-drivers` whose `Build-Depends` name a `-libs`
+version no platform builds. Both are now stamped from one computed version in
+the script that already existed to keep them in step.
+
+**Ordering, once only:** the workflows select their core packages by suffix
+(`--pattern "*~deb12_*.deb"`), so `3rdparty` and `pyindi-client` cannot build
+until a core release exists that carries suffixed files. The current core
+release predates the split. A `repackage: true` dispatch of `core-release.yml`
+is what closes that gap, and it has to happen before the other two can run —
+they fail loudly rather than silently if it has not. No compatibility shim
+was added for the interim, per `CLAUDE.md`.
+
 ## Upstream build-system facts the packaging depends on
 
 Checked against INDI's real sources, not assumed. Each of these is the reason a

@@ -38,9 +38,20 @@ NEW_LIBS_DIR=${2:-$OLD_LIBS_DIR}
 OLD_DRIVERS_DIR=${3:-$HOMEDIR/build}
 NEW_DRIVERS_DIR=${4:-$OLD_DRIVERS_DIR}
 CORE_DIR=${5:-$HOMEDIR/build}
-OLD_VER=${OLD_VER:-2.2.4.1-1}
-NEW_VER=${NEW_VER:-2.2.4.1-2}
-CORE_VER=${CORE_VER:-2.2.4.2-1}
+
+# Each version is derived from its OWN directory rather than from a literal
+# that goes stale on the next packaging bump. See scripts/lib-debver.sh.
+# -libs is what both versions are read from, because -drivers pins its
+# Depends to -libs's exact version: they always move together.
+. "$(dirname "$0")/lib-debver.sh"
+OLD_VER=${OLD_VER:-$(derive_deb_version "$OLD_LIBS_DIR" indi-stable-3rdparty-libs-apogee OLD_VER)} || exit 1
+NEW_VER=${NEW_VER:-$(derive_deb_version "$NEW_LIBS_DIR" indi-stable-3rdparty-libs-apogee NEW_VER)} || exit 1
+CORE_VER=${CORE_VER:-$(derive_deb_version "$CORE_DIR" indi-stable-core CORE_VER)} || exit 1
+# Both *_DIR pairs default to the same directory, so without a second build
+# both sides derive the same version -- an "upgrade" that upgrades nothing and
+# would pass every check below vacuously.
+test "$OLD_VER" != "$NEW_VER" \
+  || { echo "*** ABORT: OLD_VER and NEW_VER are both $OLD_VER -- there is no upgrade to test. Pass directories holding two different builds. ***"; exit 1; }
 W=$(mktemp -d /tmp/upgrade-drivers-deb.XXXXXX)
 
 # Derived from the .debs actually present, NOT hardcoded. The hardcoded list
@@ -58,8 +69,12 @@ list_from() {   # $1 = dir, $2 = package-name prefix
   ls "$1"/"$2"-*_"${NEW_VER}"_amd64.deb 2>/dev/null \
     | sed -E "s|.*/$2-(.*)_${NEW_VER}_amd64\.deb|\1|"
 }
-LIBS_VENDORS=$(list_from "$NEW_LIBS_DIR" indi-stable-3rdparty-libs | grep -v -- '-dev$' | sort)
-DRIVER_PKGS=$(list_from "$NEW_DRIVERS_DIR" indi-stable-3rdparty-drivers | sort)
+# -dbgsym excluded the same way -dev already was: found 2026-09-10 on
+# debianastro, the first time this ran with dbgsym .debs sitting in the same
+# directory as the real packages -- see scripts/test-3rdparty-coexist-deb.sh's
+# identical fix for the fuller explanation. Not Debian-specific.
+LIBS_VENDORS=$(list_from "$NEW_LIBS_DIR" indi-stable-3rdparty-libs | grep -v -- '-dev$' | grep -v -- '-dbgsym$' | sort)
+DRIVER_PKGS=$(list_from "$NEW_DRIVERS_DIR" indi-stable-3rdparty-drivers | grep -v -- '-dbgsym$' | sort)
 
 FAIL=0
 die()  { echo; echo "*** ABORT: $* ***"; echo "  work dir kept: $W"; exit 1; }
@@ -265,7 +280,13 @@ if test -n "$DISTRO_SHA"; then
   test "$(sha256sum /usr/bin/indiserver | awk '{print $1}')" = "$DISTRO_SHA" \
     && pass "/usr/bin/indiserver unchanged across the upgrade" \
     || fail "/usr/bin/indiserver CHANGED across the upgrade"
-  for p in indi-bin libindi1; do
+  # Resolved from the real installed file, not assumed to be Ubuntu's
+  # libindi1 -- same fix as test-upgrade-path-3rdparty-deb.sh's identical
+  # loop, and for the same reason (debianastro, 2026-09-10).
+  DISTRO_CLIENT_SO=$(ls /usr/lib/*/libindiclient.so.* 2>/dev/null | head -1)
+  DISTRO_CLIENT_PKG=$(test -n "$DISTRO_CLIENT_SO" && dpkg -S "$DISTRO_CLIENT_SO" 2>/dev/null | cut -d: -f1 | head -1)
+  DISTRO_CLIENT_PKG=${DISTRO_CLIENT_PKG:-libindi1}
+  for p in indi-bin "$DISTRO_CLIENT_PKG"; do
     dpkg -V "$p" >/dev/null 2>&1 && pass "dpkg -V $p still clean" \
                                  || fail "dpkg -V $p now reports modifications"
   done

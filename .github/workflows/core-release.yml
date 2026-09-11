@@ -42,6 +42,16 @@ on:
           and upstream did not.
         type: boolean
         default: false
+      build_only:
+        description: >-
+          Rehearsal. Build and smoke-test every platform, then STOP before
+          promote -- no GitHub Release, no tag, no commit to main, and no
+          release number consumed. Resolves the version the same way
+          repackage does, so it builds what is currently committed rather
+          than waiting for a new upstream tag. Use it to exercise a change to
+          this workflow before letting it publish anything.
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -73,14 +83,19 @@ jobs:
         run: bash scripts/check-upstream-tag.sh indilib/indi core
       - name: Compute the next release (repackage only)
         id: next
-        if: inputs.repackage == true
+        # build_only resolves the version exactly as repackage does -- it
+        # builds what is currently committed instead of waiting for a new
+        # upstream tag, which is the only way a rehearsal can build anything
+        # at all on a quiet day. The release number it computes is never
+        # consumed, because promote is skipped.
+        if: inputs.repackage == true || inputs.build_only == true
         run: bash scripts/next-release.sh core/rpm/indi-stable-core.spec
       # One place decides the version and release for the whole run, so a
       # build job and the promote job cannot arrive at different answers.
       - name: Resolve what this run builds
         id: resolve
         run: |
-          if [ "${{ inputs.repackage }}" = "true" ]; then
+          if [ "${{ inputs.repackage }}" = "true" ] || [ "${{ inputs.build_only }}" = "true" ]; then
             echo "new_tag=v${{ steps.next.outputs.version }}" >> "$GITHUB_OUTPUT"
             echo "release=${{ steps.next.outputs.release }}"  >> "$GITHUB_OUTPUT"
             echo "repackage: v${{ steps.next.outputs.version }} release ${{ steps.next.outputs.release }}"
@@ -139,26 +154,80 @@ jobs:
   build-debian:
     needs: check
     if: needs.check.outputs.new_tag != ''
-    # Pinned to the exact Ubuntu release ubuntuastro (this project's own
-    # verification VM) runs, not ubuntu-latest -- found 2026-08-27, the
-    # hard way: ubuntu-latest currently resolves to 24.04 "noble", whose
-    # archive ships libxisf-dev 0.2.8-1, missing the
-    # LibXISF::DataBlock::CompressionCodecSupported()/ZSTD API indi
-    # 2.2.4.2's own indiccd.cpp calls. 26.04 "resolute" carries
-    # libxisf-dev 0.2.13-1build1, which has it -- exactly why the same
-    # source has always built cleanly by hand and never on ubuntu-latest.
-    # ubuntu-26.04 is a GitHub-hosted label already, if still preview.
-    runs-on: ubuntu-26.04
+    # THREE Debian-family platforms, one job definition. Each is a container
+    # rather than a GitHub-hosted runner label, for three reasons:
+    #   1. Debian has no hosted runner at all, so debian:12 needs a container
+    #      regardless -- the same pattern build-fedora already uses.
+    #   2. It pins the distro exactly. ubuntu-26.04 is still a PREVIEW label,
+    #      and this job previously depended on it; the image does not move
+    #      under us the way a label can.
+    #   3. It matches smoke-test-fedora, which has always run in a container,
+    #      and makes the smoke tests a genuinely fresh install rather than a
+    #      runner image with half a toolchain already on it.
+    # Verified 2026-09-11 that all three tags exist on Docker Hub.
+    #
+    # WHY THE VERSION CARRIES A DISTRO SUFFIX. All three platforms otherwise
+    # emit a byte-different file at the IDENTICAL name
+    # (indi-stable-core_2.2.4.2-1_amd64.deb). promote copies every artifact
+    # into one directory before uploading, so two of the three would be
+    # silently overwritten and the release would ship one arbitrary
+    # platform's build under a name claiming to be universal. Suffixing the
+    # VERSION rather than just the filename also means `dpkg -l` on a user's
+    # box answers "which build is this?", which a filename cannot once the
+    # package is installed. `~` sorts BEFORE the bare version, the ordinary
+    # Debian convention, so none of these ever outranks a plain 2.2.4.2-1.
+    #
+    # fail-fast: false -- one platform breaking should show the others'
+    # results too, not cancel them. A release is gated on all three (see
+    # promote's needs:), so hiding two failures behind the first wastes a run.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Debian 12 has NO libxisf-dev in any pocket, and Ubuntu 24.04 has
+          # 0.2.8, which predates the CompressionCodecSupported()/ZSTD API
+          # indiccd.cpp calls. Both therefore build with the noxisf profile,
+          # which decides the libxisf-dev build dependency and the configure
+          # flag together. Ubuntu 26.04 carries libxisf-dev 0.2.13 and builds
+          # XISF in, unprofiled -- which is exactly why this job was pinned
+          # away from ubuntu-latest back when that meant 24.04. DESIGN.md,
+          # "Decided: no XISF on Debian 12 and Ubuntu 24.04".
+          - id: debian12
+            image: debian:12
+            vsuffix: '~deb12'
+            profiles: pkg.indi-stable-core.noxisf
+          - id: ubuntu2404
+            image: ubuntu:24.04
+            vsuffix: '~ubuntu24.04'
+            profiles: pkg.indi-stable-core.noxisf
+          - id: ubuntu2604
+            image: ubuntu:26.04
+            vsuffix: '~ubuntu26.04'
+            profiles: ''
+    container: ${{ matrix.image }}
+    env:
+      # Read by BOTH mk-build-deps and dpkg-buildpackage below. Confirmed by
+      # running it on a real bookworm box, not assumed: without this,
+      # mk-build-deps exits 1 there because libxisf-dev is unsatisfiable;
+      # with it, it exits 0 and the equivs package it generates omits
+      # libxisf-dev entirely. An empty value means "no profiles", which is
+      # what the Ubuntu 26.04 entry wants.
+      DEB_BUILD_PROFILES: ${{ matrix.profiles }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      # devscripts (dch, mk-build-deps) and equivs (mk-build-deps' own
-      # backend) up front -- dch is needed by the very next step.
-      - name: Install devscripts and equivs
+      # These images are minimal, so this installs what a hosted runner would
+      # already have had: curl/ca-certificates to fetch the tarball, git for
+      # checkout, devscripts for dch, equivs for mk-build-deps' backend.
+      # No sudo -- a container runs as root, and none of these images ship
+      # sudo anyway. Same as build-fedora.
+      - name: Install build tooling
         run: |
-          sudo apt-get update
-          sudo apt-get install -y devscripts equivs
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl devscripts equivs git
       - name: Fetch and unpack upstream source
         env:
           NEW_TAG: ${{ needs.check.outputs.new_tag }}
@@ -191,15 +260,23 @@ jobs:
           rm -rf "$SRCDIR/debian"
           cp -r core/deb "$SRCDIR/debian"
           cd "$SRCDIR"
-          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}" \
+          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}${{ matrix.vsuffix }}" \
             --distribution unstable \
-            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }}, built by core-release.yml"
+            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }} for ${{ matrix.image }}, built by core-release.yml"
+          head -1 debian/changelog
       - name: Resolve Build-Depends from debian/control
-        run: sudo mk-build-deps -i -t 'apt-get -y' "$SRCDIR/debian/control"
+        run: mk-build-deps -i -t 'apt-get -y --no-install-recommends' "$SRCDIR/debian/control"
       - name: Build
         run: |
           cd "$SRCDIR"
           dpkg-buildpackage -us -uc -b
+      # Assert the suffix actually landed on the built files. dch silently
+      # accepts a --newversion it considers lower than the current one only
+      # by refusing, but a matrix entry with an empty or mistyped vsuffix
+      # would otherwise produce a file named identically to another
+      # platform's and reintroduce exactly the collision the suffix exists to
+      # prevent -- silently, at the point where promote overwrites one with
+      # the other.
       - name: Collect built DEBs
         run: |
           mkdir -p out
@@ -207,9 +284,18 @@ jobs:
             ! -name '*-dbgsym*' \
             -exec cp {} out/ \;
           ls -la out/
+          test -n "$(ls out/)" || { echo "ERROR: no .deb collected"; exit 1; }
+          for f in out/*.deb; do
+            case "$f" in
+              *"${{ needs.check.outputs.release }}${{ matrix.vsuffix }}"*) ;;
+              *) echo "ERROR: $f does not carry the expected version suffix '${{ matrix.vsuffix }}'"
+                 echo "       Without it this platform's files collide with another's in promote."
+                 exit 1 ;;
+            esac
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: core-deb
+          name: core-deb-${{ matrix.id }}
           path: out/
           if-no-files-found: error
 
@@ -229,24 +315,50 @@ jobs:
 
   smoke-test-debian:
     needs: build-debian
-    # Same pin as build-debian, same reason -- and doubly so here: the
-    # .deb was linked against 26.04's own libraries (and glibc/libstdc++
-    # ABI), so installing it for a runtime smoke test on a DIFFERENT
-    # Ubuntu release risks a second, different mismatch even if the build
-    # itself had used 26.04.
-    runs-on: ubuntu-26.04
+    # Each platform is smoke-tested in the SAME image it was built in, which
+    # is the whole point of matrixing this rather than testing one build
+    # everywhere: indi-stable-core-libs carries its own glibc/libstdc++ ABI
+    # requirement, and the three builds genuinely differ on it -- measured on
+    # the VMs 2026-09-11, bookworm's build requires libc6 >= 2.34 and noble's
+    # >= 2.38. Installing one platform's .deb on another is a different test
+    # that can fail for reasons the packaging is not responsible for, and can
+    # equally pass while hiding a real mismatch.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: debian12
+            image: debian:12
+          - id: ubuntu2404
+            image: ubuntu:24.04
+          - id: ubuntu2604
+            image: ubuntu:26.04
+    container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
+      # The script runs apt-get itself and these images ship no sudo; a
+      # container is already root. Same reasoning as build-debian's own
+      # tooling step.
+      - name: Install test tooling
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git
       - uses: actions/download-artifact@v4
         with:
-          name: core-deb
+          name: core-deb-${{ matrix.id }}
           path: debs
-      - run: sudo bash scripts/smoke-test-core-deb.sh debs
+      - run: bash scripts/smoke-test-core-deb.sh debs
 
   promote:
     needs: [check, smoke-test-fedora, smoke-test-debian]
+    # Skipped entirely for a build_only rehearsal: no GitHub Release,
+    # no tag, no version-bump commit, no PR self-merged into main, and
+    # no release number consumed. Everything that actually publishes
+    # lives in this job, so one condition here is the whole gate.
+    if: inputs.build_only != true
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 is required here, unlike every other checkout in this
@@ -268,9 +380,22 @@ jobs:
         with:
           name: core-rpm
           path: artifacts/rpm
+      # One download per Debian platform. They land in ONE directory on
+      # purpose: the distro version suffix makes the filenames distinct, so a
+      # collision here would mean the suffix did not take -- and the
+      # collision check below turns that into a failed release rather than a
+      # release quietly missing two platforms.
       - uses: actions/download-artifact@v4
         with:
-          name: core-deb
+          name: core-deb-debian12
+          path: artifacts/deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-deb-ubuntu2404
+          path: artifacts/deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-deb-ubuntu2604
           path: artifacts/deb
       # dch, not preinstalled on ubuntu-latest -- the same gap
       # build-debian's own "Install devscripts and equivs" step exists to
@@ -317,6 +442,19 @@ jobs:
         run: |
           mkdir -p release-assets
           cp artifacts/rpm/*.rpm artifacts/deb/*.deb release-assets/
+          # Three Debian platforms x three binary packages, plus Fedora's.
+          # Count rather than trust: a download-artifact step landing on top
+          # of another, or a vsuffix that failed to apply, both show up here
+          # as a short count, and both would otherwise publish a release
+          # silently missing a platform.
+          N_DEB=$(ls release-assets/*.deb | wc -l)
+          test "$N_DEB" -eq 9 || {
+            echo "ERROR: expected 9 .deb files (3 platforms x 3 packages), found ${N_DEB}:"
+            ls -la release-assets/
+            echo "       A short count means two platforms produced the same filename --"
+            echo "       check each build-debian matrix entry's version suffix."
+            exit 1; }
+          ls -la release-assets/
           # Release 1 keeps the plain name, so existing tags and any link to
           # them stay valid. A repackage gets an explicit -N suffix -- without
           # it `gh release create` fails outright, because the tag for this
@@ -332,7 +470,7 @@ jobs:
           echo "creating release: ${REL_TAG}"
           gh release create "${REL_TAG}" release-assets/* \
             --title "${REL_TITLE}" \
-            --notes "Automated release. Built from upstream indilib/indi ${NEW_TAG}, gated on both Fedora and Debian/Ubuntu (build, clean install, indiserver starts, a representative driver loads). Unofficial third-party build -- see README.md."
+            --notes "Automated release. Built from upstream indilib/indi ${NEW_TAG}, gated on all four platforms -- Fedora 44, Debian 12, Ubuntu 24.04 and Ubuntu 26.04 (build, clean install, indiserver starts, a representative driver loads, each on the platform it was built for). Debian 12 and Ubuntu 24.04 builds carry no XISF support, because neither archive has a usable libxisf -- see README.md. Unofficial third-party build -- see README.md."
       # main is protected (PR required), so the bump lands via a PR the bot
       # opens and immediately merges itself -- main's branch protection
       # requires a pull request but zero approving reviews, so this is not a

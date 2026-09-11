@@ -110,29 +110,69 @@ installing means downloading the right file from a component's
 [latest release](../../releases) and installing it directly. Each release
 carries both distros' files together; grab the ones for yours.
 
-For `indi-stable-core`, the release tagged `indi-stable-core-<version>`
-carries `indi-stable-core-<version>.fc44.x86_64.rpm` and
-`indi-stable-core_<version>_amd64.deb` (plus `-libs`/`-devel`/`-dev`
-counterparts — install the base package and `-libs` together; `-devel`/`-dev`
-are only needed for building against this project, e.g. `pyindi-client`
-itself does):
+**The tag and the filenames do not spell the version the same way**, which is
+the easy mistake here. `indi-stable-core`'s release is tagged
+`indi-stable-core-v2.2.4.2` — leading `v`, no packaging revision — while the
+files inside it are `…-2.2.4.2-1.…` — no `v`, and a `-1` packaging revision
+the tag never shows. Copy the filenames from the release page rather than
+deriving them from the tag:
 
 ```
 # Fedora / RHEL / Rocky / Alma
-sudo dnf install ./indi-stable-core-libs-<version>.fc44.x86_64.rpm \
-                 ./indi-stable-core-<version>.fc44.x86_64.rpm
+sudo dnf install ./indi-stable-core-libs-2.2.4.2-1.fc44.x86_64.rpm \
+                 ./indi-stable-core-2.2.4.2-1.fc44.x86_64.rpm
 
 # Debian / Ubuntu
-sudo apt install ./indi-stable-core-libs_<version>_amd64.deb \
-                  ./indi-stable-core_<version>_amd64.deb
+sudo apt install ./indi-stable-core-libs_2.2.4.2-1_amd64.deb \
+                 ./indi-stable-core_2.2.4.2-1_amd64.deb
 ```
 
-`indi-stable-3rdparty-<version>` and `indi-stable-pyindi-client-<version>`
-follow the same shape — the release tagged with the component's own name
-carries every `.rpm`/`.deb` that release built. A release tag ending in
-`-N` (`N` > 1) is a **repackage**: the same upstream version rebuilt at a
-new packaging revision, not a new upstream release — pick the highest `-N`
-for a given version.
+Install the base package and `-libs` together. The `-devel` (RPM) and `-dev`
+(DEB) packages are needed only to *build* against this project, as
+`pyindi-client` itself does.
+
+### XISF image-format support is missing on two older platforms
+
+Cameras can save images as FITS, as raw native formats, or as XISF — the
+PixInsight format. **The Debian 12 and Ubuntu 24.04 builds have no XISF
+support**; every other platform here does.
+
+| Platform | Saves `.xisf` |
+|---|---|
+| Fedora | yes |
+| Debian 13 "trixie" | yes |
+| Ubuntu 26.04 | yes |
+| Debian 12 "bookworm" | **no** |
+| Ubuntu 24.04 "noble" | **no** |
+
+The reason is the platform's own archive, not a choice about what to
+support: XISF needs `libxisf`, and Debian 12 ships no `libxisf-dev` at all
+while Ubuntu 24.04 ships 0.2.8, which predates the compression API this INDI
+release calls. Building it in anyway would mean shipping a copy of `libxisf`
+inside these packages, which this project does not do for a dependency the
+distribution is expected to provide.
+
+Nothing else differs. Those builds save FITS and native formats normally, and
+if you do not use PixInsight's format you will not notice. If you need
+`.xisf` output specifically, use one of the three platforms above.
+
+The other two components release the same way, with two differences worth
+knowing before you go looking for a file that is not there:
+
+- **`pyindi-client`'s tag carries no `v`** — `indi-stable-pyindi-client-2.2.0`,
+  not `-v2.2.0`. Its release is one RPM and one DEB.
+- **`3rdparty` is packaged per vendor, not as one package**, so its release
+  carries every vendor's files together (96 of them in `v2.2.4.1-2`) and you
+  install only the ones for your hardware. Nine vendors ship a binary SDK and
+  are split in two — for a ZWO ASI camera that is
+  `indi-stable-3rdparty-libs-asi` *and* `indi-stable-3rdparty-drivers-asi`,
+  and the `-drivers` package depends on its `-libs` half at an exact version,
+  so hand both files to `dnf`/`apt` in one command. The remaining drivers have
+  no SDK to split out and are a single `-drivers-` package.
+
+A release tag ending in `-N` (`N` > 1) is a **repackage**: the same upstream
+version rebuilt at a new packaging revision, not a new upstream release — pick
+the highest `-N` for a given version.
 
 To run this build's `indiserver` on a machine that also has a distribution
 INDI, use the namespaced alternative rather than the plain `indiserver` name
@@ -198,8 +238,10 @@ on Ubuntu 26.04 with `ppa:mutlaqja/ppa`. [FEDORA.md](FEDORA.md) and
 verifying the coexistence guarantees, and what has been confirmed on each. The
 coexistence checks are scripted for both distributions in `scripts/`.
 
-Nothing is published yet — there is no repository to add, and these packages
-must be built from source for now.
+Building from source is **not** required to use these packages — releases
+carry prebuilt `.rpm`/`.deb` files, as "Installing" above describes. Build
+from source to work on the packaging itself, or to cover a distribution or
+architecture no release build targets.
 
 ## Repository layout
 
@@ -211,7 +253,10 @@ DESIGN.md          the full rationale for every decision here
 LESSONS_LEARNED.md gotchas worth not rediscovering
 core/              spec + debian metadata for INDI core and 3rdparty
                    (per-driver packaging; RPM and Debian both built)
-scripts/           coexistence test harnesses
+scripts/           test harnesses, upstream tag/version polling, release helpers
+.github/workflows/ the build-gate-promote pipeline for each of the three
+                   components
+versions.json      the version and channel each component currently sits at
 pyindi-client/     the Python binding, built against this project's core.
                    Debian and RPM sides both built, released, and gated by CI.
 patches/           per-version fixes applied at build time (none needed yet)

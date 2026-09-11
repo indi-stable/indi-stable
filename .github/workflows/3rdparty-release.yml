@@ -42,6 +42,16 @@ on:
           and upstream did not.
         type: boolean
         default: false
+      build_only:
+        description: >-
+          Rehearsal. Build and smoke-test every platform, then STOP before
+          promote -- no GitHub Release, no tag, no commit to main, and no
+          release number consumed. Resolves the version the same way
+          repackage does, so it builds what is currently committed rather
+          than waiting for a new upstream tag. Use it to exercise a change to
+          this workflow before letting it publish anything.
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -75,12 +85,17 @@ jobs:
       # %{version}-%{release}.
       - name: Compute the next release (repackage only)
         id: next
-        if: inputs.repackage == true
+        # build_only resolves the version exactly as repackage does -- it
+        # builds what is currently committed instead of waiting for a new
+        # upstream tag, which is the only way a rehearsal can build anything
+        # at all on a quiet day. The release number it computes is never
+        # consumed, because promote is skipped.
+        if: inputs.repackage == true || inputs.build_only == true
         run: bash scripts/next-release.sh core/rpm/indi-stable-3rdparty-libs.spec
       - name: Resolve what this run builds
         id: resolve
         run: |
-          if [ "${{ inputs.repackage }}" = "true" ]; then
+          if [ "${{ inputs.repackage }}" = "true" ] || [ "${{ inputs.build_only }}" = "true" ]; then
             echo "new_tag=v${{ steps.next.outputs.version }}" >> "$GITHUB_OUTPUT"
             echo "release=${{ steps.next.outputs.release }}"  >> "$GITHUB_OUTPUT"
             echo "repackage: v${{ steps.next.outputs.version }} release ${{ steps.next.outputs.release }}"
@@ -209,23 +224,62 @@ jobs:
   build-libs-debian:
     needs: check
     if: needs.check.outputs.new_tag != ''
-    runs-on: ubuntu-26.04
+    # Three platforms, one job definition, all containerised -- same shape and
+    # the same reasons as core-release.yml's own build-debian, which this
+    # mirrors deliberately rather than inventing a second pattern. That file
+    # carries the full rationale for the containers and the version suffix.
+    #
+    # No build profile here, unlike core: neither -libs nor -drivers
+    # references libxisf at all, so the noxisf profile is core's business
+    # only. Checked, not assumed.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: debian12
+            image: debian:12
+            vsuffix: '~deb12'
+          - id: ubuntu2404
+            image: ubuntu:24.04
+            vsuffix: '~ubuntu24.04'
+          - id: ubuntu2604
+            image: ubuntu:26.04
+            vsuffix: '~ubuntu26.04'
+    container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Install devscripts and equivs
+      - name: Install build tooling
         run: |
-          sudo apt-get update
-          sudo apt-get install -y devscripts equivs
-      - name: Download the gated core release
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl devscripts equivs git gh
+      # THIS PLATFORM's core packages, not every core package in the release.
+      # core now publishes three Debian builds per release, all named
+      # identically apart from the version suffix, so an unfiltered '*.deb'
+      # would download nine files and hand apt three conflicting versions of
+      # each package. The suffix is what makes them selectable at all.
+      - name: Download this platform's core packages from the gated release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-debs
           gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
-            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
-          sudo apt-get install -y ./core-debs/*.deb
+            --repo "${{ github.repository }}" \
+            --pattern "*${{ matrix.vsuffix }}_*.deb" --dir core-debs
+          ls -la core-debs/
+          # A core release predating the per-platform split has no suffixed
+          # files at all, and gh exits 0 having downloaded nothing. Installing
+          # from an empty directory then "succeeds" and the real failure
+          # surfaces much later as a missing header.
+          test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
+            echo "ERROR: the core release indi-stable-core-${{ needs.check.outputs.core_tag }}"
+            echo "       has no ${{ matrix.vsuffix }} packages. core must be released with"
+            echo "       per-platform suffixes before 3rdparty can build against it."
+            exit 1; }
+          apt-get install -y ./core-debs/*.deb
       - name: Fetch and unpack upstream source
         env:
           NEW_TAG: ${{ needs.check.outputs.new_tag }}
@@ -247,11 +301,12 @@ jobs:
           rm -rf "$SRCDIR/debian"
           cp -r core/deb-3rdparty-libs "$SRCDIR/debian"
           cd "$SRCDIR"
-          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}" \
+          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}${{ matrix.vsuffix }}" \
             --distribution unstable \
-            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }}, built by 3rdparty-release.yml"
+            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }} for ${{ matrix.image }}, built by 3rdparty-release.yml"
+          head -1 debian/changelog
       - name: Resolve Build-Depends from debian/control
-        run: sudo mk-build-deps -i -t 'apt-get -y' "$SRCDIR/debian/control"
+        run: mk-build-deps -i -t 'apt-get -y --no-install-recommends' "$SRCDIR/debian/control"
       - name: Build
         run: cd "$SRCDIR" && dpkg-buildpackage -us -uc -b
       - name: Collect built DEBs
@@ -259,40 +314,72 @@ jobs:
           mkdir -p out
           find /tmp -maxdepth 1 -name '*.deb' ! -name '*-dbgsym*' -exec cp {} out/ \;
           ls -la out/
+          test -n "$(ls out/)" || { echo "ERROR: no .deb collected"; exit 1; }
+          # Without the suffix this platform's files are byte-different but
+          # identically named to another's, and promote silently keeps one.
+          for f in out/*.deb; do
+            case "$f" in
+              *"${{ matrix.vsuffix }}"*) ;;
+              *) echo "ERROR: $f does not carry the expected suffix '${{ matrix.vsuffix }}'"; exit 1 ;;
+            esac
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: 3rdparty-libs-deb
+          name: 3rdparty-libs-deb-${{ matrix.id }}
           path: out/
           if-no-files-found: error
 
   build-drivers-debian:
     needs: [check, build-libs-debian]
-    runs-on: ubuntu-26.04
+    # Matrixed the same three ways as build-libs-debian. Each entry consumes
+    # ONLY its own platform's -libs artifact: -drivers Build-Depends pin -libs
+    # at an exact version, and with per-platform suffixes those pins now name
+    # a version only one of the three -libs builds actually carries.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: debian12
+            image: debian:12
+            vsuffix: '~deb12'
+          - id: ubuntu2404
+            image: ubuntu:24.04
+            vsuffix: '~ubuntu24.04'
+          - id: ubuntu2604
+            image: ubuntu:26.04
+            vsuffix: '~ubuntu26.04'
+    container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Install devscripts and equivs
+      - name: Install build tooling
         run: |
-          sudo apt-get update
-          sudo apt-get install -y devscripts equivs
-      - name: Download the gated core release
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl devscripts equivs git gh
+      - name: Download this platform's core packages from the gated release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-debs
           gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
-            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
-          sudo apt-get install -y ./core-debs/*.deb
+            --repo "${{ github.repository }}" \
+            --pattern "*${{ matrix.vsuffix }}_*.deb" --dir core-debs
+          test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
+            echo "ERROR: core release has no ${{ matrix.vsuffix }} packages -- see build-libs-debian"
+            exit 1; }
+          apt-get install -y ./core-debs/*.deb
       - uses: actions/download-artifact@v4
         with:
-          name: 3rdparty-libs-deb
+          name: 3rdparty-libs-deb-${{ matrix.id }}
           path: libs-debs
       # Same reason as the Fedora side: -drivers' Build-Depends pin -libs at
       # an exact version, and only the artifact the previous job produced
       # satisfies them.
       - name: Install the just-built -libs packages
-        run: sudo apt-get install -y ./libs-debs/*.deb
+        run: apt-get install -y ./libs-debs/*.deb
       - name: Fetch and unpack upstream source
         env:
           NEW_TAG: ${{ needs.check.outputs.new_tag }}
@@ -310,18 +397,34 @@ jobs:
       # artifact the previous job just built until they are rewritten. Run
       # the bump in the checkout FIRST, then copy the corrected tree across.
       # Transient -- nothing here is committed; only the promote job commits.
+      # DEB_SUFFIX is what keeps the eighteen -libs pins in step with the
+      # suffixed -libs packages installed above. Without it the pins would
+      # name a bare version no platform builds, and mk-build-deps below would
+      # fail outright -- loudly, but on every run. The script stamps the
+      # changelog and all eighteen pins from one computed version so the two
+      # cannot disagree; see its own header.
       - name: Rewrite the -libs version pins (this checkout only)
+        env:
+          DEB_SUFFIX: ${{ matrix.vsuffix }}
         run: bash scripts/bump-3rdparty-version.sh "${{ needs.check.outputs.new_tag }}" "${{ needs.check.outputs.release }}"
       - name: Populate debian/ and bump changelog (this checkout only)
         run: |
           rm -rf "$SRCDIR/debian"
           cp -r core/deb-3rdparty-drivers "$SRCDIR/debian"
           cd "$SRCDIR"
-          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}" \
+          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}${{ matrix.vsuffix }}" \
             --distribution unstable \
-            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }}, built by 3rdparty-release.yml"
+            "Rebuild of ${{ needs.check.outputs.new_tag }} at release ${{ needs.check.outputs.release }} for ${{ matrix.image }}, built by 3rdparty-release.yml"
+          head -1 debian/changelog
+          # The pins were rewritten in the CHECKOUT, above, and the tree was
+          # copied across after -- so this is the copy that actually gets
+          # built, and it must carry the suffixed pins.
+          grep -q "indi-stable-3rdparty-libs-apogee-dev (= ${NEW_VERSION}-${{ needs.check.outputs.release }}${{ matrix.vsuffix }})" debian/control \
+            || { echo "ERROR: debian/control's -libs pins do not name ${NEW_VERSION}-${{ needs.check.outputs.release }}${{ matrix.vsuffix }}"
+                 grep -m3 'indi-stable-3rdparty-libs-apogee' debian/control
+                 exit 1; }
       - name: Resolve Build-Depends from debian/control
-        run: sudo mk-build-deps -i -t 'apt-get -y' "$SRCDIR/debian/control"
+        run: mk-build-deps -i -t 'apt-get -y --no-install-recommends' "$SRCDIR/debian/control"
       - name: Build
         run: cd "$SRCDIR" && dpkg-buildpackage -us -uc -b
       - name: Collect built DEBs
@@ -329,9 +432,16 @@ jobs:
           mkdir -p out
           find /tmp -maxdepth 1 -name '*.deb' ! -name '*-dbgsym*' -exec cp {} out/ \;
           ls -la out/
+          test -n "$(ls out/)" || { echo "ERROR: no .deb collected"; exit 1; }
+          for f in out/*.deb; do
+            case "$f" in
+              *"${{ matrix.vsuffix }}"*) ;;
+              *) echo "ERROR: $f does not carry the expected suffix '${{ matrix.vsuffix }}'"; exit 1 ;;
+            esac
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: 3rdparty-drivers-deb
+          name: 3rdparty-drivers-deb-${{ matrix.id }}
           path: out/
           if-no-files-found: error
 
@@ -364,30 +474,70 @@ jobs:
 
   smoke-test-debian:
     needs: [check, build-libs-debian, build-drivers-debian]
-    runs-on: ubuntu-26.04
+    # Each platform smoke-tested in the image it was built in. This gate is
+    # the one that catches LESSONS_LEARNED.md #22 -- it checks EVERY shipped
+    # driver's ldd and runs one per vendor on a runtime-only install -- so
+    # running it against the wrong platform's binaries would be worse than
+    # not running it: the vendor blobs are the same files everywhere, but the
+    # drivers linking them are not.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: debian12
+            image: debian:12
+            vsuffix: '~deb12'
+          - id: ubuntu2404
+            image: ubuntu:24.04
+            vsuffix: '~ubuntu24.04'
+          - id: ubuntu2604
+            image: ubuntu:26.04
+            vsuffix: '~ubuntu26.04'
+    container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Download the gated core release
+      - name: Install test tooling
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git gh
+      - name: Download this platform's core packages from the gated release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-debs
           gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
-            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
+            --repo "${{ github.repository }}" \
+            --pattern "*${{ matrix.vsuffix }}_*.deb" --dir core-debs
+          test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
+            echo "ERROR: core release has no ${{ matrix.vsuffix }} packages -- see build-libs-debian"
+            exit 1; }
       - uses: actions/download-artifact@v4
         with:
-          name: 3rdparty-libs-deb
+          name: 3rdparty-libs-deb-${{ matrix.id }}
           path: libs-debs
       - uses: actions/download-artifact@v4
         with:
-          name: 3rdparty-drivers-deb
+          name: 3rdparty-drivers-deb-${{ matrix.id }}
           path: drivers-debs
-      - run: sudo bash scripts/smoke-test-3rdparty-deb.sh libs-debs drivers-debs core-debs
+      # No -dev filtering here on purpose: smoke-test-3rdparty-deb.sh excludes
+      # -dev itself, and its comment explains why that exclusion is the whole
+      # point of this gate (LESSONS_LEARNED.md #22 -- installing -dev would
+      # supply the very symlink whose absence broke 45 of 56 drivers, and
+      # report the broken packaging as clean). Filtering here too would put
+      # that property in two places, where the copy can silently outlive a
+      # regression in the original.
+      - run: bash scripts/smoke-test-3rdparty-deb.sh libs-debs drivers-debs core-debs
 
   promote:
     needs: [check, smoke-test-fedora, smoke-test-debian]
+    # Skipped entirely for a build_only rehearsal: no GitHub Release,
+    # no tag, no version-bump commit, no PR self-merged into main, and
+    # no release number consumed. Everything that actually publishes
+    # lives in this job, so one condition here is the whole gate.
+    if: inputs.build_only != true
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 is required here, unlike every other checkout in this
@@ -413,13 +563,35 @@ jobs:
         with:
           name: 3rdparty-drivers-rpm
           path: artifacts/drivers-rpm
+      # Six Debian artifacts now: -libs and -drivers for each of three
+      # platforms. They land in two directories, not six, because the version
+      # suffix already makes every filename distinct -- and a collision here
+      # would mean a suffix failed to apply, which the asset count below
+      # turns into a failed release rather than a release quietly missing a
+      # platform.
       - uses: actions/download-artifact@v4
         with:
-          name: 3rdparty-libs-deb
+          name: 3rdparty-libs-deb-debian12
           path: artifacts/libs-deb
       - uses: actions/download-artifact@v4
         with:
-          name: 3rdparty-drivers-deb
+          name: 3rdparty-libs-deb-ubuntu2404
+          path: artifacts/libs-deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-libs-deb-ubuntu2604
+          path: artifacts/libs-deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-drivers-deb-debian12
+          path: artifacts/drivers-deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-drivers-deb-ubuntu2404
+          path: artifacts/drivers-deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: 3rdparty-drivers-deb-ubuntu2604
           path: artifacts/drivers-deb
       - name: Install devscripts
         run: sudo apt-get update && sudo apt-get install -y devscripts
@@ -458,6 +630,18 @@ jobs:
         run: |
           mkdir -p release-assets
           cp artifacts/*/*.rpm artifacts/*/*.deb release-assets/
+          # 48 .debs per platform (9 vendors x2 for -libs, 30 -drivers), on
+          # three platforms. Count rather than trust: a download-artifact
+          # landing on top of another, or a vsuffix that failed to apply,
+          # both appear here as a short count and would otherwise publish a
+          # release silently missing a platform's worth of packages.
+          N_DEB=$(ls release-assets/*.deb | wc -l)
+          test "$N_DEB" -eq 144 || {
+            echo "ERROR: expected 144 .deb files (3 platforms x 48), found ${N_DEB}."
+            echo "       A short count means two platforms produced the same filename --"
+            echo "       check each matrix entry's version suffix."
+            ls release-assets/ | sed 's/^/         /'
+            exit 1; }
           # Release 1 keeps the plain name so existing tags stay valid; a
           # repackage gets an explicit -N suffix, without which gh release
           # create fails on the already-existing tag.
@@ -470,7 +654,7 @@ jobs:
           echo "creating release: ${REL_TAG}"
           gh release create "${REL_TAG}" release-assets/* \
             --title "${REL_TITLE}" \
-            --notes "Automated release. Built from upstream indilib/indi-3rdparty ${NEW_TAG} against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on both Fedora and Debian/Ubuntu (build, clean runtime install, every shipped driver resolves its libraries, one driver from each of the nine vendors executes). Unofficial third-party build -- see README.md."
+            --notes "Automated release. Built from upstream indilib/indi-3rdparty ${NEW_TAG} against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on all four platforms -- Fedora 44, Debian 12, Ubuntu 24.04 and Ubuntu 26.04 (build, clean runtime install, every shipped driver resolves its libraries, one driver from each vendor executes, each on the platform it was built for). Unofficial third-party build -- see README.md."
       # main is protected (PR required), so the bump lands via a PR the bot
       # opens and immediately merges itself -- main's branch protection
       # requires a pull request but zero approving reviews, so this is not a

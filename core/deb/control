@@ -25,7 +25,7 @@ Build-Depends: debhelper-compat (= 13),
                libdc1394-dev,
                libboost-regex-dev,
                libtheora-dev,
-               libxisf-dev,
+               libxisf-dev <!pkg.indi-stable-core.noxisf>,
                liberfa-dev
 Standards-Version: 4.6.2
 Homepage: https://github.com/indilib/indi
@@ -44,6 +44,12 @@ Description: INDI core library and server (stable upstream release, private pref
  distribution-provided INDI rather than replacing it. Nothing this package
  installs overwrites a file owned by another package -- notably it does not
  conflict with indi-bin, which kstars depends on.
+ .
+ XISF (PixInsight) image-format output is built in on most platforms but NOT
+ in the Debian 12 or Ubuntu 24.04 builds, because neither archive carries a
+ libxisf new enough for this INDI release. Those builds are otherwise
+ identical and still write FITS and the native formats; only .xisf output is
+ missing. The project README carries the per-platform table.
  .
  This is an unofficial third-party build. It is not affiliated with or
  endorsed by the INDI project.

@@ -126,8 +126,12 @@ core/deb-3rdparty-libs/  same role, for indi-stable-3rdparty-libs
 core/deb-3rdparty-drivers/  same role, for indi-stable-3rdparty-drivers
 scripts/           test harnesses (see FEDORA.md and DEBIAN.md -- the RPM and DEB
                    sets are separate, and the `-deb` suffix marks the Debian
-                   ones), plus check-docs.sh for doc staleness; tag
-                   polling/promotion not started
+                   ones), plus check-docs.sh for doc staleness, the
+                   check-upstream-* tag/version pollers and the bump-*
+                   release helpers the workflows call
+.github/workflows/ one check -> build -> smoke-test -> promote pipeline per
+                   component (core, 3rdparty, pyindi-client)
+versions.json      the version and channel each component currently sits at
 pyindi-client/     the Python binding, built against this project's core.
                    pyindi-client/deb/ and pyindi-client/rpm/ -- its Debian and
                    RPM packaging source, respectively
@@ -146,9 +150,11 @@ patches/           per-version fixes, applied by %autosetup -p1 / quilt (empty -
 - **The MIT license covers this repo's contents only** — spec files,
   `debian/` metadata, scripts. INDI itself stays under its own LGPL/GPL, and
   the README and `debian/copyright` must keep saying so.
-- **No CI until both packagings have built by hand at least once.**
-  Automating a build that has never succeeded means debugging the packaging
-  and the automation simultaneously, through the slower feedback loop.
+- **CI came only after both packagings had built by hand.** That gate is
+  passed and the three pipelines are live; the rule still governs anything
+  new. Automating a build that has never succeeded means debugging the
+  packaging and the automation simultaneously, through the slower feedback
+  loop.
 
 ## Current state
 

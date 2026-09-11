@@ -1231,3 +1231,115 @@ is also scripted, `scripts/test-upgrade-path-3rdparty-deb.sh` and
   someone installing a *distribution package* expects their hardware supported.
   Current answer is build everything; revisit if build time or breakage surface
   proves unreasonable. (It does not: a full build is under four minutes.)
+- **Should Fedora get a `pyindi-client` Python-version matrix, and does
+  Debian 13 become a permanent CI platform?** Both still genuinely open —
+  see `DESIGN.md`, "Single-Python-version scope" under "`pyindi-client` —
+  packaging decisions".
+
+## Debian 12 and Ubuntu 24.04 — core done, 3rdparty and pyindi-client left
+
+Both VMs exist as of 2026-09-11 and the repo is cloned on each at
+`~/src/indi-stable`, on `development`, with both per-clone git settings
+applied. Decision and reasoning for the platforms themselves: `DESIGN.md`,
+"Decided: full platforms for Debian 12 and Ubuntu 24.04 too".
+
+| | `debian12astro` | `ubuntu24astro` |
+|---|---|---|
+| Distro | Debian 12.0 "bookworm" | Ubuntu 24.04.5 LTS "noble" |
+| Archive INDI | 1.9.9, `libindiclient1` | 1.9.9, `libindiclient1` |
+| Configuration | **A** (`libindiclient.so.1` vs our `.so.2`) | **A** — same |
+| `libc6` floor of our build | `>= 2.34` | `>= 2.38` |
+| Pristine package set | 1524 | 1514 |
+| Baseline at end of 2026-09-11 | 1847 | 1818 |
+
+**Neither box can reach core-level configuration B** — no PPA equivalent and
+the archive is at 1.9.9, so the SONAMEs cannot collide. Same limitation as
+`debianastro`.
+
+**Name lists are the PRISTINE sets**, `~/<host>-baseline-2026-09-11.txt` on
+each box, captured before any toolchain went on — so they are a record of the
+untouched VM, NOT what a harness will diff against today. The 1847/1818
+figures are the live baselines and include the build toolchain, `lintian`,
+and the distribution's `libindi-dev` and `indi-bin` (both installed
+deliberately: `test-devel-compile-deb.sh` and `test-3rdparty-coexist-deb.sh`
+each abort without one, because the collision they test cannot otherwise
+arise). Both boxes ended the session at these numbers with no `indi-stable`
+package installed, `/opt/indi-stable` absent, no `indiserver-stable`
+alternative left behind, and `dpkg -V indi-bin` clean.
+
+**All four packagings are built and verified on both boxes** — `core`,
+`-3rdparty-libs`, `-3rdparty-drivers` and `pyindi-client`. The full list of
+harnesses that ran, and the per-platform findings, are in `DEBIAN.md`,
+"Debian 12 and Ubuntu 24.04 — verified 2026-09-11". Nothing outstanding is a
+test.
+
+`core` is built with the `noxisf` profile. XISF was confirmed absent from the
+built `libindidriver.so.2` itself — no `FORMAT_XISF` string, no `libXISF` in
+`DT_NEEDED` — with `FORMAT_FITS` present in the same binary as the control.
+**On noble that check ran with `libxisf-dev` 0.2.8 deliberately left
+installed**, so it demonstrates the profile suppressing a library that is
+present, not merely one that is absent.
+
+**The two `libc6` floors above are the empirical form of why these platforms
+needed their own builds at all**: the noble build requires 2.38, which
+bookworm's 2.36 cannot satisfy, and the bookworm build asks only 2.34.
+
+`.deb`s live in `~/build` on both boxes, with the `2.2.4.1-3` scratch builds
+the 3rdparty upgrade harnesses consumed in `~/build/rel3`. Both boxes also
+hold an unpacked `indi-2.2.4.2`, `indi-3rdparty-2.2.4.1` and
+`pyindi_client-2.2.0` tree, and the persistent build toolchain (`devscripts`,
+`lintian`, `swig`, `dh-python`, `python3-dev`, plus the distribution's
+`libindi-dev` and `indi-bin`, which two harnesses require as preconditions).
+
+**Both platforms are wired into all three CI pipelines**, 2026-09-11 — each
+workflow's Debian jobs are matrixed over `debian:12`, `ubuntu:24.04` and
+`ubuntu:26.04`, all containerised, and every `promote` gates on all of them.
+The per-distribution version suffix that makes three same-named builds
+distinguishable, and its knock-on effect on `-drivers`' eighteen `-libs`
+pins, are in `DESIGN.md`, "Decided: a per-distribution version suffix on the
+Debian side".
+
+### Open: CI is not run-verified, and core must release first
+
+Two things, both consequences of that change:
+
+- **None of the three workflow changes has been exercised by a real run.**
+  They parse, every matrix expands to the intended three entries, and every
+  `download-artifact` name has a matching upload — all checked mechanically.
+  **Rehearse it with the `build_only` dispatch input** rather than by cutting
+  a release: it runs check → build → smoke-test on every platform and skips
+  `promote`, which is where every publishing action in all three workflows
+  lives. Nothing is tagged, released, committed or consumed.
+- **`3rdparty` and `pyindi-client` cannot build until core re-releases.**
+  Both now select their core packages by version suffix, and the current core
+  release predates the split, so it carries no suffixed files. Each asserts
+  it actually matched something, so they fail loudly rather than building
+  against nothing. A `repackage: true` dispatch of `core-release.yml` closes
+  the gap, and it has to come first — their `build_only` rehearsals will fail
+  until it has.
+
+**`main` is 20 commits behind `development` and knows none of this.** Every
+workflow checks out `ref: main`, so a dispatch of any kind — `build_only`
+included — runs against main's packaging, which has no `noxisf` profile and
+no per-platform matrix. **Merging `development` into `main` is the first
+step of all of them**, before any rehearsal is meaningful.
+
+**Ubuntu names its dbgsym packages `.ddeb`, Debian names them `.deb`** — so
+`ubuntu24astro`'s `~/build` holds two `.ddeb` files a `*.deb` glob will not
+match at all, where `debian12astro`'s holds two `.deb` files that one will.
+`LESSONS_LEARNED.md` #29's `-dbgsym` half was written against the Debian
+spelling; nothing has yet needed the Ubuntu one, but a harness that derives a
+list by globbing `~/build` will see different things on these two boxes.
+
+**Both packagings now assert the XISF outcome**, `core/deb/rules` in both
+directions and `core/rpm/indi-stable-core.spec` in the one direction Fedora
+has (always on — there is no profile there). Verified on `fedoraastro`
+2026-09-11 by a real `mock` build, and the assertion was shown able to FAIL:
+a scratch spec carrying `-DCMAKE_DISABLE_FIND_PACKAGE_LibXISF=ON` aborted the
+build at exactly that check and produced zero RPMs.
+
+That rebuild also gives the cross-platform control for the Debian result:
+Fedora's own `libindidriver.so.2` carries `FORMAT_XISF` **and**
+`libXISF.so.0` in `DT_NEEDED`, where bookworm's and noble's carry neither —
+the same check on the same kind of artifact, finding it present on one
+platform and absent on the others.

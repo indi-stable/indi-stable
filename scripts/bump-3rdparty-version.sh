@@ -69,6 +69,28 @@ else
 fi
 DEB_REV=$REV
 
+# DEB_SUFFIX -- a per-distribution version suffix, Debian side ONLY.
+#
+# 3rdparty-release.yml builds the Debian packaging on three platforms
+# (debian:12, ubuntu:24.04, ubuntu:26.04) which otherwise emit byte-different
+# files at identical names, so each stamps its own suffix (~deb12 and so on).
+# The reason this belongs HERE rather than in a sed in the workflow is the
+# reason this script exists at all, stated in its own header: -drivers pins
+# -libs at eighteen exact literal versions, and a suffix applied to the
+# changelog but not to those pins produces a -drivers that Build-Depends on a
+# -libs version no platform builds. One place computes the version; the pins
+# and the changelog cannot disagree.
+#
+# Empty by default, so a normal promote run is byte-identical to before.
+# RPM is deliberately unaffected: Fedora is one platform and its Release:
+# carries %{?dist} already.
+DEB_SUFFIX=${DEB_SUFFIX:-}
+case "$DEB_SUFFIX" in
+  "") ;;
+  '~'*) ;;
+  *) echo "*** ABORT: DEB_SUFFIX must start with '~' (got '${DEB_SUFFIX}') -- anything else sorts ABOVE the bare version and would outrank an unsuffixed build ***" >&2; exit 1 ;;
+esac
+
 : "${DEBFULLNAME:=Will Snyder}"
 : "${DEBEMAIL:=william@williamlsnyder.org}"
 export DEBFULLNAME DEBEMAIL
@@ -92,6 +114,10 @@ case "$NEW_TAG" in
   *) die "tag '$NEW_TAG' is not shaped like a vX.Y.Z upstream tag" ;;
 esac
 NEW_VERSION=${NEW_TAG#v}
+# The full Debian version every changelog entry and every -libs pin must
+# agree on. DEB_SUFFIX is empty on a normal promote, making this exactly
+# the ${NEW_VERSION}-${DEB_REV} it has always been.
+DEB_VER="${NEW_VERSION}-${DEB_REV}${DEB_SUFFIX}"
 
 # The libs spec is the source of truth for what version we are moving FROM --
 # every other file is required below to agree with it.
@@ -198,20 +224,23 @@ DEPS_TOTAL=$(dep_tokens "$DRIVERS_CONTROL" | grep -c 'indi-stable-3rdparty-libs'
   || die "found NO -libs dependencies in $(basename "$DRIVERS_CONTROL")'s Depends:/Build-Depends: fields -- the file's format has changed and this script no longer understands it"
 say "found $DEPS_TOTAL -libs dependencies (every one must end up exactly pinned)"
 
-sed -i -E "s/(indi-stable-3rdparty-libs-[a-z0-9]+(-dev)?[[:space:]]*\([[:space:]]*=[[:space:]]*)${OLD_RE}-[0-9]+\)/\1${NEW_VERSION}-${DEB_REV})/g" \
+# The incoming pin may already carry a suffix (a re-run, or a checkout left
+# by a previous platform in the same matrix), so the match tolerates one;
+# the replacement always writes the suffix this run was asked for.
+sed -i -E "s/(indi-stable-3rdparty-libs-[a-z0-9]+(-dev)?[[:space:]]*\([[:space:]]*=[[:space:]]*)${OLD_RE}-[0-9]+(~[A-Za-z0-9.+]+)?\)/\1${DEB_VER})/g" \
   "$DRIVERS_CONTROL"
 
 # Anchored whole-token: a bare unpinned name fails this, as does any other
 # operator, spacing or version.
-PINNED_RE="^indi-stable-3rdparty-libs-[a-z0-9]+(-dev)?[[:space:]]*\([[:space:]]*=[[:space:]]*$(esc "$NEW_VERSION")-${DEB_REV}\)$"
+PINNED_RE="^indi-stable-3rdparty-libs-[a-z0-9]+(-dev)?[[:space:]]*\([[:space:]]*=[[:space:]]*$(esc "$DEB_VER")\)$"
 UNPINNED=$(dep_tokens "$DRIVERS_CONTROL" | grep 'indi-stable-3rdparty-libs' | grep -vE "$PINNED_RE" || true)
 
 if [ -n "$UNPINNED" ]; then
-  echo "--- -libs dependencies NOT exactly pinned at ${NEW_VERSION}-${DEB_REV}: ---" >&2
+  echo "--- -libs dependencies NOT exactly pinned at ${DEB_VER}: ---" >&2
   printf '%s\n' "$UNPINNED" | sed 's/^/    /' >&2
-  die "$(printf '%s\n' "$UNPINNED" | wc -l) of $DEPS_TOTAL -libs dependencies are not exactly pinned at ${NEW_VERSION}-${DEB_REV} (listed above) -- a changed operator, a missing version clause, or a stale version all land here, and leaving any of them is how -drivers ends up accepting a -libs build CI is not producing"
+  die "$(printf '%s\n' "$UNPINNED" | wc -l) of $DEPS_TOTAL -libs dependencies are not exactly pinned at ${DEB_VER} (listed above) -- a changed operator, a missing version clause, or a stale version all land here, and leaving any of them is how -drivers ends up accepting a -libs build CI is not producing"
 fi
-say "PASS: all $DEPS_TOTAL -libs dependencies pinned at ${NEW_VERSION}-${DEB_REV}"
+say "PASS: all $DEPS_TOTAL -libs dependencies pinned at ${DEB_VER}"
 
 # ------------------------------------------------------- RPM %changelog ----
 # core-release.yml's promote job never did this for core -- STATUS.md records
@@ -255,17 +284,17 @@ deb_changelog_add() {   # $1 = changelog path
   local cl=$1 top
   top=$(head -1 "$cl")
   case "$top" in
-    *"(${NEW_VERSION}-${DEB_REV})"*)
-      say "SKIP: $(basename "$(dirname "$cl")")/changelog top entry is already ${NEW_VERSION}-${DEB_REV}"
+    *"(${DEB_VER})"*)
+      say "SKIP: $(basename "$(dirname "$cl")")/changelog top entry is already ${DEB_VER}"
       return 0 ;;
   esac
-  dch --changelog "$cl" --newversion "${NEW_VERSION}-${DEB_REV}" \
+  dch --changelog "$cl" --newversion "${DEB_VER}" \
       --distribution unstable \
       "New upstream release ${NEW_TAG}, built and gated by 3rdparty-release.yml" \
     || die "dch failed on $cl"
-  head -1 "$cl" | grep -qF "(${NEW_VERSION}-${DEB_REV})" \
-    || die "$cl top entry is not ${NEW_VERSION}-${DEB_REV} after dch"
-  say "PASS: $(dirname "$cl" | xargs basename)/changelog -> ${NEW_VERSION}-${DEB_REV}"
+  head -1 "$cl" | grep -qF "(${DEB_VER})" \
+    || die "$cl top entry is not ${DEB_VER} after dch"
+  say "PASS: $(dirname "$cl" | xargs basename)/changelog -> ${DEB_VER}"
 }
 
 deb_changelog_add "$LIBS_CHANGELOG"
@@ -284,6 +313,6 @@ $STRAY"
 fi
 
 echo
-echo "############ BUMP COMPLETE: indi-stable-3rdparty at ${NEW_VERSION}-${DEB_REV} ############"
+echo "############ BUMP COMPLETE: indi-stable-3rdparty at ${DEB_VER} (rpm: ${NEW_VERSION}-${DEB_REV}) ############"
 echo "Review with: git diff"
 exit 0
