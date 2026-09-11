@@ -119,13 +119,31 @@ deriving them from the tag:
 
 ```
 # Fedora / RHEL / Rocky / Alma
-sudo dnf install ./indi-stable-core-libs-2.2.4.2-1.fc44.x86_64.rpm \
-                 ./indi-stable-core-2.2.4.2-1.fc44.x86_64.rpm
+sudo dnf install ./indi-stable-core-libs-2.2.4.2-2.fc44.x86_64.rpm \
+                 ./indi-stable-core-2.2.4.2-2.fc44.x86_64.rpm
 
-# Debian / Ubuntu
-sudo apt install ./indi-stable-core-libs_2.2.4.2-1_amd64.deb \
-                 ./indi-stable-core_2.2.4.2-1_amd64.deb
+# Debian / Ubuntu -- pick YOUR distribution's files (see below)
+sudo apt install ./indi-stable-core-libs_2.2.4.2-2.deb12_amd64.deb \
+                 ./indi-stable-core_2.2.4.2-2.deb12_amd64.deb
 ```
+
+**The `.deb`s are per-distribution and you must take the matching set.** Each
+release carries three Debian builds, distinguished by a marker before
+`_amd64`:
+
+| Your system | Take the files marked |
+|---|---|
+| Debian 12 "bookworm" | `.deb12` |
+| Ubuntu 24.04 "noble" | `.ubuntu24.04` |
+| Ubuntu 26.04 | `.ubuntu26.04` |
+
+They are not interchangeable: each is linked against its own distribution's
+libraries, and installing the wrong one fails on a `libc6` version it cannot
+satisfy. `apt` will tell you so rather than installing something broken.
+
+Once installed, `dpkg -l indi-stable-core` reports the version with a `~`
+(`2.2.4.2-2~deb12`) where the filename has a `.` — GitHub rewrites `~` in
+release filenames. The package version is the authoritative one.
 
 Install the base package and `-libs` together. The `-devel` (RPM) and `-dev`
 (DEB) packages are needed only to *build* against this project, as

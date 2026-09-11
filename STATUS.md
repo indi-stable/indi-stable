@@ -1299,30 +1299,38 @@ distinguishable, and its knock-on effect on `-drivers`' eighteen `-libs`
 pins, are in `DESIGN.md`, "Decided: a per-distribution version suffix on the
 Debian side".
 
-### Open: CI is not run-verified, and core must release first
+**`core-release.yml` is verified end to end on all four platforms,
+2026-09-11**, twice: a `build_only` rehearsal (nine jobs green, `promote`
+correctly skipped, nothing published) and then a real `repackage: true` run
+that published **`indi-stable-core-v2.2.4.2-2`, 12 assets** — 9 `.deb`s
+across three platforms plus 3 Fedora RPMs.
 
-Two things, both consequences of that change:
+The XISF assertion fired in **both directions in the same run**, which is
+what makes it a live control rather than a check that passes by finding
+nothing: `asked for no, configured no` on Debian 12 and Ubuntu 24.04, and
+`asked for yes, configured yes` on Ubuntu 26.04 with
+`Found LibXISF: /usr/lib/x86_64-linux-gnu/libXISF.so`. Each smoke test
+installed its own platform's package.
 
-- **None of the three workflow changes has been exercised by a real run.**
-  They parse, every matrix expands to the intended three entries, and every
-  `download-artifact` name has a matching upload — all checked mechanically.
-  **Rehearse it with the `build_only` dispatch input** rather than by cutting
-  a release: it runs check → build → smoke-test on every platform and skips
-  `promote`, which is where every publishing action in all three workflows
-  lives. Nothing is tagged, released, committed or consumed.
-- **`3rdparty` and `pyindi-client` cannot build until core re-releases.**
-  Both now select their core packages by version suffix, and the current core
-  release predates the split, so it carries no suffixed files. Each asserts
-  it actually matched something, so they fail loudly rather than building
-  against nothing. A `repackage: true` dispatch of `core-release.yml` closes
-  the gap, and it has to come first — their `build_only` rehearsals will fail
-  until it has.
+`promote` itself is now exercised for the first time: the 9-asset count
+check passed, PR #15 was opened and **merged by `github-actions[bot]`
+itself**, the release published three seconds before the bump commit (the
+deliberate ordering), `development` was fast-forwarded to zero divergence,
+and the promotion branch was deleted.
 
-**`main` is 20 commits behind `development` and knows none of this.** Every
-workflow checks out `ref: main`, so a dispatch of any kind — `build_only`
-included — runs against main's packaging, which has no `noxisf` profile and
-no per-platform matrix. **Merging `development` into `main` is the first
-step of all of them**, before any rehearsal is meaningful.
+### Open: `3rdparty` and `pyindi-client` CI is still unexercised
+
+Their workflows carry the identical four-platform shape but have never run.
+Both are now unblocked — core's release carries per-platform packages — so
+the next step for each is a `build_only` rehearsal before any real
+promotion. Treat their matrices as fixed-by-the-same-patch, not as
+independently verified.
+
+**One defect that first release did surface**, and it would have hit exactly
+those two workflows: GitHub rewrites `~` to `.` in a release asset's
+filename, so the `*~deb12_*.deb` download patterns matched nothing.
+Demonstrated against the live release and fixed to a separator-less glob
+before either workflow ran. `LESSONS_LEARNED.md` #31.
 
 **Ubuntu names its dbgsym packages `.ddeb`, Debian names them `.deb`** — so
 `ubuntu24astro`'s `~/build` holds two `.ddeb` files a `*.deb` glob will not
