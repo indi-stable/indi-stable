@@ -187,12 +187,15 @@ jobs:
           - id: debian12
             image: debian:12
             vsuffix: '~deb12'
+            asset_glob: '*deb12_*.deb'
           - id: ubuntu2404
             image: ubuntu:24.04
             vsuffix: '~ubuntu24.04'
+            asset_glob: '*ubuntu24.04_*.deb'
           - id: ubuntu2604
             image: ubuntu:26.04
             vsuffix: '~ubuntu26.04'
+            asset_glob: '*ubuntu26.04_*.deb'
     container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
@@ -203,6 +206,12 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             ca-certificates curl devscripts equivs git gh
+      # asset_glob, NOT the '~' vsuffix: GitHub REWRITES '~' to '.' when it
+      # stores a release asset, so a file built as ...-2~deb12_amd64.deb is
+      # served as ...-2.deb12_amd64.deb and a '*~deb12_*' pattern matches
+      # nothing. Found on the first real release, 2026-09-11, by reading the
+      # published asset names. The package's own Version field still carries
+      # the '~' and is unaffected.
       - name: Download this platform's core packages from the gated release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -210,7 +219,7 @@ jobs:
           mkdir -p core-debs
           gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
             --repo "${{ github.repository }}" \
-            --pattern "*${{ matrix.vsuffix }}_*.deb" --dir core-debs
+            --pattern "${{ matrix.asset_glob }}" --dir core-debs
           test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
             echo "ERROR: the core release has no ${{ matrix.vsuffix }} packages. core must be"
             echo "       released with per-platform suffixes before pyindi-client can build."
@@ -303,12 +312,15 @@ jobs:
           - id: debian12
             image: debian:12
             vsuffix: '~deb12'
+            asset_glob: '*deb12_*.deb'
           - id: ubuntu2404
             image: ubuntu:24.04
             vsuffix: '~ubuntu24.04'
+            asset_glob: '*ubuntu24.04_*.deb'
           - id: ubuntu2604
             image: ubuntu:26.04
             vsuffix: '~ubuntu26.04'
+            asset_glob: '*ubuntu26.04_*.deb'
     container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
@@ -325,7 +337,7 @@ jobs:
           mkdir -p core-debs
           gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
             --repo "${{ github.repository }}" \
-            --pattern "*${{ matrix.vsuffix }}_*.deb" --dir core-debs
+            --pattern "${{ matrix.asset_glob }}" --dir core-debs
           test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
             echo "ERROR: core release has no ${{ matrix.vsuffix }} packages -- see build-debian"
             exit 1; }
