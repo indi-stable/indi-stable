@@ -157,23 +157,51 @@ jobs:
   build-debian:
     needs: check
     if: needs.check.outputs.new_version != ''
-    runs-on: ubuntu-26.04
+    # Three platforms, matching core-release.yml's own build-debian -- see
+    # that file for the full reasoning on containers and version suffixes.
+    #
+    # For THIS component the platform split is the entire point: the compiled
+    # SWIG extension is built against the box's own Python, so each platform
+    # produces a genuinely different module -- _PyIndi.cpython-311 on
+    # bookworm, -312 on noble, -314 on resolute. Verified by hand on the VMs
+    # 2026-09-11. One build could never have served all three.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: debian12
+            image: debian:12
+            vsuffix: '~deb12'
+          - id: ubuntu2404
+            image: ubuntu:24.04
+            vsuffix: '~ubuntu24.04'
+          - id: ubuntu2604
+            image: ubuntu:26.04
+            vsuffix: '~ubuntu26.04'
+    container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Install devscripts and equivs
+      - name: Install build tooling
         run: |
-          sudo apt-get update
-          sudo apt-get install -y devscripts equivs
-      - name: Download the gated core release
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl devscripts equivs git gh
+      - name: Download this platform's core packages from the gated release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-debs
           gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
-            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
-          sudo apt-get install -y ./core-debs/*.deb
+            --repo "${{ github.repository }}" \
+            --pattern "*${{ matrix.vsuffix }}_*.deb" --dir core-debs
+          test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
+            echo "ERROR: the core release has no ${{ matrix.vsuffix }} packages. core must be"
+            echo "       released with per-platform suffixes before pyindi-client can build."
+            exit 1; }
+          apt-get install -y ./core-debs/*.deb
       # The sdist comes from the URL the check job resolved, and its hash is
       # verified HERE rather than trusted -- the RPM side gets this free from
       # the spec's own %prep check, and the Debian side would otherwise build
@@ -196,11 +224,12 @@ jobs:
           rm -rf "$SRCDIR/debian"
           cp -r pyindi-client/deb "$SRCDIR/debian"
           cd "$SRCDIR"
-          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}" \
+          dch --changelog debian/changelog --newversion "${NEW_VERSION}-${{ needs.check.outputs.release }}${{ matrix.vsuffix }}" \
             --distribution unstable \
-            "Rebuild of ${NEW_VERSION} at release ${{ needs.check.outputs.release }}, built by pyindi-client-release.yml"
+            "Rebuild of ${NEW_VERSION} at release ${{ needs.check.outputs.release }} for ${{ matrix.image }}, built by pyindi-client-release.yml"
+          head -1 debian/changelog
       - name: Resolve Build-Depends from debian/control
-        run: sudo mk-build-deps -i -t 'apt-get -y' "$SRCDIR/debian/control"
+        run: mk-build-deps -i -t 'apt-get -y --no-install-recommends' "$SRCDIR/debian/control"
       - name: Build
         run: cd "$SRCDIR" && dpkg-buildpackage -us -uc -b
       - name: Collect built DEBs
@@ -208,9 +237,16 @@ jobs:
           mkdir -p out
           find /tmp -maxdepth 1 -name '*.deb' ! -name '*-dbgsym*' -exec cp {} out/ \;
           ls -la out/
+          test -n "$(ls out/)" || { echo "ERROR: no .deb collected"; exit 1; }
+          for f in out/*.deb; do
+            case "$f" in
+              *"${{ matrix.vsuffix }}"*) ;;
+              *) echo "ERROR: $f does not carry the expected suffix '${{ matrix.vsuffix }}'"; exit 1 ;;
+            esac
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: pyindi-client-deb
+          name: pyindi-client-deb-${{ matrix.id }}
           path: out/
           if-no-files-found: error
 
@@ -239,23 +275,51 @@ jobs:
 
   smoke-test-debian:
     needs: [check, build-debian]
-    runs-on: ubuntu-26.04
+    # Each platform tested in the image it was built in, which matters more
+    # here than anywhere else: this gate imports the compiled extension and
+    # checks every symbol PyIndi.py references is exported by it. That check
+    # is only meaningful against the interpreter the module was built for --
+    # a cpython-311 module on a 3.12 box does not import at all, which would
+    # fail for a reason that says nothing about the packaging.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: debian12
+            image: debian:12
+            vsuffix: '~deb12'
+          - id: ubuntu2404
+            image: ubuntu:24.04
+            vsuffix: '~ubuntu24.04'
+          - id: ubuntu2604
+            image: ubuntu:26.04
+            vsuffix: '~ubuntu26.04'
+    container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Download the gated core release
+      - name: Install test tooling
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git gh
+      - name: Download this platform's core packages from the gated release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p core-debs
           gh release download "indi-stable-core-${{ needs.check.outputs.core_tag }}" \
-            --repo "${{ github.repository }}" --pattern '*.deb' --dir core-debs
+            --repo "${{ github.repository }}" \
+            --pattern "*${{ matrix.vsuffix }}_*.deb" --dir core-debs
+          test -n "$(ls core-debs/*.deb 2>/dev/null)" || {
+            echo "ERROR: core release has no ${{ matrix.vsuffix }} packages -- see build-debian"
+            exit 1; }
       - uses: actions/download-artifact@v4
         with:
-          name: pyindi-client-deb
+          name: pyindi-client-deb-${{ matrix.id }}
           path: py-debs
-      - run: sudo bash scripts/smoke-test-pyindi-client-deb.sh py-debs core-debs
+      - run: bash scripts/smoke-test-pyindi-client-deb.sh py-debs core-debs
 
   promote:
     needs: [check, smoke-test-fedora, smoke-test-debian]
@@ -280,9 +344,21 @@ jobs:
         with:
           name: pyindi-client-rpm
           path: artifacts/rpm
+      # One per platform. They share a directory because the version suffix
+      # makes every filename distinct; the count check below turns a suffix
+      # that failed to apply into a failed release rather than a release
+      # quietly carrying one platform's module three times.
       - uses: actions/download-artifact@v4
         with:
-          name: pyindi-client-deb
+          name: pyindi-client-deb-debian12
+          path: artifacts/deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: pyindi-client-deb-ubuntu2404
+          path: artifacts/deb
+      - uses: actions/download-artifact@v4
+        with:
+          name: pyindi-client-deb-ubuntu2604
           path: artifacts/deb
       - name: Install devscripts
         run: sudo apt-get update && sudo apt-get install -y devscripts
@@ -318,6 +394,15 @@ jobs:
         run: |
           mkdir -p release-assets
           cp artifacts/rpm/*.rpm artifacts/deb/*.deb release-assets/
+          # One .deb per platform. A short count means two platforms produced
+          # the same filename -- i.e. a version suffix did not apply -- and
+          # the release would otherwise ship one platform's compiled module
+          # while appearing to cover three.
+          N_DEB=$(ls release-assets/*.deb | wc -l)
+          test "$N_DEB" -eq 3 || {
+            echo "ERROR: expected 3 .deb files (one per platform), found ${N_DEB}:"
+            ls -la release-assets/
+            exit 1; }
           # Release 1 keeps the plain name so existing tags stay valid; a
           # repackage gets an explicit -N suffix, without which gh release
           # create fails on the already-existing tag.
@@ -330,7 +415,7 @@ jobs:
           echo "creating release: ${REL_TAG}"
           gh release create "${REL_TAG}" release-assets/* \
             --title "${REL_TITLE}" \
-            --notes "Automated release. Built from the PyPI pyindi-client ${NEW_VERSION} sdist against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on both Fedora and Debian/Ubuntu. Linked against this project's own libindiclient rather than any system libindi. Unofficial third-party build -- see README.md."
+            --notes "Automated release. Built from the PyPI pyindi-client ${NEW_VERSION} sdist against indi-stable-core ${{ needs.check.outputs.core_tag }}, gated on all four platforms -- Fedora 44, Debian 12, Ubuntu 24.04 and Ubuntu 26.04, each built and imported against that platform's own Python. Linked against this project's own libindiclient rather than any system libindi. Unofficial third-party build -- see README.md."
       # main is protected (PR required), so the bump lands via a PR the bot
       # opens and immediately merges itself -- main's branch protection
       # requires a pull request but zero approving reviews, so this is not a
