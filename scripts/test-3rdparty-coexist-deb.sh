@@ -19,7 +19,8 @@
 # indi-3rdparty package at all, so RPM coexistence could only be checked
 # against distro CORE INDI, never against a real competing 3rdparty artifact.
 # Ubuntu's *archive* (not the PPA) is different: `apt-cache show indi-apogee`
-# resolves to a real package, `libapogee3t64` ships `libapogee.so.3` --
+# resolves to a real package, and the library package it depends on (named
+# per-release -- see STEP 2) ships `libapogee.so.3` --
 # BYTE-IDENTICAL SONAME to indi-stable-3rdparty-libs-apogee's own
 # libapogee.so.3 (confirmed 2026-08-26 by extracting the actual archive .deb
 # and reading its SONAME with readelf, not by trusting the package name --
@@ -211,15 +212,30 @@ pass "$INSTALLED 3rdparty packages installed; $OUR_SERVER -> $(readlink -e "$OUR
 
 echo
 echo "############ STEP 2: get a REAL colliding artifact from the archive, without installing it ############"
-( cd "$W" && apt-get download libapogee3t64 >download.log 2>&1 )
-DISTRO_APOGEE_DEB=$(ls "$W"/libapogee3t64_*.deb 2>/dev/null | head -1)
+# Which archive package ships libapogee.so.3 is NOT a constant across the
+# Debian family, and it cannot be resolved the way LESSONS_LEARNED.md #29
+# resolves the others: that package is deliberately never installed here
+# (installing it drags in the distribution's own indi-apogee and removes
+# indi-bin), so there is no local file for `dpkg -S` to attribute. Ask the
+# archive's own metadata instead -- the distribution's indi-apogee depends on
+# whichever package ships the library. Debian 12 has libapogee3; Debian 13 and
+# Ubuntu 24.04, which went through the 64-bit time_t transition, have
+# libapogee3t64. A hardcoded name silently covers only the release it was
+# written on, which is #29 exactly.
+DISTRO_APOGEE_PKG=${DISTRO_APOGEE_PKG:-$(apt-cache depends indi-apogee 2>/dev/null \
+  | sed -n 's/.*Depends: \(libapogee[0-9a-z]*\)$/\1/p' | head -1)}
+test -n "$DISTRO_APOGEE_PKG" \
+  || die "could not resolve which archive package ships libapogee.so.3 from indi-apogee's dependencies -- set DISTRO_APOGEE_PKG explicitly"
+echo "  ....  archive package shipping libapogee.so.3 on this box: $DISTRO_APOGEE_PKG"
+( cd "$W" && apt-get download "$DISTRO_APOGEE_PKG" >download.log 2>&1 )
+DISTRO_APOGEE_DEB=$(ls "$W/${DISTRO_APOGEE_PKG}"_*.deb 2>/dev/null | head -1)
 test -f "$DISTRO_APOGEE_DEB" \
-  || { cat "$W/download.log"; die "apt-get download libapogee3t64 failed -- needs network access, see this script's header"; }
+  || { cat "$W/download.log"; die "apt-get download $DISTRO_APOGEE_PKG failed -- needs network access, see this script's header"; }
 dpkg-deb -x "$DISTRO_APOGEE_DEB" "$W/distro-apogee" \
   || die "dpkg-deb -x on the downloaded archive package failed"
 DISTRO_LIBAPOGEE=$(find "$W/distro-apogee" -name 'libapogee.so.3*' -type f | head -1)
 test -f "$DISTRO_LIBAPOGEE" || die "the downloaded archive package does not contain libapogee.so.3 -- cannot prove a real collision"
-dpkg -s libapogee3t64 >/dev/null 2>&1 && die "libapogee3t64 got INSTALLED somehow -- this step must only download, never install"
+dpkg -s "$DISTRO_APOGEE_PKG" >/dev/null 2>&1 && die "$DISTRO_APOGEE_PKG got INSTALLED somehow -- this step must only download, never install"
 pass "real distro libapogee.so.3 extracted to $W/distro-apogee, never installed via dpkg"
 
 OUR_SONAME=$(readelf -d "$OUR_LIBDIR/libapogee.so.3" 2>/dev/null | sed -n 's/.*Library soname: \[\(.*\)\]/\1/p')
