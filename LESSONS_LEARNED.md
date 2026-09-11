@@ -840,3 +840,45 @@ deliberately left installed: a plain configure caches
 same configure with `-DCMAKE_DISABLE_FIND_PACKAGE_LibXISF=ON` leaves it out
 of the cache entirely. `core/deb/rules` now asserts that outcome against
 what the build profile asked for.
+
+## 31. GitHub rewrites `~` in a release asset's filename, so the uploaded name is not the served name
+
+`core-release.yml` builds three Debian platforms and disambiguates them with
+a `~deb12` / `~ubuntu24.04` / `~ubuntu26.04` version suffix. The build
+produced `indi-stable-core_2.2.4.2-2~deb12_amd64.deb`, `promote` uploaded
+exactly that name — and GitHub served it as
+`indi-stable-core_2.2.4.2-2.deb12_amd64.deb`. The tilde became a dot.
+
+Nothing failed. The release looked correct, the asset count assertion passed
+at 9, and every job was green. The defect was one step downstream and had not
+run yet: `3rdparty-release.yml` and `pyindi-client-release.yml` select their
+core packages with `gh release download --pattern "*~deb12_*.deb"`, which
+matches **nothing** against the stored name. Demonstrated rather than
+reasoned about — the tilde pattern returns "no assets match the file
+pattern", the separator-less `*deb12_*.deb` returns exactly the right three
+files.
+
+**What survived, and it is the part that matters:** the package's own
+`Version` field is untouched — `dpkg-deb -f` on a downloaded asset reads
+`2.2.4.2-2~deb12`. So dpkg's version ordering, and `dpkg -l` answering "which
+build is this?", both still work. Only the *filename* is rewritten.
+
+The general rule is not about tildes. It is that **an artifact's name after a
+service has stored it is a different fact from the name you gave it**, and
+any pattern matching that name is matching the service's version. This is #2
+("read the artifact, not the log") applied to a published artifact: the
+upload log said `~deb12` and was accurate about what was sent, and the thing
+that was actually served differed.
+
+**Rule:** after publishing an artifact whose name something else will match
+on, read the published name back and match a pattern against it for real.
+Where a name passes through a service, avoid depending on punctuation
+surviving — the fix here drops the separator from the glob entirely, so it
+works against either spelling.
+
+*Evidence:* found 2026-09-11 on the first real four-platform release
+(`indi-stable-core-v2.2.4.2-2`), by listing the published asset names rather
+than assuming they matched what `promote` uploaded. Both download patterns
+were then tested against the live release, the broken one confirmed to return
+zero files and the fixed one exactly three per platform, before either
+workflow ran.
