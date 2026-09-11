@@ -42,6 +42,16 @@ on:
           and upstream did not.
         type: boolean
         default: false
+      build_only:
+        description: >-
+          Rehearsal. Build and smoke-test every platform, then STOP before
+          promote -- no GitHub Release, no tag, no commit to main, and no
+          release number consumed. Resolves the version the same way
+          repackage does, so it builds what is currently committed rather
+          than waiting for a new upstream tag. Use it to exercise a change to
+          this workflow before letting it publish anything.
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -73,14 +83,19 @@ jobs:
         run: bash scripts/check-upstream-tag.sh indilib/indi core
       - name: Compute the next release (repackage only)
         id: next
-        if: inputs.repackage == true
+        # build_only resolves the version exactly as repackage does -- it
+        # builds what is currently committed instead of waiting for a new
+        # upstream tag, which is the only way a rehearsal can build anything
+        # at all on a quiet day. The release number it computes is never
+        # consumed, because promote is skipped.
+        if: inputs.repackage == true || inputs.build_only == true
         run: bash scripts/next-release.sh core/rpm/indi-stable-core.spec
       # One place decides the version and release for the whole run, so a
       # build job and the promote job cannot arrive at different answers.
       - name: Resolve what this run builds
         id: resolve
         run: |
-          if [ "${{ inputs.repackage }}" = "true" ]; then
+          if [ "${{ inputs.repackage }}" = "true" ] || [ "${{ inputs.build_only }}" = "true" ]; then
             echo "new_tag=v${{ steps.next.outputs.version }}" >> "$GITHUB_OUTPUT"
             echo "release=${{ steps.next.outputs.release }}"  >> "$GITHUB_OUTPUT"
             echo "repackage: v${{ steps.next.outputs.version }} release ${{ steps.next.outputs.release }}"
@@ -339,6 +354,11 @@ jobs:
 
   promote:
     needs: [check, smoke-test-fedora, smoke-test-debian]
+    # Skipped entirely for a build_only rehearsal: no GitHub Release,
+    # no tag, no version-bump commit, no PR self-merged into main, and
+    # no release number consumed. Everything that actually publishes
+    # lives in this job, so one condition here is the whole gate.
+    if: inputs.build_only != true
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 is required here, unlike every other checkout in this

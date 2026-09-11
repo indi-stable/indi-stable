@@ -35,6 +35,16 @@ on:
           and upstream did not.
         type: boolean
         default: false
+      build_only:
+        description: >-
+          Rehearsal. Build and smoke-test every platform, then STOP before
+          promote -- no GitHub Release, no tag, no commit to main, and no
+          release number consumed. Resolves the version the same way
+          repackage does, so it builds what is currently committed rather
+          than waiting for a new upstream tag. Use it to exercise a change to
+          this workflow before letting it publish anything.
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -65,7 +75,11 @@ jobs:
         run: bash scripts/check-upstream-pypi.sh pyindi-client pyindi-client
       - name: Compute the next release (repackage only)
         id: next
-        if: inputs.repackage == true
+        # build_only resolves the version exactly as repackage does, so a
+        # rehearsal builds what is currently committed rather than needing a
+        # new PyPI release to exist. The release number it computes is never
+        # consumed, because promote is skipped.
+        if: inputs.repackage == true || inputs.build_only == true
         run: bash scripts/next-release.sh pyindi-client/rpm/indi-stable-pyindi-client.spec
       # A repackage builds the SAME sdist, so its URL and hash come from the
       # spec that is already pinned to them rather than from PyPI again --
@@ -74,7 +88,7 @@ jobs:
       - name: Resolve what this run builds
         id: resolve
         run: |
-          if [ "${{ inputs.repackage }}" = "true" ]; then
+          if [ "${{ inputs.repackage }}" = "true" ] || [ "${{ inputs.build_only }}" = "true" ]; then
             SPEC=pyindi-client/rpm/indi-stable-pyindi-client.spec
             URL=$(sed -n 's|^Source0:[[:space:]]*\(.*\)$|\1|p' "$SPEC" | head -1)
             SHA=$(grep -oE '^echo "[0-9a-f]{64}' "$SPEC" | head -1 | sed 's/^echo "//')
@@ -323,6 +337,11 @@ jobs:
 
   promote:
     needs: [check, smoke-test-fedora, smoke-test-debian]
+    # Skipped entirely for a build_only rehearsal: no GitHub Release,
+    # no tag, no version-bump commit, no PR self-merged into main, and
+    # no release number consumed. Everything that actually publishes
+    # lives in this job, so one condition here is the whole gate.
+    if: inputs.build_only != true
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 is required here, unlike every other checkout in this
