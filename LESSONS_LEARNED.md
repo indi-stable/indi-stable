@@ -798,3 +798,45 @@ rather than a literal list.
 found and fixed 2026-09-10, running each harness for the first time on
 `debianastro` rather than `ubuntuastro`. Every fix was verified by re-running
 the same harness to a clean pass on the same box, not just read as correct.
+
+## 30. A build flag nothing reads looks like it works, wherever the feature is absent for another reason
+
+INDI declares `OPTION(INDI_BUILD_XISF "Build XISF support" ON)` at
+`CMakeLists.txt:100` and then **never reads it anywhere**. What actually
+decides the feature is `find_package(LibXISF)` at
+`libs/indibase/CMakeLists.txt:51`, which is **not `REQUIRED`** and adds
+`-DHAVE_XISF` only on success. So XISF appears and disappears silently with
+the library's availability, and `-DINDI_BUILD_XISF=OFF` does nothing at all.
+
+The trap is not the dead option by itself — it is that the dead option
+**appears to work on exactly the platform you would first test it on**.
+Debian 12 has no `libxisf-dev` in any pocket, so a build there with
+`-DINDI_BUILD_XISF=OFF` produces a package with no XISF support and every
+check passes. The flag gets the credit for an outcome the missing library
+had already produced. Ubuntu 24.04 is where the illusion breaks: it *has*
+`libxisf-dev` (0.2.8, too old for this INDI release), so the same flag
+changes nothing, `find_package` succeeds, and the build fails at compile
+time on an API the header does not declare.
+
+This is #5's "a check that passes by finding nothing" one layer out: not a
+check passing vacuously, but a **control** that was never connected to
+anything, agreeing with the desired outcome by coincidence. A flag and its
+effect looking consistent on one box is not evidence the flag caused it.
+
+**Rule:** before trusting a build option, confirm something actually reads
+it — `grep` the option name across the build system, not just the line that
+declares it. Where the real control is an optional dependency, name it
+explicitly (`CMAKE_DISABLE_FIND_PACKAGE_<Pkg>`) rather than hoping absence
+does the job, and **assert the configured outcome in both directions**,
+because a silently-optional dependency fails toward a quietly feature-less
+package rather than an error.
+
+*Evidence:* found 2026-09-11 while scoping Debian 12 and Ubuntu 24.04, by
+grepping `INDI_BUILD_XISF` across the tree instead of trusting its name —
+the option has exactly one occurrence, its own declaration. The real switch
+was verified in both directions on `ubuntu24astro` with `libxisf-dev`
+deliberately left installed: a plain configure caches
+`LibXISF_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libXISF.so`, and the
+same configure with `-DCMAKE_DISABLE_FIND_PACKAGE_LibXISF=ON` leaves it out
+of the cache entirely. `core/deb/rules` now asserts that outcome against
+what the build profile asked for.
