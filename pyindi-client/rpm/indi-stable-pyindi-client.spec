@@ -28,7 +28,7 @@
 
 Name:           indi-stable-pyindi-client
 Version:        2.2.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Python bindings for the INDI client library (indi-stable build)
 
 # pyindi-client itself is GPL-3.0-or-later (LICENSE is the plain GPLv3 text;
@@ -175,6 +175,9 @@ rm -rf %{buildroot}%{python3_sitearch}/pyindi_client-*.egg-info
 %{python3_sitearch}/PyIndi/
 
 %changelog
+* Sat Sep 12 2026 Will Snyder <william@williamlsnyder.org> - 2.2.0-2
+- New upstream release 2.2.0, built and gated by pyindi-client-release.yml.
+
 * Thu Aug 27 2026 Will Snyder <william@williamlsnyder.org> - 2.2.0-1
 - Initial package. Builds pyindi-client's 2.2.0 PyPI release against
   indi-stable-core, RPATH into the private prefix, installed to the ordinary

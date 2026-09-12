@@ -1,3 +1,10 @@
+indi-stable-pyindi-client (2.2.0-2) unstable; urgency=medium
+
+  * New upstream release 2.2.0, built and gated by pyindi-client-
+    release.yml
+
+ -- Will Snyder <william@williamlsnyder.org>  Sat, 12 Sep 2026 00:25:34 +0000
+
 indi-stable-pyindi-client (2.2.0-1) unstable; urgency=medium
 
   * Initial package. Builds indilib/pyindi-client's 2.2.0 PyPI release (the
