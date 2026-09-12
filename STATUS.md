@@ -1341,15 +1341,26 @@ three Debian platforms**, and `pyindi-client` at **1199 symbols referenced,
 exactly that installed, which is the `DEB_SUFFIX` mechanism working end to
 end.
 
-### Open: only `core`'s `promote` has actually published
+**`core` and `3rdparty` have both published for real through the
+four-platform pipeline**, 2026-09-11/12:
 
-`core-release.yml` has run its `promote` for real (release
-`indi-stable-core-v2.2.4.2-2`, 12 assets, PR #15 self-merged). The other two
-have only ever skipped theirs, so their asset-count assertions — 144 for
-3rdparty, 3 for pyindi-client — their `gh release create`, and their
-self-merging promotion PRs remain unexercised. Treat those as
-fixed-by-the-same-patch, not as independently verified, until one of them
-promotes for real.
+| release | assets | promotion PR |
+|---|---|---|
+| `indi-stable-core-v2.2.4.2-2` | 12 (9 deb + 3 rpm) | #15, self-merged |
+| `indi-stable-3rdparty-v2.2.4.1-3` | 192 (**48 per Debian platform** + 48 rpm) | #19, self-merged |
+
+3rdparty's is the one that proves the scheme at scale: 144 `.deb`s published
+side by side with none overwriting another, which is the collision the
+per-distribution version suffix exists to prevent. Its committed packaging
+correctly carries the **unsuffixed** `Release: 3` and `(= 2.2.4.1-3)` pins —
+the suffix is applied per-platform at build time only, never committed.
+
+### Open: only `pyindi-client`'s `promote` is unexercised
+
+It has passed a `build_only` rehearsal but never published. Its 3-asset
+assertion, `gh release create` and self-merging PR remain untested —
+fixed-by-the-same-patch, not independently verified. It is the smallest of
+the three and carries the identical shape that has now worked twice.
 
 **Two defects surfaced between core's release and the other two rehearsals**,
 both found by reading published state rather than by a run failing, and both
