@@ -1363,7 +1363,17 @@ release.** `promote` ends by fast-forwarding `development` from `main` with
 and it fails *after* the release has published, leaving a half-finished
 promotion. The same mechanism also means `development` moves under you during
 a promotion: a local branch goes stale mid-session and the next push is
-rejected as non-fast-forward.
+rejected as non-fast-forward. That happened three times on 2026-09-11.
+
+**The `concurrency` group on the three `promote` jobs does NOT fix that**, and
+should not be mistaken for it. It serializes promotions against each other,
+which is a different hazard — two workflows writing `main` and `development`
+at once, reachable whenever a manual dispatch overlaps a scheduled run. A
+local clone still goes stale whenever any promotion runs, because `promote`
+moves `development` by design. The only thing that would stop that is
+`promote` not touching `development` at all, which would let it drift behind
+main's automated bumps — the drift the fast-forward exists to prevent. `git
+pull --rebase` before pushing is the working practice.
 
 **Two defects surfaced between core's release and the other two rehearsals**,
 both found by reading published state rather than by a run failing, and both
