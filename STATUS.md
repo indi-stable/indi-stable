@@ -1325,19 +1325,38 @@ a `.release` of `v2.2.4.2`. The consumers read that field rather than
 rebuilding the string, and refuse a missing one. `LESSONS_LEARNED.md` #32 for
 why the old derivation failed *silently* rather than loudly.
 
-### Open: `3rdparty` and `pyindi-client` CI is still unexercised
+**All three pipelines are rehearsed green on all four platforms,
+2026-09-11.** `3rdparty-release.yml` (13 jobs) and
+`pyindi-client-release.yml` (10 jobs) both passed a `build_only` run with
+`promote` skipped and nothing published — no release, no tag, no commit, no
+release number consumed.
 
-Their workflows carry the identical four-platform shape but have never run.
-Both are now unblocked — core's release carries per-platform packages — so
-the next step for each is a `build_only` rehearsal before any real
-promotion. Treat their matrices as fixed-by-the-same-patch, not as
-independently verified.
+Both reproduced the counts the by-hand VM work produced, which is the
+cross-check that CI builds the same packages rather than merely building
+successfully: **86 driver binaries and 30 vendors executed on each of the
+three Debian platforms**, and `pyindi-client` at **1199 symbols referenced,
+0 missing** on each — compiled genuinely per-interpreter,
+`_PyIndi.cpython-311` on bookworm, `-312` on noble, `-314` on resolute.
+`-drivers` pinned all 18 `-libs` dependencies at `2.2.4.1-3~deb12` and found
+exactly that installed, which is the `DEB_SUFFIX` mechanism working end to
+end.
 
-**One defect that first release did surface**, and it would have hit exactly
-those two workflows: GitHub rewrites `~` to `.` in a release asset's
-filename, so the `*~deb12_*.deb` download patterns matched nothing.
-Demonstrated against the live release and fixed to a separator-less glob
-before either workflow ran. `LESSONS_LEARNED.md` #31.
+### Open: only `core`'s `promote` has actually published
+
+`core-release.yml` has run its `promote` for real (release
+`indi-stable-core-v2.2.4.2-2`, 12 assets, PR #15 self-merged). The other two
+have only ever skipped theirs, so their asset-count assertions — 144 for
+3rdparty, 3 for pyindi-client — their `gh release create`, and their
+self-merging promotion PRs remain unexercised. Treat those as
+fixed-by-the-same-patch, not as independently verified, until one of them
+promotes for real.
+
+**Two defects surfaced between core's release and the other two rehearsals**,
+both found by reading published state rather than by a run failing, and both
+fixed before either workflow ran: GitHub rewrites `~` to `.` in release asset
+filenames (`LESSONS_LEARNED.md` #31), and `versions.json` recorded the
+upstream tag where consumers needed the published release tag — a derivation
+that resolved to a real but wrong release (#32).
 
 **Ubuntu names its dbgsym packages `.ddeb`, Debian names them `.deb`** — so
 `ubuntu24astro`'s `~/build` holds two `.ddeb` files a `*.deb` glob will not
