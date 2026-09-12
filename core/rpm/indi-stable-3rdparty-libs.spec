@@ -82,7 +82,7 @@
 
 Name:           indi-stable-3rdparty-libs
 Version:        2.2.4.1
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Vendor camera/focuser SDKs bundled by indi-3rdparty (stable upstream release, private prefix)
 
 # One tarball, several vendors, several licences -- this tag is a defensible
@@ -684,6 +684,9 @@ done
 %{indi_includedir}/libsvbonycam/
 
 %changelog
+* Sat Sep 12 2026 Will Snyder <william@williamlsnyder.org> - 2.2.4.1-3
+- New upstream release v2.2.4.1, built and gated by 3rdparty-release.yml.
+
 * Wed Sep 09 2026 Will Snyder <william@williamlsnyder.org> - 2.2.4.1-2
 - New upstream release v2.2.4.1, built and gated by 3rdparty-release.yml.
 
