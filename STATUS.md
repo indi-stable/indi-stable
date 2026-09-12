@@ -1138,60 +1138,29 @@ pre-fix build and pass against the fixed one.
 
 ## Fedora — remaining
 
-### `Release` tagging across rebuilds — done 2026-09-04, one step unrun
+Nothing. Fedora builds in every pipeline, `core/rpm/indi-stable-core.spec`
+asserts its XISF outcome, and all three components have published Fedora RPMs
+from a real gated run.
 
-**Both halves are built.** The bump scripts rewrite RPM `Release:` from the
-same number that drives the Debian revision and take `--repackage` to hold
-the upstream version and advance the release. All three workflows take a
-`repackage` **workflow_dispatch input** that rebuilds the current version at
-the next release, so a repackage is now shippable rather than a by-hand
-build.
+### Closed: `Release` tagging across rebuilds, verified for real 2026-09-11/12
 
-Fixing it uncovered that the revision argument was already accepted and
-already half-wired — it moved the Debian revision and the RPM `%changelog`
-while leaving `Release:` at 1, so `bump-core-version.sh v2.2.4.2 2` built an
-RPM whose NVR was `-1` while its own changelog claimed `-2`.
+The `-N` repackage path is exercised end to end, three times, which is what
+this section spent two corrections saying had never happened:
 
-Release tags: release 1 keeps the plain name so existing tags stay valid; a
-repackage gets an explicit `-N` suffix, without which `gh release create`
-fails on the already-existing tag.
+| dispatch | published |
+|---|---|
+| `core-release.yml` `repackage: true` | `indi-stable-core-v2.2.4.2-2` |
+| `3rdparty-release.yml` `repackage: true` | `indi-stable-3rdparty-v2.2.4.1-3` |
+| `pyindi-client-release.yml` `repackage: true` | `indi-stable-pyindi-client-2.2.0-2` |
 
-**NOT verified end to end — see the correction below.** This paragraph
-previously claimed a 2026-09-04 run in which all 8 jobs passed, both specs
-built as `-2`, the 18 Debian pins rewrote to `(= 2.2.4.1-2)` and a release
-published as `indi-stable-3rdparty-v2.2.4.1-2`. No such release, tag or
-`Release: 2` spec state exists anywhere, and the claim was checked and
-withdrawn on 2026-09-08. What is genuinely verified is the bump-script half:
-the scripts rewrite `Release:` and the Debian revision together, refuse to
-move `Release:` backward, and were exercised locally. What is **not** verified
-is any of that running inside a runner and producing a `-N`-suffixed release.
+Each advanced `Release:` in both specs, wrote the deb changelog, published a
+`-N`-suffixed tag `gh release create` accepted, and self-merged its promotion
+PR. 3rdparty additionally rewrote all 18 `-libs` pins to `(= 2.2.4.1-3)`.
 
-That run also surfaced one cosmetic defect, fixed in `0e5d28d`: the promote
-commit subject omitted the release, so the repackage commit was
-byte-identical to the original promotion's.
-
-**Correction, 2026-09-08: the `-2` release described above does not exist,
-and `3rdparty` is at `Release: 1`.** This section previously claimed
-`3rdparty` "now sits at `Release: 2` with a published `-2` release",
-contradicting this same file's own table entry above it, which says the
-release published "at a clean `Release: 1`". Checked directly rather than
-choosing between the two claims: `git ls-remote --tags` has exactly one
-`3rdparty` tag (`indi-stable-3rdparty-v2.2.4.1`, no `-2` suffix),
-`gh release list` has exactly one `3rdparty` release, and `Release:` reads
-`1%{?dist}` in the spec on both `development` and `origin/main`. The table
-entry was right; this section was wrong.
-
-**What actually happened, and it was never recorded:** the scheduled run on
-2026-09-05 (`33969183934`) built all four packages successfully over ten
-minutes and then **failed at `Create GitHub Release`** — consistent with
-`gh release create` refusing the already-existing
-`indi-stable-3rdparty-v2.2.4.1` tag, the same failure mode this file already
-documents for core. Its `Commit to development` step never ran, which is
-exactly why `Release:` stayed at 1 and no `-2` artifact exists anywhere. The
-repackage path's `-N` suffix logic is therefore **not** verified end to end;
-treat the claim above that it was as covering the bump scripts only.
-Subsequent scheduled runs (09-06, 09-07, 09-08) all complete in ~13s with
-`check` correctly finding nothing, so nothing is failing now.
+The earlier history — a claim of a `-2` release that did not exist, withdrawn
+2026-09-08, and the 2026-09-05 run that failed at `Create GitHub Release` on
+an already-existing tag — is in git. It is deleted here rather than annotated
+a third time, per this file's own rule.
 
 ## Debian / Ubuntu — remaining
 
@@ -1236,7 +1205,7 @@ is also scripted, `scripts/test-upgrade-path-3rdparty-deb.sh` and
   see `DESIGN.md`, "Single-Python-version scope" under "`pyindi-client` —
   packaging decisions".
 
-## Debian 12 and Ubuntu 24.04 — core done, 3rdparty and pyindi-client left
+## Debian 12 and Ubuntu 24.04 — done, and shipping
 
 Both VMs exist as of 2026-09-11 and the repo is cloned on each at
 `~/src/indi-stable`, on `development`, with both per-clone git settings
@@ -1401,3 +1370,28 @@ Fedora's own `libindidriver.so.2` carries `FORMAT_XISF` **and**
 `libXISF.so.0` in `DT_NEEDED`, where bookworm's and noble's carry neither —
 the same check on the same kind of artifact, finding it present on one
 platform and absent on the others.
+
+### Machine state on the two new boxes, end of 2026-09-11
+
+Both hold, and these are reusable rather than rebuildable-for-free:
+
+| Path | What |
+|---|---|
+| `~/build/*.deb` | `core` `2.2.4.2-1` and `-2`, `-3rdparty-libs`/`-drivers` at `2.2.4.1-2`, `pyindi-client` `2.2.0-1` |
+| `~/build/rel3/` | `-libs`+`-drivers` at `2.2.4.1-3`, the scratch set both 3rdparty upgrade harnesses consume |
+| `~/build/stage/` | the 41-package runtime-only set the smoke test runs against |
+| `~/build/pystage/` | the 3-package set the pyindi smoke test runs against |
+| `~/indi-2.2.4.2`, `~/indi-3rdparty-2.2.4.1`, `~/pyindi_client-2.2.0` | unpacked source trees |
+
+**These are build-time versions and do NOT match what CI publishes.** CI
+stamps a per-platform suffix; the by-hand builds here do not. A `~/build`
+`.deb` and a release `.deb` of nominally the same version are different
+files.
+
+**`debian12astro` dropped off the network twice on 2026-09-11**, unprompted
+and mid-build both times — no SSH, no ping, recovered only by Will rebooting
+it. Nothing was lost either time (`~/build` survived both), and the only
+casualty was an in-flight scratch build that was simply restarted. Two
+unexplained drops in one session looks like a VM-level problem rather than
+coincidence; if a long build on that box dies again, check whether the host
+is reachable before assuming the build broke.
