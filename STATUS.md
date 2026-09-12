@@ -1341,26 +1341,29 @@ three Debian platforms**, and `pyindi-client` at **1199 symbols referenced,
 exactly that installed, which is the `DEB_SUFFIX` mechanism working end to
 end.
 
-**`core` and `3rdparty` have both published for real through the
-four-platform pipeline**, 2026-09-11/12:
+**All three pipelines have published for real through the four-platform
+pipeline**, 2026-09-11/12. Nothing about CI is unexercised any more.
 
 | release | assets | promotion PR |
 |---|---|---|
 | `indi-stable-core-v2.2.4.2-2` | 12 (9 deb + 3 rpm) | #15, self-merged |
 | `indi-stable-3rdparty-v2.2.4.1-3` | 192 (**48 per Debian platform** + 48 rpm) | #19, self-merged |
+| `indi-stable-pyindi-client-2.2.0-2` | 4 (3 deb + 1 rpm) | #21, self-merged |
 
 3rdparty's is the one that proves the scheme at scale: 144 `.deb`s published
 side by side with none overwriting another, which is the collision the
-per-distribution version suffix exists to prevent. Its committed packaging
-correctly carries the **unsuffixed** `Release: 3` and `(= 2.2.4.1-3)` pins —
-the suffix is applied per-platform at build time only, never committed.
+per-distribution version suffix exists to prevent. All three committed
+packagings correctly carry **unsuffixed** versions and pins — the suffix is
+applied per-platform at build time only, and a `~deb12` appearing in git
+would mean something had gone wrong.
 
-### Open: only `pyindi-client`'s `promote` is unexercised
-
-It has passed a `build_only` rehearsal but never published. Its 3-asset
-assertion, `gh release create` and self-merging PR remain untested —
-fixed-by-the-same-patch, not independently verified. It is the smallest of
-the three and carries the identical shape that has now worked twice.
+**Merge any hand-authored `development` commit to `main` BEFORE dispatching a
+release.** `promote` ends by fast-forwarding `development` from `main` with
+`--ff-only`, which fails when `development` carries a commit `main` lacks —
+and it fails *after* the release has published, leaving a half-finished
+promotion. The same mechanism also means `development` moves under you during
+a promotion: a local branch goes stale mid-session and the next push is
+rejected as non-fast-forward.
 
 **Two defects surfaced between core's release and the other two rehearsals**,
 both found by reading published state rather than by a run failing, and both
