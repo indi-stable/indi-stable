@@ -363,6 +363,24 @@ jobs:
 
   promote:
     needs: [check, smoke-test-fedora, smoke-test-debian]
+    # Serialized ACROSS all three release workflows, because all three write
+    # the same two refs: they commit to main via a self-merged PR and then
+    # fast-forward development. Two promotions overlapping race on those,
+    # and a manual dispatch overlapping a scheduled run is the realistic way
+    # that happens -- the crons are staggered, dispatches are not.
+    #
+    # Scoped to THIS JOB, not the whole workflow, deliberately. A
+    # workflow-level group would serialize entire ~25-60 minute pipelines,
+    # and GitHub keeps only ONE run pending per group -- a third would be
+    # silently cancelled, losing a scheduled poll. promote is the only job
+    # touching shared state and runs in a couple of minutes, so serializing
+    # just this one makes eviction a non-issue.
+    #
+    # cancel-in-progress: false -- cancelling a promotion midway could leave
+    # a published release with no committed version bump. Queue, never kill.
+    concurrency:
+      group: indi-stable-promotion
+      cancel-in-progress: false
     # Skipped entirely for a build_only rehearsal: no GitHub Release,
     # no tag, no version-bump commit, no PR self-merged into main, and
     # no release number consumed. Everything that actually publishes
@@ -429,8 +447,10 @@ jobs:
       # referenced that does not exist yet and 404 trying to download it --
       # loud, not silent, and self-healing the next run, but avoidable
       # entirely by not publishing the pointer before the thing it points to
-      # exists. No workflow here uses a `concurrency:` guard, so this
-      # ordering is what actually closes the gap, not a lock.
+      # exists. The concurrency group on this job serializes promotions
+      # against each other, but it does NOT close this gap -- the window is
+      # between two steps of a SINGLE run, which no lock against other runs
+      # can help with. This ordering is what closes it.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
