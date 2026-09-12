@@ -111,11 +111,11 @@ installing means downloading the right file from a component's
 carries both distros' files together; grab the ones for yours.
 
 **The tag and the filenames do not spell the version the same way**, which is
-the easy mistake here. `indi-stable-core`'s release is tagged
-`indi-stable-core-v2.2.4.2` — leading `v`, no packaging revision — while the
-files inside it are `…-2.2.4.2-1.…` — no `v`, and a `-1` packaging revision
-the tag never shows. Copy the filenames from the release page rather than
-deriving them from the tag:
+the easy mistake here. `indi-stable-core`'s current release is tagged
+`indi-stable-core-v2.2.4.2-2` — leading `v` on the upstream version, then the
+packaging revision — while the files inside it are `…-2.2.4.2-2.deb12…` — no
+`v`, and a distribution marker the tag never shows. Copy the filenames from
+the release page rather than deriving them from the tag:
 
 ```
 # Fedora / RHEL / Rocky / Alma
@@ -177,10 +177,11 @@ if you do not use PixInsight's format you will not notice. If you need
 The other two components release the same way, with two differences worth
 knowing before you go looking for a file that is not there:
 
-- **`pyindi-client`'s tag carries no `v`** — `indi-stable-pyindi-client-2.2.0`,
-  not `-v2.2.0`. Its release is one RPM and one DEB.
+- **`pyindi-client`'s tag carries no `v`** — `indi-stable-pyindi-client-2.2.0-2`,
+  not `-v2.2.0`. Its release is one RPM and one DEB per platform.
 - **`3rdparty` is packaged per vendor, not as one package**, so its release
-  carries every vendor's files together (96 of them in `v2.2.4.1-2`) and you
+  carries every vendor's files together (192 of them in `v2.2.4.1-3`, which is
+  48 per distribution plus 48 RPMs) and you
   install only the ones for your hardware. Nine vendors ship a binary SDK and
   are split in two — for a ZWO ASI camera that is
   `indi-stable-3rdparty-libs-asi` *and* `indi-stable-3rdparty-drivers-asi`,
