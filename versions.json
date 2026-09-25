@@ -9,7 +9,7 @@
     "candidate": "v2.2.4.1"
   },
   "pyindi-client": {
-    "release": "2.2.0",
-    "candidate": "2.2.0"
+    "release": "2.3.0",
+    "candidate": "2.3.0"
   }
 }
