@@ -27,8 +27,8 @@
 %global indi_incdir %{indi_prefix}/include/libindi
 
 Name:           indi-stable-pyindi-client
-Version:        2.2.0
-Release:        2%{?dist}
+Version:        2.3.0
+Release:        1%{?dist}
 Summary:        Python bindings for the INDI client library (indi-stable build)
 
 # pyindi-client itself is GPL-3.0-or-later (LICENSE is the plain GPLv3 text;
@@ -46,7 +46,7 @@ URL:            https://github.com/indilib/pyindi-client
 # infrastructure staying up. sha256 verified 2026-08-27 both against PyPI's
 # own JSON API digest (pypi.org/pypi/pyindi-client/2.2.0/json) and by hashing
 # a local download directly -- not trusted from one source alone.
-Source0:        https://files.pythonhosted.org/packages/55/92/bbde7827ad87fbd56ce9586f7beb0cf677b7618aab5d8a1368a2f18ca8cf/pyindi_client-2.2.0.tar.gz
+Source0:        https://files.pythonhosted.org/packages/69/1c/0c895872b206ffa21575edec4d9ee643b6b2dde5ede5ead60ab3b7ef53ad/pyindi_client-2.3.0.tar.gz
 
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
@@ -95,7 +95,7 @@ Unofficial third-party build; not affiliated with or endorsed by the
 INDI project.
 
 %prep
-echo "2f224edcc52177aa380bece0d82fb65369ac65eeeb526c65d08211687b7f571a  %{SOURCE0}" | sha256sum -c - \
+echo "131d42cb15f81912917cf1a333e9480eecd1f82d467c5f0d65a3b17551389bb9  %{SOURCE0}" | sha256sum -c - \
     || { echo "ERROR: pyindi_client-%{version}.tar.gz sha256 mismatch -- upstream tarball changed"; exit 1; }
 # PyPI's sdist unpacks to pyindi_client-VERSION (underscore, the normalized
 # distribution name), not pyindi-client-VERSION -- confirmed 2026-08-27
@@ -175,6 +175,9 @@ rm -rf %{buildroot}%{python3_sitearch}/pyindi_client-*.egg-info
 %{python3_sitearch}/PyIndi/
 
 %changelog
+* Fri Sep 25 2026 Will Snyder <william@williamlsnyder.org> - 2.3.0-1
+- New upstream release 2.3.0, built and gated by pyindi-client-release.yml.
+
 * Sat Sep 12 2026 Will Snyder <william@williamlsnyder.org> - 2.2.0-2
 - New upstream release 2.2.0, built and gated by pyindi-client-release.yml.
 

@@ -1,3 +1,10 @@
+indi-stable-pyindi-client (2.3.0-1) unstable; urgency=medium
+
+  * New upstream release 2.3.0, built and gated by pyindi-client-
+    release.yml
+
+ -- Will Snyder <william@williamlsnyder.org>  Fri, 25 Sep 2026 15:52:02 +0000
+
 indi-stable-pyindi-client (2.2.0-2) unstable; urgency=medium
 
   * New upstream release 2.2.0, built and gated by pyindi-client-
