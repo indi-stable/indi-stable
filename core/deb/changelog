@@ -1,3 +1,9 @@
+indi-stable-core (2.2.5-1) unstable; urgency=medium
+
+  * New upstream release v2.2.5, built and gated by core-release.yml
+
+ -- Will Snyder <william@williamlsnyder.org>  Thu, 01 Oct 2026 16:50:40 +0000
+
 indi-stable-core (2.2.4.2-2) unstable; urgency=medium
 
   * New upstream release v2.2.4.2, built and gated by core-release.yml

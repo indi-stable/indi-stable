@@ -87,8 +87,8 @@
 %global __requires_exclude      ^libindi.*\\.so.*$
 
 Name:           indi-stable-core
-Version:        2.2.4.2
-Release:        2%{?dist}
+Version:        2.2.5
+Release:        1%{?dist}
 Summary:        INDI core library and server (stable upstream release, private prefix)
 
 # INDI itself is LGPL-2.1+/GPL-2.0+. This spec file is MIT, but the license
@@ -481,6 +481,9 @@ fi
 %{indi_libdir}/pkgconfig/
 
 %changelog
+* Thu Oct 01 2026 Will Snyder <william@williamlsnyder.org> - 2.2.5-1
+- New upstream release v2.2.5, built and gated by core-release.yml.
+
 * Fri Sep 11 2026 Will Snyder <william@williamlsnyder.org> - 2.2.4.2-2
 - New upstream release v2.2.4.2, built and gated by core-release.yml.
 
