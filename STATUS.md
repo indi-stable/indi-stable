@@ -134,6 +134,13 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 **Baselines, both boxes, end of 2026-09-08.** Neither carries any
 `indi-stable` package and `/opt/indi-stable` is absent on both.
 
+**A date warning for the 2026-10-07 entries.** That session ran across a UTC
+midnight, so it is dated two ways and both are correct: hand work and box
+baselines carry the LOCAL date (2026-10-07, MDT), while anything GitHub
+stamped carries UTC (the v2.2.5 release and PR #28, 2026-10-08). The release
+is not a day later than the verification that preceded it — they are hours
+apart on the same night.
+
 - **`fedoraastro`: 2167 packages as of 2026-09-09, and there is now a NAME
   list**, `~/fedoraastro-baseline-2026-09-09.txt`. It had only ever had a
   count, which is what `LESSONS_LEARNED.md` #6 says not to rely on, and the
@@ -186,9 +193,9 @@ six superseded smoke-test staging directories and, on `fedoraastro`, the
 six superseded `mock-result-drivers-slice*` sets. `ubuntuastro` went to 71%
 used, `fedoraastro` to 59%.
 
-**Disk as of 2026-10-07: `ubuntuastro` 82% used, 7.0 GB free; `fedoraastro`
-67% used, 11 GB free.** The v2.2.5 verification added 3.7 GB of unpacked
-source to `ubuntuastro` (`~/build/v225-libs` and `~/build/v225-drivers`) and
+**Disk at the 2026-10-07 handoff: `ubuntuastro` 82% used, 6.8 GB free;
+`fedoraastro` 67% used, 11 GB free.** The v2.2.5 verification added 3.7 GB of
+unpacked source to `ubuntuastro` (`~/build/v225-libs` and `~/build/v225-drivers`) and
 the 316 MB tarball. Both trees regenerate in one `tar xf` from
 `~/build/indi-3rdparty-v2.2.5.tar.gz`, so they are the first thing to delete
 when the next build needs room.
