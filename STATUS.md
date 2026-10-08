@@ -13,37 +13,14 @@ Two rules keep it living rather than growing:
 
 ---
 
-## In progress — 3rdparty v2.2.5: built and verified by hand, awaiting merge to `main`
+## In progress — 3rdparty scope is a deny-list with no guard
 
-- **CI state:** every scheduled `indi-stable-3rdparty release` run still
-  fails in all four `build-drivers-*` jobs (`%install` /
-  `override_dh_auto_install`, "expected exactly 4 udev rules, found 5"), and
-  will keep failing until the fix on `development` reaches `main` — every job
-  checks out `main`. `-libs` builds pass; nothing has been promoted.
-- **Fix on `development`, now BUILT and smoke-tested on both distros,
-  2026-10-07:** `-DWITH_SCOPELINK=OFF` in both
-  `core/rpm/indi-stable-3rdparty-drivers.spec` and
-  `core/deb-3rdparty-drivers/rules`. Built at v2.2.5 release 1 from the same
-  upstream tarball on both boxes (sha256 `c4db74b0b8c87a90…`, compared
-  across them):
-  - `ubuntuastro`, native Ubuntu 26.04 — `-libs` 18 debs, `-drivers` 30 debs,
-    `lintian --profile debian` with no `E:` on either and only the already
-    documented un-overridden upstream tags,
-    `scripts/smoke-test-3rdparty-deb.sh` 32 PASS and 0 FAIL.
-  - `fedoraastro`, Fedora 44 in `mock` — `-libs` 18 RPMs, `-drivers` 30 RPMs,
-    `scripts/smoke-test-3rdparty.sh` 32 PASS and 0 FAIL.
-  - Both: exactly 4 `-drivers` udev rules at their re-homed names, 86 driver
-    binaries, and no `scopelink` file in any of the 60 built packages.
-  - Both smoke tests report "checked 86 driver binaries", so the
-    `LESSONS_LEARNED.md` #22 gate ran against a real set rather than an
-    empty one.
-- **Next: Will merges `development` to `main`.** The daily run then builds
-  v2.2.5 for real on all four platforms. Nothing in the v2.2.5 path is
-  unexercised any more except the promote job itself.
-- **Open, not started:** the drivers scope is a deny-list, so the next
-  default-On driver upstream adds will be silently packaged unless it
-  happens to trip a check. A guard that diffs upstream's `option(WITH_...)`
-  list against a known set would make that a deliberate decision.
+- **Open, not started:** the next default-On driver upstream adds will be
+  silently packaged unless it happens to trip a check. `WITH_SCOPELINK` in
+  v2.2.5 was caught only because `indi-scopelink` ships a udev rule and both
+  `%install` and `override_dh_auto_install` assert the rule count. A guard
+  that diffs upstream's `option(WITH_...)` list against a known set would
+  make that a deliberate decision instead of luck.
 - **Not ours:** the 2026-10-05 `pyindi-client` failure was GitHub ("job was
   not acquired by Runner"). `ubuntu-latest` moves to Ubuntu 26 from
   2026-10-19.
@@ -54,7 +31,7 @@ Two rules keep it living rather than growing:
 |---|---|
 | **Fedora `core/`** | **Testing complete.** Built, installed, coexisting (runtime, metadata, `-devel`, and Ekos in *both* the opt-in and bystander cases), upgraded and removed — all verified, and the whole suite re-run green on 2026-08-26. The one item left is release tooling, not a test. |
 | **Debian `core/`** | **Testing complete.** Built, installed, coexisting (runtime, metadata, `-dev`), upgraded and removed — verified in **configuration B**, against a distribution INDI carrying the same SONAME and the same upstream release, and now scripted as four harnesses in `scripts/`. Nothing outstanding is a test. |
-| **`3rdparty/`** | RPM and Debian sides both complete for both source packages, all three verified together (`indi-stable-core`, `-3rdparty-libs`, `-3rdparty-drivers`), on both distros. **9 vendors plus 21 non-blob drivers as of 2026-09-09 — 30 `-drivers` packages, 86 driver binaries**, added across seven slices and each one built, installed, coexistence- and smoke-verified on both distros. **It shipped 2026-09-09**: `-drivers` is at `Release: 2` / `-2`, published as GitHub Release `indi-stable-3rdparty-v2.2.4.1-2` (96 assets), and `main` carries the bump. Only `dsi` and `rolloffino` remain unbuilt, both on licence grounds rather than packaging ones. **A serious defect was found and fixed 2026-09-04 that all of the earlier verification had missed: 45 of 56 driver binaries could not load on a runtime-only install**, because 17 vendor blobs carry an unversioned SONAME and their bare `.so` symlink was shipped in `-devel`/`-dev` rather than the runtime package (`LESSONS_LEARNED.md` #22). Fixed and re-verified on both distros — see the dated section below. See "3rdparty — remaining" for what is still genuinely open (QSI stays excluded for a confirmed reason; `flipro`/`flialgo` licence coverage; non-blob drivers). |
+| **`3rdparty/`** | RPM and Debian sides both complete for both source packages, all three verified together (`indi-stable-core`, `-3rdparty-libs`, `-3rdparty-drivers`), on both distros. **9 vendors plus 21 non-blob drivers as of 2026-09-09 — 30 `-drivers` packages, 86 driver binaries**, added across seven slices and each one built, installed, coexistence- and smoke-verified on both distros. **Current release: v2.2.5 at `Release: 1` / `-1`**, published 2026-10-08 as GitHub Release `indi-stable-3rdparty-v2.2.5` — 192 assets, 48 per platform (18 `-libs` + 30 `-drivers`) across `fc44`, `deb12`, `ubuntu24.04` and `ubuntu26.04`, with `main` and `development` both carrying the bump at the same commit. The published `ubuntu26.04` and `fc44` packages were compared file-for-file against the hand builds on the two VMs. Only `dsi` and `rolloffino` remain unbuilt, both on licence grounds rather than packaging ones. **A serious defect was found and fixed 2026-09-04 that all of the earlier verification had missed: 45 of 56 driver binaries could not load on a runtime-only install**, because 17 vendor blobs carry an unversioned SONAME and their bare `.so` symlink was shipped in `-devel`/`-dev` rather than the runtime package (`LESSONS_LEARNED.md` #22). Fixed and re-verified on both distros — see the dated section below. See "3rdparty — remaining" for what is still genuinely open (QSI stays excluded for a confirmed reason; `flipro`/`flialgo` licence coverage; non-blob drivers). |
 | **`pyindi-client/`** | Both sides built, installed, imported for real, and coexistence/upgrade-tested via scripted harnesses: Debian 2026-08-26/27 (`pyindi-client/deb/`), RPM 2026-08-27 (`pyindi-client/rpm/`). Release automation added 2026-09-04, including a smoke check that every symbol the SWIG wrapper references is actually exported — the `DESIGN.md` 2026-09-03 incident's failure mode, which `import PyIndi` and `BaseClient()` both survive. Nothing outstanding on the packaging itself. |
 | **CI (all three)** | **Verified end to end ON THIS REPO, 2026-09-04**, not just inherited from the seed's own history. Core, 3rdparty and pyindi-client each ran a real (not dry-run) check → build → smoke-test → promote cycle here for the first time, each publishing a real GitHub Release and pushing a real promotion commit: `indi-stable-core-v2.2.4.2` (6 assets), `indi-stable-3rdparty-v2.2.4.1` (54 assets, at a clean `Release: 1` — see below for why that needed a real fix first), `indi-stable-pyindi-client-2.2.0` (2 assets, symbol-check counts 1172/1199 confirmed substantive, not vacuous). All three promote jobs now create the GitHub Release **before** committing the version bump (`53cef94`) — closing a real, if narrow, window where a downstream workflow reading `versions.json` could see a release referenced before it existed; confirmed on this run by the release's `publishedAt` and the promote commit's own timestamp landing in the same second, not by trusting the reorder alone. |
 | **3rdparty's first real run here failed, and the cause was worth finding.** The fresh-history seed carried over the archived repo's already-bumped state (`Release: 2%{?dist}`, changelogs and all 18 control pins at `-2` — leftover from a repackage test run there). This repo's own release history starts fresh, so the first real promotion attempt collided: Debian's `dch` correctly refused to write a lower version than what its changelog already claimed, but the RPM side's plain `sed` had no equivalent check and **silently regressed `Release: 2` back down to `1`**, reporting success. Fixed in two parts, `01b52b9`: the seed's phantom `-2` content reset to a clean `-1` (nothing describing that content ever actually shipped from this repo), and all three bump scripts hardened to refuse moving RPM `Release:` backward for an unchanged upstream version, matching what `dch` already enforced on the Debian side. Re-run afterward: all 8 jobs passed. |
@@ -106,12 +83,11 @@ negligible. `development` was fast-forwarded to `main` by hand once
 (`39e2676`), confirmed a genuine ancestor first; the fix means the next
 real promotion on any of the three does this itself.
 
-**Only 3rdparty's own promote has actually run under the new permission.**
-core's and pyindi-client's promote jobs carry the identical fetch-depth fix
-but have not had a real promotion since it landed — both upstream polls
-were quiet the whole session (STATUS.md checked this directly, not
-assumed). Treat their self-merge as fixed-by-the-same-patch, not as
-independently verified, until one of them actually promotes for real.
+**All three promote jobs have now self-merged for real**, so none of them is
+fixed-by-the-same-patch any more: pyindi-client 2.3.0 (PR #25, 2026-09-25),
+core v2.2.5 (PR #26, 2026-10-01) and 3rdparty v2.2.5 (PR #28, 2026-10-08).
+Each PR's `mergedBy` is `app/github-actions`, read back from the API rather
+than inferred from the job going green.
 
 **This repo is public**, with Will as its only collaborator with write
 access (`gh api repos/:owner/:repo/collaborators`, confirmed 2026-09-05).
