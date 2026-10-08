@@ -13,6 +13,41 @@ Two rules keep it living rather than growing:
 
 ---
 
+## In progress — 3rdparty v2.2.5: built and verified by hand, awaiting merge to `main`
+
+- **CI state:** every scheduled `indi-stable-3rdparty release` run still
+  fails in all four `build-drivers-*` jobs (`%install` /
+  `override_dh_auto_install`, "expected exactly 4 udev rules, found 5"), and
+  will keep failing until the fix on `development` reaches `main` — every job
+  checks out `main`. `-libs` builds pass; nothing has been promoted.
+- **Fix on `development`, now BUILT and smoke-tested on both distros,
+  2026-10-07:** `-DWITH_SCOPELINK=OFF` in both
+  `core/rpm/indi-stable-3rdparty-drivers.spec` and
+  `core/deb-3rdparty-drivers/rules`. Built at v2.2.5 release 1 from the same
+  upstream tarball on both boxes (sha256 `c4db74b0b8c87a90…`, compared
+  across them):
+  - `ubuntuastro`, native Ubuntu 26.04 — `-libs` 18 debs, `-drivers` 30 debs,
+    `lintian --profile debian` with no `E:` on either and only the already
+    documented un-overridden upstream tags,
+    `scripts/smoke-test-3rdparty-deb.sh` 32 PASS and 0 FAIL.
+  - `fedoraastro`, Fedora 44 in `mock` — `-libs` 18 RPMs, `-drivers` 30 RPMs,
+    `scripts/smoke-test-3rdparty.sh` 32 PASS and 0 FAIL.
+  - Both: exactly 4 `-drivers` udev rules at their re-homed names, 86 driver
+    binaries, and no `scopelink` file in any of the 60 built packages.
+  - Both smoke tests report "checked 86 driver binaries", so the
+    `LESSONS_LEARNED.md` #22 gate ran against a real set rather than an
+    empty one.
+- **Next: Will merges `development` to `main`.** The daily run then builds
+  v2.2.5 for real on all four platforms. Nothing in the v2.2.5 path is
+  unexercised any more except the promote job itself.
+- **Open, not started:** the drivers scope is a deny-list, so the next
+  default-On driver upstream adds will be silently packaged unless it
+  happens to trip a check. A guard that diffs upstream's `option(WITH_...)`
+  list against a known set would make that a deliberate decision.
+- **Not ours:** the 2026-10-05 `pyindi-client` failure was GitHub ("job was
+  not acquired by Runner"). `ubuntu-latest` moves to Ubuntu 26 from
+  2026-10-19.
+
 ## Where the project is
 
 | | |
@@ -132,13 +167,18 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
   `dnf autoremove` is NOT the way to close the gap — it offers to remove 11
   packages dated April and August, all of them baseline packages merely
   orphaned by the churn.
-- **`ubuntuastro`: 1839 packages, not the 1832 this file used to say.** The
-  difference is **not** leftover work — it is `unattended-upgrades` running a
-  kernel and security update mid-session (7.0.0-30 → 7.0.0-31, plus
-  openssl/sssd/webkit/bind9), which added seven `linux-*` packages and removed
-  none. Diffed by package *name* to establish that, not by count. Re-baseline
-  from 1839 rather than treating the delta as contamination — and note this is
-  a live desktop that will drift again, so diff names, never counts (#6).
+- **`ubuntuastro`: 1841 packages as of 2026-10-07**, measured as a name list
+  at the start of that session and restored to it exactly at the end (`comm`
+  on the two sorted name lists, empty both ways). It drifted there from the
+  1839 this file used to say, which had itself drifted from 1832; both moves
+  were `unattended-upgrades` on a live desktop, not leftover work, and both
+  were established by diffing package *names*. It will drift again — diff
+  names, never counts (#6).
+- **`-drivers` needs `libftdi1-dev`, and `ubuntuastro`'s baseline does not
+  carry it.** `dpkg-checkbuilddeps` is the only thing that says so; it is the
+  one Build-Depends the box was missing on 2026-10-07. Install it before a
+  `-drivers` build and remove it after, or the baseline above stops matching.
+  CI never sees this: `mk-build-deps` installs it in a throwaway container.
 
 **Build artifacts left on both boxes**, reusable rather than rebuilt:
 
@@ -154,6 +194,9 @@ git config core.hooksPath .githooks                # or the pre-commit hook is i
 | `ubuntuastro` | `~/build/*_2.2.4.1-1_*.deb` | `-libs` and `-drivers` at `-1`; the `-drivers` set is the current **30-package** build |
 | `ubuntuastro` | `~/build/slice7-stage/` | the runtime-only 41-deb set the slice-7 smoke test ran against, one version of each |
 | `ubuntuastro` | `~/build/*_2.2.4.1-2_*.deb` | both at `-2`: `-libs` 18, `-drivers` **30**, the latter rebuilt at full scope 2026-09-09 (it held 10 from the eqmod slice). All 30 share one mtime, so there is no stale mix |
+| `ubuntuastro` | `~/build/*_2.2.5-1~ubuntu26.04_*.deb` | **v2.2.5**, the WITH_SCOPELINK verification build: `-libs` 18, `-drivers` 30. Staged by class in `~/build/v225-stage/{core,libs,drivers}` for the smoke test; source trees `~/build/v225-{libs,drivers}` and the bumped scratch clone `~/build/repo-v225` |
+| `fedoraastro` | `~/mock-result-libs-225` | **v2.2.5** `-libs`, 18 RPMs |
+| `fedoraastro` | `~/mock-result-drivers-225` | **v2.2.5** `-drivers`, 30 RPMs. Staged without debuginfo in `~/v225-stage/{libs,drivers}`; core 2.2.5 RPMs from the gated release in `~/core-rpms-2.2.5`, bumped scratch clone in `~/repo-v225` |
 
 **Disk cleanup, 2026-09-09.** `ubuntuastro` reached 99% full (643 MB free)
 during the driver widening. The cause was seven unpacked `indi-3rdparty`
@@ -161,6 +204,13 @@ build trees, one per slice, at ~1.5 GB each. All were deleted, along with
 six superseded smoke-test staging directories and, on `fedoraastro`, the
 six superseded `mock-result-drivers-slice*` sets. `ubuntuastro` went to 71%
 used, `fedoraastro` to 59%.
+
+**Disk as of 2026-10-07: `ubuntuastro` 82% used, 7.0 GB free; `fedoraastro`
+67% used, 11 GB free.** The v2.2.5 verification added 3.7 GB of unpacked
+source to `ubuntuastro` (`~/build/v225-libs` and `~/build/v225-drivers`) and
+the 316 MB tarball. Both trees regenerate in one `tar xf` from
+`~/build/indi-3rdparty-v2.2.5.tar.gz`, so they are the first thing to delete
+when the next build needs room.
 
 **None of that was an artifact.** `dpkg-buildpackage` writes the `.deb`s to
 the *parent* of the build tree, so they were always in `~/build` itself, and
