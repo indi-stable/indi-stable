@@ -699,10 +699,15 @@ sed -i '/add_executable(omegonprocam_test /a set_target_properties(omegonprocam_
 # libindi*.so (core) and the vendor libraries (-libs), both of which live in
 # the SAME %%{indi_libdir}, so one RPATH entry covers both.
 #
-# 27 WITH_<X>=OFF overrides -- the full "everything except our 9 vendors and
-# the 21 non-blob drivers" list. It was 47 when only eqmod was built; every
-# driver added since has removed its own entry, so this count moves with the
-# scope rather than being a number to preserve. And it is
+# The WITH_<X>=OFF overrides -- the full "everything except our 9 vendors and
+# the 21 non-blob drivers" list. It was 47 entries when only eqmod was built;
+# every driver added since has removed its own entry, so its length moves
+# with the scope rather than being a number to preserve (LESSONS_LEARNED.md
+# #27). It is also a DENY-list, so it moves with UPSTREAM too: a driver
+# upstream adds with a default-On option() is built and packaged unless an
+# entry is added here. WITH_SCOPELINK is the first case -- new in v2.2.5,
+# out of scope, and caught only because indi-scopelink ships a udev rule and
+# %%install asserts the rule count. And it is
 # the single biggest way this %%build differs from -libs's own. Found the
 # hard way on the first real build attempt (2026-08-26): -DBUILD_LIBS=ON (the
 # libs phase) only ever processes "lib*" subdirectories, and non-blob vendors
@@ -743,7 +748,7 @@ sed -i '/add_executable(omegonprocam_test /a set_target_properties(omegonprocam_
 # add_subdirectory(indi-fishcamp)` branch is what actually runs, not the
 # library-build fallback.
 #
-# The other 37 are out of THIS project's CURRENT scope, not excluded for any
+# The rest are out of THIS project's CURRENT scope, not excluded for any
 # licence reason -- non-blob drivers deferred by the eqmod-first decision
 # (STATUS.md, "3rdparty -- remaining"; the file header above), to be revisited
 # once eqmod has been through the full verification cycle on both distros.
@@ -809,6 +814,7 @@ export CXXFLAGS="${CXXFLAGS:-} -I%{indi_includedir}"
     -DWITH_MGEN=OFF \
     -DWITH_RADIOSIM=OFF \
     -DWITH_ROLLOFFINO=OFF \
+    -DWITH_SCOPELINK=OFF \
     -DWITH_SPECTRACYBER=OFF \
     -DWITH_STARBOOK=OFF \
     -DWITH_SX=OFF \
