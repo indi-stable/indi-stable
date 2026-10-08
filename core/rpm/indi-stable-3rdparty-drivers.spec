@@ -77,8 +77,8 @@
 %global __requires_exclude      ^lib(indi.*|apogee|ASICamera2|CAARotator|EAFFocuser|EFWFilter|USB2ST4Conv|fli|fishcamp|inovasdk|gxccd|PlayerOneCamera|PlayerOnePW|sbig|altaircam|bressercam|mallincam|meadecam|nncam|ogmacam|omegonprocam|starshootg|svbonycam|toupcam|tscam)\\.so.*$
 
 Name:           indi-stable-3rdparty-drivers
-Version:        2.2.4.1
-Release:        3%{?dist}
+Version:        2.2.5
+Release:        1%{?dist}
 Summary:        INDI drivers for 9 vendor camera/focuser SDKs plus non-blob mount, focuser and dome drivers (stable upstream release, private prefix)
 
 # Aggregate across 9 driver source trees, confirmed by reading actual SOURCE
@@ -1397,6 +1397,9 @@ done
 %{indi_datadir}/indi_svbonycam.xml
 
 %changelog
+* Thu Oct 08 2026 Will Snyder <william@williamlsnyder.org> - 2.2.5-1
+- New upstream release v2.2.5, built and gated by 3rdparty-release.yml.
+
 * Sat Sep 12 2026 Will Snyder <william@williamlsnyder.org> - 2.2.4.1-3
 - New upstream release v2.2.4.1, built and gated by 3rdparty-release.yml.
 
