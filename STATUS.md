@@ -13,6 +13,32 @@ Two rules keep it living rather than growing:
 
 ---
 
+## In progress — 3rdparty v2.2.5: CI red daily since 2026-10-01
+
+- **State:** every scheduled `indi-stable-3rdparty release` run since
+  2026-10-01 fails in all four `build-drivers-*` jobs (`%install` /
+  `override_dh_auto_install`, "expected exactly 4 udev rules, found 5").
+  `-libs` builds pass; nothing has been promoted. Cause: upstream v2.2.5 adds
+  `indi-scopelink` behind a default-On `WITH_SCOPELINK`, the only new
+  top-level option or `add_subdirectory()` versus v2.2.4.1 (diffed from both
+  tarballs).
+- **Fix committed on `development`, NOT yet built:** `-DWITH_SCOPELINK=OFF`
+  in both `core/rpm/indi-stable-3rdparty-drivers.spec` and
+  `core/deb-3rdparty-drivers/rules`. Not merged to `main`, so the daily run
+  keeps failing until it is — every job checks out `main`, and `build_only`
+  builds the committed version (2.2.4.1), so CI cannot test this first.
+- **Next:** from the VM that has SSH access to the others, build v2.2.5
+  `-libs` then `-drivers` on `fedoraastro` and a Debian box, and run the
+  smoke tests. Only v2.2.5 up to the udev-count check has ever executed;
+  everything after it is unexercised. Then Will merges to `main`.
+- **Open, not started:** the drivers scope is a deny-list, so the next
+  default-On driver upstream adds will be silently packaged unless it
+  happens to trip a check. A guard that diffs upstream's `option(WITH_...)`
+  list against a known set would make that a deliberate decision.
+- **Not ours:** the 2026-10-05 `pyindi-client` failure was GitHub ("job was
+  not acquired by Runner"). `ubuntu-latest` moves to Ubuntu 26 from
+  2026-10-19.
+
 ## Where the project is
 
 | | |
