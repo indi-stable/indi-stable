@@ -5,8 +5,8 @@
     "release_tag": "indi-stable-core-v2.2.5"
   },
   "3rdparty": {
-    "release": "v2.2.4.1",
-    "candidate": "v2.2.4.1"
+    "release": "v2.2.5",
+    "candidate": "v2.2.5"
   },
   "pyindi-client": {
     "release": "2.3.0",
