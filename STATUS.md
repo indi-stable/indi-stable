@@ -13,14 +13,17 @@ Two rules keep it living rather than growing:
 
 ---
 
-## In progress — 3rdparty scope is a deny-list with no guard
+## In progress — the option guard has not run in CI yet
 
-- **Open, not started:** the next default-On driver upstream adds will be
-  silently packaged unless it happens to trip a check. `WITH_SCOPELINK` in
-  v2.2.5 was caught only because `indi-scopelink` ships a udev rule and both
-  `%install` and `override_dh_auto_install` assert the rule count. A guard
-  that diffs upstream's `option(WITH_...)` list against a known set would
-  make that a deliberate decision instead of luck.
+- **`scripts/check-upstream-options.sh` is written, validated by hand, and
+  wired into `3rdparty-release.yml`'s `check` job, but that step has never
+  executed in CI.** Validated locally against the v2.2.5 tag (clean, 75
+  options, both deny-lists agreeing) and replayed against the real pre-fix
+  packaging at `64bb47b^` with a v2.2.4.1 snapshot, where it reports
+  `WITH_SCOPELINK` as new and in scope by default and exits 1. Its six
+  controls all fire. What is unexercised is the wiring: the step needs one
+  real run to confirm `python3` and `curl` are present on the runner and the
+  tag fetch works from inside the job.
 - **Not ours:** the 2026-10-05 `pyindi-client` failure was GitHub ("job was
   not acquired by Runner"). `ubuntu-latest` moves to Ubuntu 26 from
   2026-10-19.

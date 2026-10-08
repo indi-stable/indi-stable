@@ -1941,6 +1941,24 @@ packaging without knowing them reintroduces a bug that was already fixed.
   would switch the whole check off and lose `0x0004` (insecure *relative*
   RPATH) and `0x0020` (`..` traversal) — both of which would be real bugs worth
   failing on.
+- **`indi-3rdparty`'s driver scope is expressed as a DENY-list, and upstream
+  moves it.** Both packagings configure by passing `-DWITH_<X>=OFF` for
+  everything out of scope and letting the rest build, because most of
+  upstream's top-level options default to On. The consequence is structural: a
+  driver upstream adds with a default of On is in our scope the day it lands,
+  with no edit and no decision. `WITH_SCOPELINK` in v2.2.5 was exactly that,
+  and the only thing that caught it was `indi-scopelink` happening to ship a
+  udev rule, which tripped the exact-count assertion in `%install` and
+  `override_dh_auto_install` alike — luck, not design, and only four build
+  jobs deep. `scripts/check-upstream-options.sh` is the deliberate form, run
+  in `3rdparty-release.yml`'s `check` job before anything builds; its own
+  header carries the mechanics and the two parsing traps that make a naive
+  grep wrong here. Two further categories it exists to see, neither visible
+  from the deny-list alone: an option whose default **flips** from Off to On
+  (nothing names it, because it was previously off for free), and one whose
+  default is **conditional on a build-host dependency** (`WITH_WEBCAM` on
+  FFmpeg, `WITH_NUT` on NUTClient — declared twice in mutually exclusive
+  branches, so whether it is packaged would otherwise vary by builder).
 
 ## Build-logic portability (the COPR/OBS dependency question)
 
