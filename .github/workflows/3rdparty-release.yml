@@ -104,6 +104,20 @@ jobs:
             echo "release=1" >> "$GITHUB_OUTPUT"
             echo "poll: '${{ steps.check.outputs.new_tag }}' release 1"
           fi
+      # The drivers scope is a DENY-list, so an option upstream adds with a
+      # default of On is packaged with no decision from us. WITH_SCOPELINK was
+      # exactly that in v2.2.5, and it was caught only because indi-scopelink
+      # happens to ship a udev rule that tripped %install's exact rule count --
+      # four build jobs deep, and by luck rather than design. This asks the
+      # question deliberately, here, before anything builds: a surface change
+      # fails the job in seconds instead of twenty minutes per platform.
+      #
+      # Fetches only the tag's top-level CMakeLists.txt, so it costs nothing
+      # and needs no tarball. Skipped when new_tag is empty, which is a quiet
+      # poll with nothing to build and so nothing whose scope could have moved.
+      - name: Guard the upstream option surface
+        if: steps.resolve.outputs.new_tag != ''
+        run: bash scripts/check-upstream-options.sh "${{ steps.resolve.outputs.new_tag }}"
       # Which core release to build against. Read from versions.json rather
       # than "whatever is newest", so a core promotion landing mid-run cannot
       # change what this build links against halfway through.

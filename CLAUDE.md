@@ -124,11 +124,17 @@ core/deb/          indi-stable-core's packaging source; copy to debian/ in an
                    unpacked tree to build
 core/deb-3rdparty-libs/  same role, for indi-stable-3rdparty-libs
 core/deb-3rdparty-drivers/  same role, for indi-stable-3rdparty-drivers
+core/3rdparty-upstream-options.txt  upstream's declared build options and
+                   their defaults, as last ruled on; data for
+                   scripts/check-upstream-options.sh, which fails a release
+                   when that surface moves. Records UPSTREAM only -- our own
+                   deny-list stays in the two packagings, never copied here
 scripts/           test harnesses (see FEDORA.md and DEBIAN.md -- the RPM and DEB
                    sets are separate, and the `-deb` suffix marks the Debian
                    ones), plus check-docs.sh for doc staleness, the
-                   check-upstream-* tag/version pollers and the bump-*
-                   release helpers the workflows call
+                   check-upstream-tag/-pypi pollers, check-upstream-options.sh
+                   for the driver-scope guard, and the bump-* release helpers
+                   the workflows call
 .github/workflows/ one check -> build -> smoke-test -> promote pipeline per
                    component (core, 3rdparty, pyindi-client)
 versions.json      the version and channel each component currently sits at
