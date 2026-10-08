@@ -13,20 +13,22 @@ Two rules keep it living rather than growing:
 
 ---
 
-## In progress — the option guard has not run in CI yet
+## In progress — nothing
 
-- **`scripts/check-upstream-options.sh` is written, validated by hand, and
-  wired into `3rdparty-release.yml`'s `check` job, but that step has never
-  executed in CI.** Validated locally against the v2.2.5 tag (clean, 75
-  options, both deny-lists agreeing) and replayed against the real pre-fix
-  packaging at `64bb47b^` with a v2.2.4.1 snapshot, where it reports
-  `WITH_SCOPELINK` as new and in scope by default and exits 1. Its six
-  controls all fire. What is unexercised is the wiring: the step needs one
-  real run to confirm `python3` and `curl` are present on the runner and the
-  tag fetch works from inside the job.
+The v2.2.5 outage is closed and its guard is exercised. What remains open
+lives in the per-component sections below: "3rdparty — remaining", "Fedora —
+remaining", "Debian / Ubuntu — remaining" and "Undecided". Nothing is
+mid-flight.
+
+Two standing notes that are not work items:
+
 - **Not ours:** the 2026-10-05 `pyindi-client` failure was GitHub ("job was
-  not acquired by Runner"). `ubuntu-latest` moves to Ubuntu 26 from
-  2026-10-19.
+  not acquired by Runner").
+- **Dated runner warnings, on green runs.** `ubuntu-latest` migrates to
+  Ubuntu 26 on **2026-10-19**, and `actions/checkout@v4` is already forced
+  onto Node 24 since Node 20's deprecation. The 3rdparty pipeline already
+  builds and smoke-tests `ubuntu:26.04` as its own matrix entry, so the
+  migration changes the runner, not a tested target.
 
 ## Where the project is
 
